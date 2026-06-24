@@ -1,0 +1,32 @@
+services:
+  wedding:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    image: wedding-app:latest
+    container_name: wedding-app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    profiles:
+      - tools
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}

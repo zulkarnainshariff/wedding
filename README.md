@@ -63,45 +63,44 @@ Open [http://localhost:3000](http://localhost:3000)
 | `npm run db:generate` | Generate SQL migrations |
 | `npm run db:migrate` | Run migrations |
 
-## Deployment (DigitalOcean + GitHub Actions)
+## Deployment (Docker + OpenResty)
+
+The app runs in Docker and listens on **port 3002** on the host. OpenResty/nginx should proxy to `http://127.0.0.1:3002`.
 
 ### Server preparation (one-time)
 
 On your Ubuntu droplet:
 
 ```bash
-# Node.js 20+ recommended
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
+# Docker
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+# log out and back in so the docker group applies
 
-sudo npm install -g pm2
-
-# App directory
 sudo mkdir -p /var/www/wedding
 sudo chown $USER:$USER /var/www/wedding
 
-# Clone after pushing to GitHub
 cd /var/www/wedding
 git clone git@github.com:YOUR_USER/wedding.git .
-cp .env.example .env.local
-# Edit .env.local with your DO Postgres DATABASE_URL
+cp .env.example .env
+# Edit .env: DATABASE_URL, SESSION_SECRET
 
-npm ci
-npm run db:push
-npm run db:seed   # optional sample data
-npm run build
-pm2 start npm --name wedding -- start -- -p 3001
-pm2 save
-pm2 startup
+chmod +x scripts/docker-deploy.sh
+./scripts/docker-deploy.sh
+
+# Optional first-time data (uses the migrate image which includes dev tooling)
+docker compose --profile tools run --rm migrate npm run db:seed-users
 ```
+
+The deploy script builds the image, runs `db:push`, and starts the container bound to `127.0.0.1:3002`.
 
 ### OpenResty reverse proxy
 
-Add to your OpenResty config for `wedding.zulkarnainshariff.com`:
+Point your site at the Docker host port:
 
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:3001;
+    proxy_pass http://127.0.0.1:3002;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection 'upgrade';
@@ -113,6 +112,28 @@ location / {
 }
 ```
 
+### Manual Docker commands
+
+```bash
+docker compose build
+docker compose --profile tools run --rm migrate   # push schema
+docker compose up -d                            # start / restart
+docker compose logs -f wedding                  # follow logs
+docker compose down                             # stop
+```
+
+### Environment variables
+
+Create `.env` on the server (not committed):
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | Postgres connection string |
+| `SESSION_SECRET` | Long random string for auth cookies |
+| `PORT` | Host port in `.env.example` (3002); container uses 3000 internally |
+
+`DATABASE_URL` is also passed at **image build time** for Next.js static generation.
+
 ### GitHub Actions secrets
 
 In your GitHub repo → Settings → Secrets, add:
@@ -122,9 +143,8 @@ In your GitHub repo → Settings → Secrets, add:
 | `DO_HOST` | Droplet IP or hostname |
 | `DO_USER` | SSH user (e.g. `root` or deploy user) |
 | `DO_SSH_KEY` | Private SSH key for deployment |
-| `DATABASE_URL` | Postgres connection string (for build + migrations) |
 
-Push to `main` triggers automatic deploy via `.github/workflows/deploy.yml`.
+The server must already have `.env` configured. Push to `main` runs `scripts/docker-deploy.sh` over SSH.
 
 ## Replacing sample data
 
