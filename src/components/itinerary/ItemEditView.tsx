@@ -85,7 +85,11 @@ function ItemEditFormFields({
         </label>
 
         <label className="block text-sm">
-          <span className="mb-1 block text-stone-500">Start</span>
+          <span className="mb-1 block text-stone-500">
+            {form.category === "flight"
+              ? `Departs${form.structured.simple.fromIata ? ` (${form.structured.simple.fromIata})` : ""} — airport local`
+              : "Start"}
+          </span>
           <input
             type="datetime-local"
             value={form.startDatetime}
@@ -97,7 +101,11 @@ function ItemEditFormFields({
         </label>
 
         <label className="block text-sm">
-          <span className="mb-1 block text-stone-500">End</span>
+          <span className="mb-1 block text-stone-500">
+            {form.category === "flight"
+              ? `Arrives${form.structured.simple.toIata ? ` (${form.structured.simple.toIata})` : ""} — airport local`
+              : "End"}
+          </span>
           <input
             type="datetime-local"
             value={form.endDatetime}

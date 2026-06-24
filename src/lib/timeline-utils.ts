@@ -1,16 +1,13 @@
 import type { ItineraryItem } from "@/lib/schema";
+import { getItemSortTime } from "@/lib/item-schedule-datetime";
 import { getActivityDetails } from "@/lib/types";
 
 function sortDayItems(items: ItineraryItem[]): ItineraryItem[] {
   return [...items].sort((a, b) => {
-    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
-    const timeA = a.startDatetime
-      ? new Date(a.startDatetime).getTime()
-      : Number.MAX_SAFE_INTEGER;
-    const timeB = b.startDatetime
-      ? new Date(b.startDatetime).getTime()
-      : Number.MAX_SAFE_INTEGER;
+    const timeA = getItemSortTime(a);
+    const timeB = getItemSortTime(b);
     if (timeA !== timeB) return timeA - timeB;
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
     return a.id - b.id;
   });
 }

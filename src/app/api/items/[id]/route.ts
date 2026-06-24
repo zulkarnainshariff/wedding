@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireEditAccess, isAuthError } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { deleteDocumentFile } from "@/lib/item-documents";
-import { applyFlightDatetimeOverrides } from "@/lib/flight-datetime";
+import { applyItemDatetimeOverrides } from "@/lib/item-schedule-datetime";
 import { normalizeItemSchedule } from "@/lib/item-scheduling";
 import { filterItemsByPermission } from "@/lib/permissions";
 import { itemDocuments, itineraryDays, itineraryItems } from "@/lib/schema";
@@ -56,7 +56,7 @@ export async function PUT(request: Request, { params }: Params) {
   if (isAuthError(user)) return user;
 
   const { id } = await params;
-  const body = applyFlightDatetimeOverrides(await request.json());
+  const body = applyItemDatetimeOverrides(await request.json());
   const days = await getDays();
   const scheduled = normalizeItemSchedule(
     {

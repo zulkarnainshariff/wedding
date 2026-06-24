@@ -52,7 +52,7 @@ export async function getScheduleByDate() {
           isNull(itineraryItems.parentItemId),
         ),
       )
-      .orderBy(asc(itineraryItems.sortOrder), asc(itineraryItems.startDatetime)),
+      .orderBy(asc(itineraryItems.startDatetime), asc(itineraryItems.sortOrder)),
     user,
   );
 

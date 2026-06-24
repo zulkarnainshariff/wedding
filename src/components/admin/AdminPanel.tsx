@@ -16,6 +16,7 @@ import {
   itemToForm,
   type ItemFormState,
 } from "@/lib/admin-item-form";
+import { getItemSortTime } from "@/lib/item-schedule-datetime";
 import { useUnsavedChangesGuard } from "@/components/layout/NavigationGuard";
 import { PageShell, SectionShell } from "@/components/layout/PageShell";
 import { CATEGORY_META, CATEGORIES, type Category } from "@/lib/types";
@@ -33,10 +34,11 @@ const TAB_CONTENT_CLASS = "mx-auto flex w-full max-w-5xl flex-col";
 
 function sortItems(items: ItineraryItem[]) {
   return [...items].sort((a, b) => {
-    const aTime = a.startDatetime ? new Date(a.startDatetime).getTime() : Number.MAX_SAFE_INTEGER;
-    const bTime = b.startDatetime ? new Date(b.startDatetime).getTime() : Number.MAX_SAFE_INTEGER;
+    const aTime = getItemSortTime(a);
+    const bTime = getItemSortTime(b);
     if (aTime !== bTime) return aTime - bTime;
-    return a.sortOrder - b.sortOrder;
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+    return a.id - b.id;
   });
 }
 
@@ -472,7 +474,11 @@ export function AdminPanel({
               </label>
 
               <label className="block text-sm">
-                <span className="mb-1 block text-stone-500">Start</span>
+                <span className="mb-1 block text-stone-500">
+                  {itemForm.category === "flight"
+                    ? `Departs${itemForm.structured.simple.fromIata ? ` (${itemForm.structured.simple.fromIata})` : ""} — airport local`
+                    : "Start"}
+                </span>
                 <input
                   type="datetime-local"
                   value={itemForm.startDatetime}
@@ -484,7 +490,11 @@ export function AdminPanel({
               </label>
 
               <label className="block text-sm">
-                <span className="mb-1 block text-stone-500">End</span>
+                <span className="mb-1 block text-stone-500">
+                  {itemForm.category === "flight"
+                    ? `Arrives${itemForm.structured.simple.toIata ? ` (${itemForm.structured.simple.toIata})` : ""} — airport local`
+                    : "End"}
+                </span>
                 <input
                   type="datetime-local"
                   value={itemForm.endDatetime}
