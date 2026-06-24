@@ -28,7 +28,7 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
   return (
     <PageShell
       eyebrow="Category"
-      title="Daily Schedules"
+      title="Daily Schedule"
       toolbar={<ScheduleToolbar />}
     >
       <TripProgressIndicator days={daysWithContent} />
