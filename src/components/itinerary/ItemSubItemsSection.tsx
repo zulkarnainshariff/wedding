@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { getSubItemTimeLabel } from "@/lib/item-subitem-utils";
+import { SubItemRow } from "@/components/itinerary/SubItemDisplay";
 import type { ItineraryItem } from "@/lib/schema";
 
-function SubItemRow({
+function SubItemDetailRow({
   subItem,
   canEdit,
   onDelete,
@@ -17,7 +17,6 @@ function SubItemRow({
   onDelete: (id: number) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const timeLabel = getSubItemTimeLabel(subItem);
   const description =
     subItem.summary ||
     (typeof subItem.details === "object" &&
@@ -28,12 +27,12 @@ function SubItemRow({
 
   return (
     <div className="rounded-xl border border-stone-200 bg-white">
-      <div className="flex items-start gap-2 px-3 py-3">
+      <div className="flex items-start gap-2">
         {description ? (
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
-            className="mt-0.5 shrink-0 text-stone-400 hover:text-stone-600"
+            className="mt-3 ml-1 shrink-0 text-stone-400 hover:text-stone-600"
             aria-label={open ? "Collapse details" : "Expand details"}
           >
             {open ? (
@@ -43,19 +42,12 @@ function SubItemRow({
             )}
           </button>
         ) : (
-          <span className="w-4 shrink-0" />
+          <span className="w-5 shrink-0" />
         )}
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            {timeLabel && (
-              <span className="text-xs font-semibold tracking-wide text-[#d4a853] uppercase">
-                {timeLabel}
-              </span>
-            )}
-            <p className="font-medium text-stone-800">{subItem.title}</p>
-          </div>
+          <SubItemRow subItem={subItem} />
           {description && open && (
-            <p className="mt-2 whitespace-pre-wrap text-sm text-stone-600">
+            <p className="px-3 pb-3 whitespace-pre-wrap text-sm text-stone-600">
               {description}
             </p>
           )}
@@ -64,7 +56,7 @@ function SubItemRow({
           <button
             type="button"
             onClick={() => onDelete(subItem.id)}
-            className="shrink-0 rounded-lg border border-red-200 p-1.5 text-red-600 hover:bg-red-50"
+            className="mt-2 mr-2 shrink-0 rounded-lg border border-red-200 p-1.5 text-red-600 hover:bg-red-50"
             aria-label="Delete sub-item"
           >
             <Trash2 className="h-4 w-4" />
@@ -80,7 +72,9 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   const [subItems, setSubItems] = useState<ItineraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
-  const [timeLabel, setTimeLabel] = useState("");
+  const [time, setTime] = useState("");
+  const [locationName, setLocationName] = useState("");
+  const [locationMapUrl, setLocationMapUrl] = useState("");
   const [summary, setSummary] = useState("");
   const [saving, setSaving] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
@@ -112,7 +106,9 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: title.trim(),
-        timeLabel: timeLabel.trim() || null,
+        time: time || null,
+        locationName: locationName.trim() || null,
+        locationMapUrl: locationMapUrl.trim() || null,
         summary: summary.trim() || null,
       }),
     });
@@ -121,7 +117,9 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
     if (!response.ok) return;
 
     setTitle("");
-    setTimeLabel("");
+    setTime("");
+    setLocationName("");
+    setLocationMapUrl("");
     setSummary("");
     await refresh();
   }
@@ -152,73 +150,94 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   return (
     <>
       <div className="border-t border-stone-100 py-4">
-      <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
-        Sub-itinerary
-      </h3>
+        <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
+          Sub-itinerary
+        </h3>
 
-      {loading ? (
-        <p className="mt-3 text-sm text-stone-400">Loading…</p>
-      ) : subItems.length === 0 ? (
-        <p className="mt-3 text-sm text-stone-400">No sub-items yet.</p>
-      ) : (
-        <div className="mt-3 space-y-2 border-l-2 border-[#d4a853]/40 pl-3">
-          {subItems.map((subItem) => (
-            <SubItemRow
-              key={subItem.id}
-              subItem={subItem}
-              canEdit={canEdit}
-              onDelete={requestDelete}
-            />
-          ))}
-        </div>
-      )}
-
-      {canEdit && (
-        <form
-          onSubmit={(e) => void handleAdd(e)}
-          className="mt-4 space-y-3 rounded-xl border border-dashed border-stone-300 bg-white p-4"
-        >
-          <p className="text-sm font-medium text-stone-700">Add sub-item</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm sm:col-span-2">
-              <span className="mb-1 block text-stone-500">Title *</span>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Visit Washington Monument"
-                className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                required
+        {loading ? (
+          <p className="mt-3 text-sm text-stone-400">Loading…</p>
+        ) : subItems.length === 0 ? (
+          <p className="mt-3 text-sm text-stone-400">No sub-items yet.</p>
+        ) : (
+          <div className="mt-3 space-y-2 border-l-2 border-[#d4a853]/40 pl-3">
+            {subItems.map((subItem) => (
+              <SubItemDetailRow
+                key={subItem.id}
+                subItem={subItem}
+                canEdit={canEdit}
+                onDelete={requestDelete}
               />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-stone-500">Time label (optional)</span>
-              <input
-                value={timeLabel}
-                onChange={(e) => setTimeLabel(e.target.value)}
-                placeholder="10:00 AM"
-                className="w-full rounded-lg border border-stone-200 px-3 py-2"
-              />
-            </label>
-            <label className="block text-sm sm:col-span-2">
-              <span className="mb-1 block text-stone-500">Details (optional)</span>
-              <textarea
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                rows={3}
-                className="w-full rounded-lg border border-stone-200 px-3 py-2"
-              />
-            </label>
+            ))}
           </div>
-          <button
-            type="submit"
-            disabled={saving || !title.trim()}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        )}
+
+        {canEdit && (
+          <form
+            onSubmit={(e) => void handleAdd(e)}
+            className="mt-4 space-y-3 rounded-xl border border-dashed border-stone-300 bg-white p-4"
           >
-            <Plus className="h-4 w-4" />
-            {saving ? "Adding…" : "Add sub-item"}
-          </button>
-        </form>
-      )}
+            <p className="text-sm font-medium text-stone-700">Add sub-item</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm sm:col-span-2">
+                <span className="mb-1 block text-stone-500">Title *</span>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Visit Washington Monument"
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block text-stone-500">Time (optional)</span>
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block text-stone-500">Location name (optional)</span>
+                <input
+                  value={locationName}
+                  onChange={(e) => setLocationName(e.target.value)}
+                  placeholder="Washington Monument"
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                />
+              </label>
+              <label className="block text-sm sm:col-span-2">
+                <span className="mb-1 block text-stone-500">
+                  Google Maps link (optional)
+                </span>
+                <input
+                  type="url"
+                  value={locationMapUrl}
+                  onChange={(e) => setLocationMapUrl(e.target.value)}
+                  placeholder="https://maps.google.com/..."
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                />
+              </label>
+              <label className="block text-sm sm:col-span-2">
+                <span className="mb-1 block text-stone-500">Details (optional)</span>
+                <textarea
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                />
+              </label>
+            </div>
+            <button
+              type="submit"
+              disabled={saving || !title.trim()}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+              {saving ? "Adding…" : "Add sub-item"}
+            </button>
+          </form>
+        )}
       </div>
 
       <ConfirmDialog
