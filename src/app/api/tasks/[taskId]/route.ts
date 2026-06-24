@@ -236,6 +236,29 @@ export async function PUT(request: Request, { params }: Params) {
     );
   }
 
+  if (body.deleteNote && typeof body.deleteNote === "object") {
+    const noteId = Number(body.deleteNote.id);
+    if (!noteId) {
+      return NextResponse.json({ error: "Invalid note delete." }, { status: 400 });
+    }
+
+    if (!user.isAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const [existing] = await db
+      .select()
+      .from(taskNotes)
+      .where(and(eq(taskNotes.id, noteId), eq(taskNotes.taskId, taskId)))
+      .limit(1);
+
+    if (!existing) {
+      return NextResponse.json({ error: "Note not found." }, { status: 404 });
+    }
+
+    await db.delete(taskNotes).where(eq(taskNotes.id, noteId));
+  }
+
   if (body.remindAt && canManage) {
     await db.insert(taskReminders).values({
       taskId,

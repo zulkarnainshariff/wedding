@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Pencil, Plus, Save, X } from "lucide-react";
+import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { TaskNoteIcon } from "@/components/tasks/TaskNoteIcon";
 import {
@@ -316,6 +316,44 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
     await updateStatus(taskId, "cant_complete", reason);
   }
 
+  async function deleteTask(taskId: number) {
+    if (!confirm("Delete this task and its subtasks?")) return;
+    setBusy(true);
+    setError(null);
+    const response = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+    setBusy(false);
+    if (!response.ok) {
+      setError("Failed to delete task.");
+      return;
+    }
+    if (editingTask?.id === taskId) returnToList();
+    await loadTasks();
+    notifyTasksChanged();
+  }
+
+  async function deleteNote(taskId: number, noteId: number) {
+    if (!confirm("Delete this note?")) return;
+    setBusy(true);
+    setError(null);
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deleteNote: { id: noteId } }),
+    });
+    setBusy(false);
+    if (!response.ok) {
+      setError("Failed to delete note.");
+      return;
+    }
+    const detailsResponse = await fetch(`/api/tasks/${taskId}`);
+    if (detailsResponse.ok) {
+      const details = await detailsResponse.json();
+      setEditingNotes(details.notes ?? []);
+    }
+    await loadTasks();
+    notifyTasksChanged();
+  }
+
   const rootTasks = tasks.filter((task) => !task.parentTaskId);
   const subtasksByParent = useMemo(() => {
     const map = new Map<number, ItemTaskRow[]>();
@@ -385,6 +423,17 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
               >
                 <Pencil className="h-3.5 w-3.5" />
                 Edit
+              </button>
+            )}
+            {user?.isAdmin && mode === "list" && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void deleteTask(task.id)}
+                className="inline-flex items-center justify-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
               </button>
             )}
             {isAssignee && (
@@ -475,9 +524,25 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
             </p>
             <div className="mt-2 space-y-2">
               {editingNotes.map(({ note, author }) => (
-                <div key={note.id} className="text-sm">
-                  <p className="text-stone-700">{note.content}</p>
-                  <p className="mt-0.5 text-xs text-stone-400">{author}</p>
+                <div
+                  key={note.id}
+                  className="flex items-start justify-between gap-2 text-sm"
+                >
+                  <div>
+                    <p className="text-stone-700">{note.content}</p>
+                    <p className="mt-0.5 text-xs text-stone-400">{author}</p>
+                  </div>
+                  {user?.isAdmin && editingTask && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void deleteNote(editingTask.id, note.id)}
+                      className="shrink-0 rounded p-1 text-red-500 hover:bg-red-50"
+                      aria-label="Delete note"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -490,7 +555,7 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
           </p>
         )}
 
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
             disabled={busy || !form.title.trim()}
@@ -500,6 +565,17 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
             <Save className="h-4 w-4" />
             {mode === "create" ? "Create task" : "Save changes"}
           </button>
+          {mode === "edit" && user?.isAdmin && editingTask && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void deleteTask(editingTask.id)}
+              className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete task
+            </button>
+          )}
           <button
             type="button"
             onClick={returnToList}

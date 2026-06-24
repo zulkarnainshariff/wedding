@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { TaskNoteIcon } from "@/components/tasks/TaskNoteIcon";
 import { SectionShell } from "@/components/layout/PageShell";
@@ -289,6 +289,44 @@ export function TasksPanel() {
     window.dispatchEvent(new Event("tasks-changed"));
   }
 
+  async function deleteTask(taskId: number) {
+    if (!confirm("Delete this task and its subtasks?")) return;
+    setBusy(true);
+    setError(null);
+    const response = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+    setBusy(false);
+    if (!response.ok) {
+      setError("Failed to delete task.");
+      return;
+    }
+    if (expandedId === taskId) setExpandedId(null);
+    setDetails((current) => {
+      const next = { ...current };
+      delete next[taskId];
+      return next;
+    });
+    await loadTasks();
+    window.dispatchEvent(new Event("tasks-changed"));
+  }
+
+  async function deleteNote(taskId: number, noteId: number) {
+    if (!confirm("Delete this note?")) return;
+    setBusy(true);
+    setError(null);
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deleteNote: { id: noteId } }),
+    });
+    setBusy(false);
+    if (!response.ok) {
+      setError("Failed to delete note.");
+      return;
+    }
+    await Promise.all([loadDetails(taskId), loadTasks()]);
+    window.dispatchEvent(new Event("tasks-changed"));
+  }
+
   function formatDueDate(value: string | Date | null) {
     if (!value) return "No due date";
     const date = typeof value === "string" ? new Date(value) : value;
@@ -357,8 +395,20 @@ export function TasksPanel() {
               </div>
             </button>
 
-            {isAssignee && (
-              <div className="flex flex-col gap-2">
+            <div className="flex flex-col items-stretch gap-2 sm:items-end">
+              {user?.isAdmin && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void deleteTask(task.id)}
+                  className="inline-flex items-center justify-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
+              )}
+              {isAssignee && (
+                <>
                 <select
                   value={pendingCantCompleteId === task.id ? "cant_complete" : task.status}
                   disabled={busy}
@@ -396,8 +446,9 @@ export function TasksPanel() {
                     </button>
                   </div>
                 )}
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </div>
 
           {isExpanded && (
@@ -420,10 +471,23 @@ export function TasksPanel() {
                     {taskDetails.notes.map(({ note, author }) => (
                       <div
                         key={note.id}
-                        className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                        className="flex items-start justify-between gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm"
                       >
-                        <p className="text-stone-700">{note.content}</p>
-                        <p className="mt-1 text-xs text-stone-400">{author}</p>
+                        <div className="min-w-0">
+                          <p className="text-stone-700">{note.content}</p>
+                          <p className="mt-1 text-xs text-stone-400">{author}</p>
+                        </div>
+                        {user?.isAdmin && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void deleteNote(task.id, note.id)}
+                            className="shrink-0 rounded p-1 text-red-500 hover:bg-red-50"
+                            aria-label="Delete note"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
