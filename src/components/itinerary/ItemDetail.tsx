@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, ExternalLink, MapPin, Pencil, Trash2, X } from "lucide-react";
 import { ItemDocumentsSection } from "@/components/itinerary/ItemDocumentsSection";
 import { ItemSubItemsSection } from "@/components/itinerary/ItemSubItemsSection";
+import { ItemCompleteToggle } from "@/components/itinerary/ItemCompleteToggle";
 import { ItemTaskSection } from "@/components/tasks/ItemTaskSection";
 import {
   FlightDetailView,
@@ -384,6 +385,7 @@ function ItemDetailHeader({
   Icon,
   sharedLocation,
   formatDateTime,
+  formatFlightSchedule,
   onEdit,
   onDelete,
   onClose,
@@ -394,10 +396,17 @@ function ItemDetailHeader({
   Icon: React.ComponentType<{ className?: string }>;
   sharedLocation: ReturnType<typeof getItemLocation>;
   formatDateTime: (value: string | Date) => string;
+  formatFlightSchedule: (item: ItineraryItem) => {
+    departure: string | null;
+    arrival: string | null;
+  };
   onEdit?: () => void;
   onDelete?: () => void;
   onClose?: () => void;
 }) {
+  const flightSchedule =
+    category === "flight" ? formatFlightSchedule(item) : null;
+
   return (
     <>
       <div className="flex items-start justify-between gap-3">
@@ -433,6 +442,7 @@ function ItemDetailHeader({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <ItemCompleteToggle item={item} />
           {onEdit && (
             <button
               type="button"
@@ -467,11 +477,24 @@ function ItemDetailHeader({
       </div>
 
       <div className="mt-5 flex flex-wrap gap-4 text-sm text-stone-500">
-        {item.startDatetime && (
-          <span>Starts: {formatDateTime(item.startDatetime)}</span>
-        )}
-        {item.endDatetime && (
-          <span>Ends: {formatDateTime(item.endDatetime)}</span>
+        {category === "flight" ? (
+          <>
+            {flightSchedule?.departure && (
+              <span>Departs: {flightSchedule.departure}</span>
+            )}
+            {flightSchedule?.arrival && (
+              <span>Arrives: {flightSchedule.arrival}</span>
+            )}
+          </>
+        ) : (
+          <>
+            {item.startDatetime && (
+              <span>Starts: {formatDateTime(item.startDatetime)}</span>
+            )}
+            {item.endDatetime && (
+              <span>Ends: {formatDateTime(item.endDatetime)}</span>
+            )}
+          </>
         )}
       </div>
     </>
@@ -544,7 +567,7 @@ export function ItemDetailView({
   const carDetails = getCarRentalDetails(item.details);
   const activityDetails = getActivityDetails(item.details);
   const sharedLocation = getItemLocation(item.details as Record<string, unknown>);
-  const { formatDateTime } = useDisplayFormat();
+  const { formatDateTime, formatFlightSchedule } = useDisplayFormat();
 
   const header = (
     <ItemDetailHeader
@@ -554,6 +577,7 @@ export function ItemDetailView({
       Icon={Icon}
       sharedLocation={sharedLocation}
       formatDateTime={formatDateTime}
+      formatFlightSchedule={formatFlightSchedule}
       onEdit={onEdit}
       onDelete={onDelete}
       onClose={modal ? onClose : undefined}

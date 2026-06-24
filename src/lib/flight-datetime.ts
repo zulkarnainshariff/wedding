@@ -1,4 +1,5 @@
 import { getAirportTimezone } from "@/lib/airport-timezones";
+import type { ItineraryItem } from "@/lib/schema";
 import { getFlightDetails } from "@/lib/types";
 
 export type FlightScheduleInput = {
@@ -198,6 +199,181 @@ export function resolveFlightSchedule(
     startDatetime,
     endDatetime,
     eventDate,
+  };
+}
+
+export function utcToDatetimeLocalInTimezone(
+  value: Date | string,
+  timeZone: string,
+): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  const parts = zonedParts(date, timeZone);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}`;
+}
+
+export function formatInstantInTimezone(
+  value: Date | string,
+  timeZone: string,
+  options?: { hour12?: boolean },
+): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleString("en-GB", {
+    timeZone,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: options?.hour12 ?? false,
+  });
+}
+
+export function formatFlightEndpointLabel(
+  item: ItineraryItem,
+  endpoint: "departure" | "arrival",
+  options?: { hour12?: boolean },
+): string | null {
+  if (item.category !== "flight") return null;
+
+  const flight = getFlightDetails(item.details);
+  const schedule = resolveFlightSchedule({
+    eventDate: item.eventDate,
+    startDatetime: item.startDatetime,
+    endDatetime: item.endDatetime,
+    details: item.details,
+  });
+
+  const instant =
+    endpoint === "departure" ? schedule.startDatetime : schedule.endDatetime;
+  const iata =
+    endpoint === "departure" ? flight?.fromIata : flight?.toIata;
+  const clockTime =
+    endpoint === "departure"
+      ? flight?.departureTime
+      : flight?.arrivalTime;
+  const timeZone = getAirportTimezone(iata);
+  const code = iata?.trim().toUpperCase();
+
+  if (instant && timeZone) {
+    const formatted = formatInstantInTimezone(instant, timeZone, options);
+    return code ? `${formatted} (${code})` : formatted;
+  }
+
+  const travelDate = schedule.eventDate ?? item.eventDate;
+  if (travelDate && clockTime?.trim()) {
+    const dateLabel = new Date(`${travelDate}T12:00:00`).toLocaleDateString(
+      "en-GB",
+      {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      },
+    );
+    const timeLabel = formatClockForLabel(clockTime.trim(), options?.hour12);
+    return code
+      ? `${dateLabel}, ${timeLabel} (${code})`
+      : `${dateLabel}, ${timeLabel}`;
+  }
+
+  if (instant) {
+    const formatted = instant.toLocaleString("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: options?.hour12 ?? false,
+    });
+    return code ? `${formatted} (${code})` : formatted;
+  }
+
+  return null;
+}
+
+function formatClockForLabel(time: string, hour12?: boolean): string {
+  const clock = parseClockTime(time);
+  if (!clock) return time;
+
+  if (hour12) {
+    const period = clock.hour >= 12 ? "PM" : "AM";
+    const hour = clock.hour % 12 || 12;
+    return `${hour}:${String(clock.minute).padStart(2, "0")} ${period}`;
+  }
+
+  return `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`;
+}
+
+export function formatFlightScheduleLines(
+  item: ItineraryItem,
+  options?: { hour12?: boolean },
+): { departure: string | null; arrival: string | null } {
+  if (item.category !== "flight") {
+    return { departure: null, arrival: null };
+  }
+
+  const departure = formatFlightEndpointLabel(item, "departure", options);
+  const arrival = formatFlightEndpointLabel(item, "arrival", options);
+
+  return {
+    departure:
+      departure ??
+      (item.startDatetime
+        ? new Date(item.startDatetime).toLocaleString("en-GB", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: options?.hour12 ?? false,
+          })
+        : null),
+    arrival:
+      arrival ??
+      (item.endDatetime
+        ? new Date(item.endDatetime).toLocaleString("en-GB", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: options?.hour12 ?? false,
+          })
+        : null),
+  };
+}
+
+export function flightFormDatetimes(item: ItineraryItem): {
+  startDatetime: string;
+  endDatetime: string;
+} {
+  const flight = getFlightDetails(item.details);
+  const schedule = resolveFlightSchedule({
+    eventDate: item.eventDate,
+    startDatetime: item.startDatetime,
+    endDatetime: item.endDatetime,
+    details: item.details,
+  });
+
+  const departureTz = getAirportTimezone(flight?.fromIata);
+  const arrivalTz = getAirportTimezone(flight?.toIata);
+
+  return {
+    startDatetime:
+      schedule.startDatetime && departureTz
+        ? utcToDatetimeLocalInTimezone(schedule.startDatetime, departureTz)
+        : "",
+    endDatetime:
+      schedule.endDatetime && arrivalTz
+        ? utcToDatetimeLocalInTimezone(schedule.endDatetime, arrivalTz)
+        : "",
   };
 }
 

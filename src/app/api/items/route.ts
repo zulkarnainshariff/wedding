@@ -2,7 +2,7 @@ import { asc, eq, isNull, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireAuth, requireEditAccess, isAuthError } from "@/lib/api-auth";
 import { db } from "@/lib/db";
-import { applyFlightDatetimeOverrides } from "@/lib/flight-datetime";
+import { applyItemDatetimeOverrides } from "@/lib/item-schedule-datetime";
 import { normalizeItemSchedule } from "@/lib/item-scheduling";
 import { filterItemsByPermission } from "@/lib/permissions";
 import { itineraryDays, itineraryItems } from "@/lib/schema";
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   const user = await requireEditAccess();
   if (isAuthError(user)) return user;
 
-  const body = applyFlightDatetimeOverrides(await request.json());
+  const body = applyItemDatetimeOverrides(await request.json());
 
   if (!body.category || !body.title) {
     return NextResponse.json(

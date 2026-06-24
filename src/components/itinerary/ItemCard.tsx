@@ -22,6 +22,11 @@ import type { ItineraryItem } from "@/lib/schema";
 import { ItemTaskIndicator } from "@/components/tasks/useTaskIndicators";
 import type { ItemTaskSummary } from "@/lib/task-queries";
 import { FlightProgressBar } from "@/components/itinerary/FlightProgressBar";
+import {
+  ItemCompleteToggle,
+  ItemDoneBadge,
+} from "@/components/itinerary/ItemCompleteToggle";
+import { isItemCompleted } from "@/lib/item-completion";
 import { useItineraryUI } from "./ItineraryUIContext";
 
 function StatusPill({ status }: { status?: "confirmed" | "tbc" }) {
@@ -163,7 +168,8 @@ export function ItemCard({
   taskSummary?: ItemTaskSummary;
 }) {
   const { openItem, viewMode } = useItineraryUI();
-  const { formatDateTime, formatClockTime, formatBaggage } = useDisplayFormat();
+  const { formatDateTime, formatClockTime, formatBaggage, formatFlightSchedule } =
+    useDisplayFormat();
   const category = isCategory(item.category) ? item.category : "flight";
   const styles = CATEGORY_STYLES[category];
   const Icon = getCategoryIcon(category);
@@ -187,6 +193,10 @@ export function ItemCard({
   const showFlightDetails =
     viewMode === "detailed" && category === "flight" && flightDetails;
 
+  const flightSchedule =
+    category === "flight" ? formatFlightSchedule(item) : null;
+  const completed = isItemCompleted(item);
+
   const displayTime =
     (activityDetails?.time
       ? formatClockTime(activityDetails.time)
@@ -194,15 +204,19 @@ export function ItemCard({
     (item.startDatetime ? formatDateTime(item.startDatetime) : null);
 
   return (
-    <button
-      type="button"
-      onClick={() => openItem(item.id)}
+    <div
       className={[
-        "group w-full rounded-2xl border bg-white p-4 text-left shadow-sm transition-all",
+        "group w-full rounded-2xl border bg-white shadow-sm transition-all",
         "hover:-translate-y-0.5 hover:border-[#1e3a5f]/20 hover:shadow-md",
         styles.border,
+        completed ? "border-emerald-200 bg-emerald-50/40" : "",
       ].join(" ")}
     >
+      <button
+        type="button"
+        onClick={() => openItem(item.id)}
+        className="w-full rounded-2xl p-4 text-left"
+      >
       <div className="flex items-start gap-3">
         <div
           className={[
@@ -225,13 +239,24 @@ export function ItemCard({
                 <BookingStatusPill status={stayDetails?.bookingStatus} />
                 <BookingStatusPill status={carDetails?.bookingStatus} />
                 {linkedItemId && <LinkedPill />}
+                {completed && <ItemDoneBadge />}
                 <ItemTaskIndicator summary={taskSummary} />
               </div>
-              <h3 className="mt-0.5 font-medium text-stone-900 group-hover:text-[#1e3a5f]">
+              <h3
+                className={[
+                  "mt-0.5 font-medium group-hover:text-[#1e3a5f]",
+                  completed
+                    ? "text-stone-500 line-through decoration-emerald-600/40"
+                    : "text-stone-900",
+                ].join(" ")}
+              >
                 {item.title}
               </h3>
             </div>
-            <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-stone-300 group-hover:text-[#d4a853]" />
+            <div className="flex shrink-0 items-center gap-1.5">
+              <ItemCompleteToggle item={item} compact />
+              <ChevronRight className="h-4 w-4 text-stone-300 group-hover:text-[#d4a853]" />
+            </div>
           </div>
 
           {item.summary && (
@@ -256,14 +281,34 @@ export function ItemCard({
             </p>
           )}
 
-          {displayTime && (viewMode === "condensed" || category === "activity") && (
+          {displayTime &&
+            category !== "flight" &&
+            (viewMode === "condensed" || category === "activity") && (
             <p className="mt-2 text-xs text-stone-400">{displayTime}</p>
+          )}
+
+          {category === "flight" && flightSchedule && (
+            <div className="mt-2 space-y-0.5 text-xs text-stone-500">
+              {flightSchedule.departure && (
+                <p>
+                  <span className="font-medium text-stone-400">Departs </span>
+                  {flightSchedule.departure}
+                </p>
+              )}
+              {flightSchedule.arrival && (
+                <p>
+                  <span className="font-medium text-stone-400">Arrives </span>
+                  {flightSchedule.arrival}
+                </p>
+              )}
+            </div>
           )}
 
           {category === "flight" && <FlightProgressBar item={item} />}
 
           {viewMode === "condensed" &&
             category !== "activity" &&
+            category !== "flight" &&
             item.startDatetime && (
               <p className="mt-2 text-xs text-stone-400">
                 {formatDateTime(item.startDatetime)}
@@ -308,6 +353,7 @@ export function ItemCard({
           )}
         </div>
       </div>
-    </button>
+      </button>
+    </div>
   );
 }
