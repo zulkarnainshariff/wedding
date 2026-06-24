@@ -1,7 +1,11 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import type { GuestListAccess } from "@/lib/guest-list-types";
-import type { SessionUser } from "@/lib/permissions";
+import {
+  canEditItinerary,
+  canManageUsers,
+  type SessionUser,
+} from "@/lib/permissions";
 import {
   eventRsvpSettings,
   guestListPermissions,
@@ -10,21 +14,38 @@ import {
   weddingEvents,
 } from "@/lib/schema";
 
+/** Bride and groom always see every guest list (both celebrations). */
+export const GUEST_LIST_HOST_USERNAMES = new Set(["natalie", "zulkarnain"]);
+
+function hasFullGuestListAccess(user: SessionUser): boolean {
+  return (
+    user.isAdmin ||
+    canManageUsers(user) ||
+    canEditItinerary(user) ||
+    GUEST_LIST_HOST_USERNAMES.has(user.username.toLowerCase())
+  );
+}
+
+async function getAllGuestListAccess(): Promise<GuestListAccess[]> {
+  const events = await db
+    .select()
+    .from(weddingEvents)
+    .orderBy(asc(weddingEvents.sortOrder));
+
+  return events.map((event) => ({
+    eventId: event.id,
+    eventSlug: event.slug,
+    eventName: event.name,
+    canView: true,
+    canEdit: true,
+  }));
+}
+
 export async function getGuestListAccessForUser(
   user: SessionUser,
 ): Promise<GuestListAccess[]> {
-  if (user.isAdmin) {
-    const events = await db
-      .select()
-      .from(weddingEvents)
-      .orderBy(asc(weddingEvents.sortOrder));
-    return events.map((event) => ({
-      eventId: event.id,
-      eventSlug: event.slug,
-      eventName: event.name,
-      canView: true,
-      canEdit: true,
-    }));
+  if (hasFullGuestListAccess(user)) {
+    return getAllGuestListAccess();
   }
 
   const rows = await db
@@ -46,7 +67,7 @@ export async function canViewGuestList(
   user: SessionUser,
   eventId: number,
 ): Promise<boolean> {
-  if (user.isAdmin) return true;
+  if (hasFullGuestListAccess(user)) return true;
   const [row] = await db
     .select()
     .from(guestListPermissions)
@@ -64,7 +85,7 @@ export async function canEditGuestList(
   user: SessionUser,
   eventId: number,
 ): Promise<boolean> {
-  if (user.isAdmin) return true;
+  if (hasFullGuestListAccess(user)) return true;
   const [row] = await db
     .select()
     .from(guestListPermissions)

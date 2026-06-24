@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { GUEST_LIST_HOST_USERNAMES } from "@/lib/guest-queries";
 import {
   guestListPermissions,
   notifications,
@@ -53,10 +54,18 @@ export async function notifyGuestListWatchers(
     .from(users)
     .where(eq(users.isAdmin, true));
 
+  const hosts = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      inArray(users.username, [...GUEST_LIST_HOST_USERNAMES]),
+    );
+
   const userIds = [
     ...new Set([
       ...watchers.map((row) => row.userId),
       ...admins.map((row) => row.id),
+      ...hosts.map((row) => row.id),
     ]),
   ];
 
