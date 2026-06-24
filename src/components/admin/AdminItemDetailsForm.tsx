@@ -288,11 +288,38 @@ function FlightSegmentsEditor({
                 }}
               />
               <TextInput
-                label="Flight number"
-                value={segment.flightNumber ?? ""}
+                label="From airport (IATA)"
+                value={segment.fromIata ?? ""}
                 onChange={(value) => {
                   const next = [...segments];
-                  next[index] = { ...segment, flightNumber: value };
+                  next[index] = { ...segment, fromIata: value.toUpperCase() };
+                  onChange(next);
+                }}
+              />
+              <TextInput
+                label="To airport (IATA)"
+                value={segment.toIata ?? ""}
+                onChange={(value) => {
+                  const next = [...segments];
+                  next[index] = { ...segment, toIata: value.toUpperCase() };
+                  onChange(next);
+                }}
+              />
+              <TextInput
+                label="Your flight number"
+                value={segment.marketingFlightNumber ?? segment.flightNumber ?? ""}
+                onChange={(value) => {
+                  const next = [...segments];
+                  next[index] = { ...segment, marketingFlightNumber: value.toUpperCase() };
+                  onChange(next);
+                }}
+              />
+              <TextInput
+                label="Operating flight number"
+                value={segment.operatingFlightNumber ?? ""}
+                onChange={(value) => {
+                  const next = [...segments];
+                  next[index] = { ...segment, operatingFlightNumber: value.toUpperCase() };
                   onChange(next);
                 }}
               />
@@ -409,10 +436,35 @@ export function AdminItemDetailsForm({
       {category === "flight" && (
         <>
           <TextInput label="From" value={structured.simple.from} onChange={(v) => setSimple("from", v)} />
+          <TextInput label="From airport (IATA)" value={structured.simple.fromIata} onChange={(v) => setSimple("fromIata", v.toUpperCase())} />
           <TextInput label="To" value={structured.simple.to} onChange={(v) => setSimple("to", v)} />
-          <TextInput label="Flight number" value={structured.simple.flightNumber} onChange={(v) => setSimple("flightNumber", v)} />
+          <TextInput label="To airport (IATA)" value={structured.simple.toIata} onChange={(v) => setSimple("toIata", v.toUpperCase())} />
+          <TextInput
+            label="Your flight number (codeshare / ticket)"
+            value={structured.simple.marketingFlightNumber}
+            onChange={(v) => setSimple("marketingFlightNumber", v.toUpperCase())}
+          />
+          <TextInput
+            label="Operating flight number (for tracking)"
+            value={structured.simple.operatingFlightNumber}
+            onChange={(v) => setSimple("operatingFlightNumber", v.toUpperCase())}
+          />
+          <p className="sm:col-span-2 text-xs text-stone-500">
+            Displayed as your flight (operating), e.g. QF1234 (AA456). Live
+            tracking uses the operating flight and departure IATA code.
+          </p>
           <TimeInput label="Departure time" value={structured.simple.departureTime} onChange={(v) => setSimple("departureTime", v)} />
           <TimeInput label="Arrival time" value={structured.simple.arrivalTime} onChange={(v) => setSimple("arrivalTime", v)} />
+          <p className="sm:col-span-2 text-xs text-stone-500">
+            Departure and arrival times use each airport&apos;s local timezone (from
+            the IATA codes above), not your device timezone.
+          </p>
+          <TextInput label="Aircraft" value={structured.simple.aircraft} onChange={(v) => setSimple("aircraft", v)} />
+          <TextInput label="Total flight time" value={structured.simple.totalFlightTime} onChange={(v) => setSimple("totalFlightTime", v)} />
+          <TextInput label="Dep. terminal" value={structured.simple.departureTerminal} onChange={(v) => setSimple("departureTerminal", v)} />
+          <TextInput label="Dep. gate" value={structured.simple.departureGate} onChange={(v) => setSimple("departureGate", v)} />
+          <TextInput label="Arr. terminal" value={structured.simple.arrivalTerminal} onChange={(v) => setSimple("arrivalTerminal", v)} />
+          <TextInput label="Arr. gate" value={structured.simple.arrivalGate} onChange={(v) => setSimple("arrivalGate", v)} />
           <label className="block text-sm">
             <span className="mb-1 block text-stone-500">Status</span>
             <select

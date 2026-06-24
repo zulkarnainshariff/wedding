@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, MapPin, Pencil, X } from "lucide-react";
+import { ArrowLeft, ExternalLink, MapPin, Pencil, Trash2, X } from "lucide-react";
+import { ItemDocumentsSection } from "@/components/itinerary/ItemDocumentsSection";
+import { ItemSubItemsSection } from "@/components/itinerary/ItemSubItemsSection";
 import { ItemTaskSection } from "@/components/tasks/ItemTaskSection";
 import {
   FlightDetailView,
@@ -24,6 +26,48 @@ import {
   type TravelInsuranceDetails,
 } from "@/lib/types";
 import type { ItineraryItem } from "@/lib/schema";
+
+function NotesBlock({
+  title = "Notes",
+  notes,
+}: {
+  title?: string;
+  notes?: string[] | string | null;
+}) {
+  const lines = Array.isArray(notes)
+    ? notes
+    : notes
+      ? notes.split("\n").map((line) => line.trim()).filter(Boolean)
+      : [];
+  if (lines.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
+      <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
+        {title}
+      </h3>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-700">
+        {lines.map((note) => (
+          <li key={note}>{note}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function DescriptionBlock({ description }: { description?: string | null }) {
+  if (!description?.trim()) return null;
+  return (
+    <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3">
+      <h3 className="text-sm font-semibold tracking-wide text-indigo-800 uppercase">
+        Details
+      </h3>
+      <p className="mt-2 whitespace-pre-wrap text-sm text-stone-700">
+        {description}
+      </p>
+    </div>
+  );
+}
 
 function DetailRow({
   label,
@@ -249,13 +293,14 @@ function ActivityDetail({
 
   return (
     <div className="space-y-4">
+      <DescriptionBlock description={details.description} />
+      <NotesBlock notes={details.notes} />
       <dl>
         <DetailRow
           label="Type"
           value={ACTIVITY_TYPE_LABELS[details.activityType] ?? details.activityType}
         />
         <DetailRow label="Time" value={details.time ?? undefined} />
-        <DetailRow label="Description" value={details.description} />
         <DetailRow
           label="Participants"
           value={details.participants?.join(", ")}
@@ -340,6 +385,7 @@ function ItemDetailHeader({
   sharedLocation,
   formatDateTime,
   onEdit,
+  onDelete,
   onClose,
 }: {
   item: ItineraryItem;
@@ -349,6 +395,7 @@ function ItemDetailHeader({
   sharedLocation: ReturnType<typeof getItemLocation>;
   formatDateTime: (value: string | Date) => string;
   onEdit?: () => void;
+  onDelete?: () => void;
   onClose?: () => void;
 }) {
   return (
@@ -396,6 +443,16 @@ function ItemDetailHeader({
               Edit
             </button>
           )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          )}
           {onClose && (
             <button
               type="button"
@@ -441,7 +498,7 @@ function ItemDetailBody({
   return (
     <>
       {category === "flight" && flightDetails && (
-        <FlightDetailView details={flightDetails} />
+        <FlightDetailView details={flightDetails} itemId={item.id} />
       )}
       {category === "pet_relocation" && petDetails && (
         <PetRelocationDetailView details={petDetails} />
@@ -458,6 +515,8 @@ function ItemDetailBody({
       {category === "travel_insurance" && (
         <InsuranceDetail details={item.details as TravelInsuranceDetails} />
       )}
+      {!item.parentItemId && <ItemSubItemsSection item={item} />}
+      {!item.parentItemId && <ItemDocumentsSection item={item} />}
       <ItemTaskSection item={item} />
     </>
   );
@@ -468,11 +527,13 @@ export function ItemDetailView({
   modal = false,
   onClose,
   onEdit,
+  onDelete,
 }: {
   item: ItineraryItem;
   modal?: boolean;
   onClose?: () => void;
   onEdit?: () => void;
+  onDelete?: () => void;
 }) {
   const category = isCategory(item.category) ? item.category : "flight";
   const styles = CATEGORY_STYLES[category];
@@ -494,6 +555,7 @@ export function ItemDetailView({
       sharedLocation={sharedLocation}
       formatDateTime={formatDateTime}
       onEdit={onEdit}
+      onDelete={onDelete}
       onClose={modal ? onClose : undefined}
     />
   );

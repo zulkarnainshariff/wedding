@@ -18,6 +18,9 @@ services:
       PORT: 3000
       DATABASE_URL: ${DATABASE_URL}
       SESSION_SECRET: ${SESSION_SECRET}
+      AVIATIONSTACK_ACCESS_KEY: ${AVIATIONSTACK_ACCESS_KEY:-}
+    volumes:
+      - wedding-uploads:/app/data/uploads
 
   migrate:
     build:
@@ -30,3 +33,6 @@ services:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
+
+volumes:
+  wedding-uploads:

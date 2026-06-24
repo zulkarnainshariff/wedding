@@ -2,7 +2,7 @@
 
 import { MapPin } from "lucide-react";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
-import { computeTripProgress } from "@/lib/trip-time";
+import { computeTripProgress, formatDaysUntilStart } from "@/lib/trip-time";
 import { formatDate } from "@/lib/types";
 import type { ItineraryDay } from "@/lib/schema";
 
@@ -18,7 +18,9 @@ export function TripProgressIndicator({
 
   const statusLabel =
     progress.status === "upcoming"
-      ? "Trip hasn't started yet"
+      ? progress.daysUntilStart !== null
+        ? formatDaysUntilStart(progress.daysUntilStart)
+        : "Trip hasn't started yet"
       : progress.status === "complete"
         ? "Trip complete"
         : progress.currentDayTitle || `Day ${progress.currentDayNumber}`;
@@ -87,9 +89,11 @@ export function TripProgressIndicator({
           <span className="font-medium text-[#1e3a5f]">
             {progress.status === "in-progress"
               ? "You are here"
-              : progress.status === "upcoming"
-                ? "Starts soon"
-                : "Journey complete"}
+              : progress.status === "upcoming" && progress.daysUntilStart !== null
+                ? formatDaysUntilStart(progress.daysUntilStart)
+                : progress.status === "complete"
+                  ? "Journey complete"
+                  : null}
           </span>
           <span>{formatDate(progress.endDate)}</span>
         </div>

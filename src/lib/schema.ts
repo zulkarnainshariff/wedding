@@ -22,6 +22,7 @@ export const itineraryItems = pgTable("itinerary_items", {
   dayId: integer("day_id").references(() => itineraryDays.id, {
     onDelete: "set null",
   }),
+  parentItemId: integer("parent_item_id"),
   category: text("category").notNull(),
   title: text("title").notNull(),
   summary: text("summary"),
@@ -30,6 +31,26 @@ export const itineraryItems = pgTable("itinerary_items", {
   endDatetime: timestamp("end_datetime", { withTimezone: true }),
   sortOrder: integer("sort_order").default(0).notNull(),
   details: jsonb("details").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const itemDocuments = pgTable("item_documents", {
+  id: serial("id").primaryKey(),
+  itemId: integer("item_id")
+    .notNull()
+    .references(() => itineraryItems.id, { onDelete: "cascade" }),
+  travellerName: text("traveller_name").notNull(),
+  label: text("label").notNull(),
+  fileName: text("file_name").notNull(),
+  storageKey: text("storage_key").notNull().unique(),
+  mimeType: text("mime_type"),
+  fileSize: integer("file_size"),
+  uploadedByUserId: integer("uploaded_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  extraViewers: jsonb("extra_viewers").notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -235,6 +256,8 @@ export type ItineraryDay = typeof itineraryDays.$inferSelect;
 export type NewItineraryDay = typeof itineraryDays.$inferInsert;
 export type ItineraryItem = typeof itineraryItems.$inferSelect;
 export type NewItineraryItem = typeof itineraryItems.$inferInsert;
+export type ItemDocument = typeof itemDocuments.$inferSelect;
+export type NewItemDocument = typeof itemDocuments.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type SyncMetadata = typeof syncMetadata.$inferSelect;
