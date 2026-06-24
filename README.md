@@ -67,6 +67,9 @@ Open [http://localhost:3000](http://localhost:3000)
 
 The app runs in Docker and listens on **port 3002** on the host. OpenResty/nginx should proxy to `http://127.0.0.1:3002`.
 
+**Repository:** [github.com/zulkarnainshariff/wedding](https://github.com/zulkarnainshariff/wedding)  
+**Deploy branch:** `main` (GitHub Actions deploys on push to `main`)
+
 ### Server preparation (one-time)
 
 On your Ubuntu droplet:
@@ -81,7 +84,8 @@ sudo mkdir -p /var/www/wedding
 sudo chown $USER:$USER /var/www/wedding
 
 cd /var/www/wedding
-git clone git@github.com:YOUR_USER/wedding.git .
+git clone git@github.com:zulkarnainshariff/wedding.git .
+git checkout main
 cp .env.example .env
 # Edit .env: DATABASE_URL, SESSION_SECRET
 
@@ -90,6 +94,16 @@ chmod +x scripts/docker-deploy.sh
 
 # Optional first-time data (uses the migrate image which includes dev tooling)
 docker compose --profile tools run --rm migrate npm run db:seed-users
+```
+
+If the server directory already exists with another remote, point it at your repo:
+
+```bash
+cd /var/www/wedding
+git remote set-url origin git@github.com:zulkarnainshariff/wedding.git
+git fetch origin main
+git checkout main
+git reset --hard origin/main
 ```
 
 The deploy script builds the image, runs `db:push`, and starts the container bound to `127.0.0.1:3002`.
@@ -136,7 +150,7 @@ Create `.env` on the server (not committed):
 
 ### GitHub Actions secrets
 
-In your GitHub repo → Settings → Secrets, add:
+In **your** repo ([zulkarnainshariff/wedding](https://github.com/zulkarnainshariff/wedding)) → Settings → Secrets and variables → Actions, add:
 
 | Secret | Description |
 |--------|-------------|
@@ -144,7 +158,7 @@ In your GitHub repo → Settings → Secrets, add:
 | `DO_USER` | SSH user (e.g. `root` or deploy user) |
 | `DO_SSH_KEY` | Private SSH key for deployment |
 
-The server must already have `.env` configured. Push to `main` runs `scripts/docker-deploy.sh` over SSH.
+The server must already have `.env` configured. Push to `main` on **zulkarnainshariff/wedding** runs `scripts/docker-deploy.sh` over SSH. You can also trigger a deploy manually from the Actions tab (`workflow_dispatch`).
 
 ## Replacing sample data
 

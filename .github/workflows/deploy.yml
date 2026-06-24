@@ -3,6 +3,7 @@ name: Deploy to DigitalOcean
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -18,7 +19,9 @@ jobs:
           script: |
             set -e
             cd /var/www/wedding
+            git remote set-url origin git@github.com:zulkarnainshariff/wedding.git
             git fetch origin main
+            git checkout main
             git reset --hard origin/main
             test -f .env
             chmod +x scripts/docker-deploy.sh
