@@ -241,7 +241,8 @@ export function getAccommodationDetails(
 ): AccommodationDetails | null {
   if (!details || typeof details !== "object") return null;
   const d = details as AccommodationDetails;
-  if (!d.location) return null;
+  if (!d.platform || !d.location) return null;
+  if (typeof d.location === "object") return null;
   return d;
 }
 

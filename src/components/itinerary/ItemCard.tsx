@@ -27,6 +27,8 @@ import {
   ItemDoneBadge,
 } from "@/components/itinerary/ItemCompleteToggle";
 import { isItemCompleted } from "@/lib/item-completion";
+import type { ItineraryItemWithSubItems } from "@/lib/item-subitem-utils";
+import { SubItemCascade } from "./SubItemDisplay";
 import { useItineraryUI } from "./ItineraryUIContext";
 
 function StatusPill({ status }: { status?: "confirmed" | "tbc" }) {
@@ -164,7 +166,7 @@ export function ItemCard({
   item,
   taskSummary,
 }: {
-  item: ItineraryItem;
+  item: ItineraryItemWithSubItems;
   taskSummary?: ItemTaskSummary;
 }) {
   const { openItem, viewMode } = useItineraryUI();
@@ -196,6 +198,7 @@ export function ItemCard({
   const flightSchedule =
     category === "flight" ? formatFlightSchedule(item) : null;
   const completed = isItemCompleted(item);
+  const subItems = item.subItems ?? [];
 
   const displayTime =
     (activityDetails?.time
@@ -239,6 +242,11 @@ export function ItemCard({
                 <BookingStatusPill status={stayDetails?.bookingStatus} />
                 <BookingStatusPill status={carDetails?.bookingStatus} />
                 {linkedItemId && <LinkedPill />}
+                {subItems.length > 0 && (
+                  <span className="rounded-full bg-[#d4a853]/15 px-2 py-0.5 text-[10px] font-semibold text-[#1e3a5f] uppercase">
+                    {subItems.length} sub-item{subItems.length === 1 ? "" : "s"}
+                  </span>
+                )}
                 {completed && <ItemDoneBadge />}
                 <ItemTaskIndicator summary={taskSummary} />
               </div>
@@ -323,16 +331,32 @@ export function ItemCard({
             />
           )}
 
-          {viewMode === "detailed" && stayDetails && (
+          {viewMode === "detailed" && category === "accommodation" && stayDetails && (
             <div className="mt-3 space-y-1 border-t border-stone-100 pt-3">
-              <InlineDetail
-                label="Check-in"
-                value={`${stayDetails.checkInDate} ${stayDetails.checkInTime}`}
-              />
+              {(stayDetails.checkInDate || stayDetails.checkInTime) && (
+                <InlineDetail
+                  label="Check-in"
+                  value={[
+                    stayDetails.checkInDate ?? null,
+                    stayDetails.checkInTime
+                      ? formatClockTime(stayDetails.checkInTime)
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                />
+              )}
               {stayDetails.checkOutDate && (
                 <InlineDetail
                   label="Check-out"
-                  value={`${stayDetails.checkOutDate} ${stayDetails.checkOutTime}`}
+                  value={[
+                    stayDetails.checkOutDate,
+                    stayDetails.checkOutTime
+                      ? formatClockTime(stayDetails.checkOutTime)
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 />
               )}
               <InlineDetail
@@ -351,9 +375,34 @@ export function ItemCard({
               )}
             </div>
           )}
+
+          {viewMode === "detailed" && category === "car_rental" && carDetails && (
+            <div className="mt-3 space-y-1 border-t border-stone-100 pt-3">
+              <InlineDetail
+                label="Pickup"
+                value={
+                  carDetails.pickupTime
+                    ? formatClockTime(carDetails.pickupTime)
+                    : null
+                }
+              />
+              <InlineDetail label="Location" value={carDetails.pickupLocation} />
+              {carDetails.returnTime && (
+                <InlineDetail
+                  label="Return"
+                  value={formatClockTime(carDetails.returnTime)}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
       </button>
+
+      <SubItemCascade
+        subItems={subItems}
+        onSubItemClick={(id) => openItem(id)}
+      />
     </div>
   );
 }
