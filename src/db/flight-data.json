@@ -1,0 +1,280 @@
+{
+  "flights": [
+    {
+      "label": "Tasmania to Melbourne",
+      "date": "2026-07-08",
+      "day": "Wednesday",
+      "travellers": ["Zulkarnain", "Nadya", "Nadra"],
+      "flightNumber": "JQ736",
+      "from": "LST",
+      "to": "MEL",
+      "departureTime": "16:35",
+      "arrivalTime": "17:40",
+      "bookingReferences": {
+        "Nadya": "UJ3C7Y",
+        "Zulkarnain": "RTVP8U",
+        "Nadra": "RTVP8U"
+      },
+      "aircraft": "A320",
+      "baggage": {
+        "Zulkarnain": 20,
+        "Nadya": 20,
+        "Nadra": 20
+      }
+    },
+    {
+      "label": "Australia to Philadelphia",
+      "date": "2026-07-09",
+      "day": "Thursday",
+      "travellers": ["Zaiton", "Zulkarnain", "Nadya", "Nadra"],
+      "flightNumber": "QF93 / QF4716 (AA3164)",
+      "from": "MEL",
+      "to": "PHL",
+      "departureTime": "09:45",
+      "arrivalTime": "18:41",
+      "totalFlightTime": "22h 56m",
+      "bookingReference": "EEER5X",
+      "baggage": {
+        "Zaiton": 32,
+        "Zulkarnain": 32,
+        "Nadya": 32,
+        "Nadra": 32
+      },
+      "segments": [
+        {
+          "flightNumber": "QF93",
+          "from": "MEL",
+          "to": "LAX",
+          "departureTime": "09:45",
+          "arrivalTime": "07:05",
+          "flightTime": "14h 20m",
+          "departureTerminal": "2",
+          "arrivalTerminal": "B",
+          "aircraft": "B787-900"
+        },
+        {
+          "transit": "3h 11m",
+          "airport": "LAX"
+        },
+        {
+          "flightNumber": "QF4716 (AA3164)",
+          "from": "LAX",
+          "to": "PHL",
+          "departureTime": "10:16",
+          "arrivalTime": "18:41",
+          "flightTime": "5h 25m",
+          "aircraft": "A321neo"
+        }
+      ]
+    },
+    {
+      "label": "Toronto to Philadelphia",
+      "date": "2026-07-15",
+      "day": "Wednesday",
+      "travellers": ["Asmah", "Kamal"],
+      "flightNumber": "AC8516",
+      "from": "YYZ",
+      "to": "PHL",
+      "departureTime": "14:05",
+      "arrivalTime": "15:41",
+      "flightTime": "1h 36m",
+      "departureTerminal": "1",
+      "arrivalTerminal": "D",
+      "aircraft": "Embraer 175",
+      "baggage": {
+        "Asmah": null,
+        "Kamal": null
+      }
+    },
+    {
+      "label": "Philadelphia to Toronto",
+      "date": "2026-07-17",
+      "day": "Friday",
+      "travellers": ["Zaiton", "Asmah", "Kamal"],
+      "flightNumber": "AC8517",
+      "from": "PHL",
+      "to": "YYZ",
+      "departureTime": "16:20",
+      "arrivalTime": "17:59",
+      "flightTime": "1h 39m",
+      "departureTerminal": "D",
+      "arrivalTerminal": "1",
+      "aircraft": "Embraer 175",
+      "baggage": {
+        "Zaiton": null,
+        "Asmah": null,
+        "Kamal": null
+      }
+    },
+    {
+      "label": "Philadelphia to Toronto (TBC)",
+      "date": "2026-07-28",
+      "day": "Tuesday",
+      "travellers": ["Nat", "Zulkarnain", "Nadya", "Nadra"],
+      "flightNumber": null,
+      "from": "PHL",
+      "to": "YYZ",
+      "departureTime": null,
+      "arrivalTime": null,
+      "bookingReference": null,
+      "aircraft": null,
+      "baggage": {
+        "Nat": null,
+        "Zulkarnain": 23,
+        "Nadya": 23,
+        "Nadra": 23
+      }
+    },
+    {
+      "label": "Toronto to Melbourne",
+      "date": "2026-08-03",
+      "day": "Monday",
+      "travellers": ["Zaiton", "Nadya", "Nadra"],
+      "flightNumber": "DL2468 / DL1142 / DL11",
+      "from": "YYZ",
+      "to": "MEL",
+      "departureTime": "17:50",
+      "arrivalTime": "2026-08-05T07:50",
+      "bookingReference": "HP6VXW",
+      "notes": ["Wheelchair assistance requested for Zaiton"],
+      "baggage": {
+        "Zaiton": 23,
+        "Nadya": 23,
+        "Nadra": 23
+      },
+      "segments": [
+        {
+          "flightNumber": "DL2468",
+          "from": "YYZ",
+          "to": "SLC",
+          "departureTime": "17:50",
+          "arrivalTime": "20:10",
+          "aircraft": "B737-800"
+        },
+        {
+          "transit": "48m",
+          "airport": "SLC"
+        },
+        {
+          "flightNumber": "DL1142",
+          "from": "SLC",
+          "to": "LAX",
+          "departureTime": "20:58",
+          "arrivalTime": "22:00",
+          "aircraft": "A321neo"
+        },
+        {
+          "transit": "1h 05m",
+          "airport": "LAX"
+        },
+        {
+          "flightNumber": "DL11",
+          "from": "LAX",
+          "to": "MEL",
+          "departureTime": "23:05",
+          "arrivalTime": "2026-08-05T07:50",
+          "aircraft": "A350-900"
+        }
+      ]
+    },
+    {
+      "label": "Toronto to Philadelphia (TBC)",
+      "date": "2026-08-03",
+      "day": "Monday",
+      "travellers": ["Nat", "Zulkarnain"],
+      "flightNumber": null,
+      "from": "YYZ",
+      "to": "PHL",
+      "baggage": {
+        "Nat": null,
+        "Zulkarnain": null
+      }
+    },
+    {
+      "label": "Melbourne to Tasmania (TBC)",
+      "date": "2026-08-05",
+      "day": "Wednesday",
+      "travellers": ["Nadya", "Nadra"],
+      "flightNumber": null,
+      "from": "MEL",
+      "to": "LST",
+      "baggage": {
+        "Nadya": 23,
+        "Nadra": 23
+      }
+    },
+    {
+      "label": "Seymour Relocation",
+      "date": "2026-09-11",
+      "day": "Friday",
+      "travellers": ["Seymour"],
+      "flightNumber": null,
+      "from": "JFK",
+      "to": "MEL",
+      "notes": [
+        "Cat relocation handled by pet relocation company",
+        "Travelling as cargo"
+      ],
+      "baggage": {
+        "Seymour": null
+      }
+    },
+    {
+      "label": "New York to Melbourne",
+      "date": "2026-09-12",
+      "day": "Saturday",
+      "travellers": ["Nat", "Zulkarnain"],
+      "flightNumber": "QF3226 / QF94",
+      "from": "JFK",
+      "to": "MEL",
+      "bookingReference": "D8T8QU",
+      "baggage": {
+        "Nat": 32,
+        "Zulkarnain": 32
+      }
+    },
+    {
+      "label": "Wedding Weekend Arrival (TBC)",
+      "date": "2026-09-18",
+      "day": "Friday",
+      "travellers": ["Nadya", "Nadra"],
+      "flightNumber": null,
+      "from": "LST",
+      "to": "MEL",
+      "baggage": {
+        "Nadya": null,
+        "Nadra": null
+      }
+    },
+    {
+      "label": "Wedding Weekend Return (TBC)",
+      "date": "2026-09-20",
+      "day": "Sunday",
+      "travellers": ["Nadya", "Nadra"],
+      "flightNumber": null,
+      "from": "MEL",
+      "to": "LST",
+      "baggage": {
+        "Nadya": 20,
+        "Nadra": 20
+      }
+    },
+    {
+      "label": "Melbourne to Tasmania (Post Wedding)",
+      "date": "2026-09-22",
+      "day": "Tuesday",
+      "travellers": ["Nat", "Zulkarnain", "Seymour"],
+      "flightNumber": null,
+      "from": "MEL",
+      "to": "LST",
+      "notes": [
+        "Seymour transported as cargo"
+      ],
+      "baggage": {
+        "Nat": 20,
+        "Zulkarnain": 20,
+        "Seymour": null
+      }
+    }
+  ]
+}

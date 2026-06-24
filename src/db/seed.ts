@@ -1,7 +1,48 @@
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { itineraryDays, itineraryItems } from "../lib/schema";
+import accommodationData from "./accommodation-data.json";
+import carRentalData from "./car-rental-data.json";
+import dailyItineraryData from "./daily-itinerary-data.json";
+import flightData from "./flight-data.json";
+import {
+  ACTIVITY_LINKS,
+  buildActivityDetails,
+  buildActivitySummary,
+  combineActivityDatetime,
+  type RawDailyDay,
+} from "../lib/activity-utils";
+import {
+  accommodationCheckInDatetime,
+  accommodationCheckOutDatetime,
+  buildAccommodationDetails,
+  buildAccommodationSummary,
+  type RawAccommodation,
+} from "../lib/accommodation-utils";
+import {
+  buildCarRentalDetails,
+  buildCarRentalSummary,
+  carRentalPickupDatetime,
+  type RawCarRental,
+} from "../lib/car-rental-utils";
+import {
+  buildFlightCategory,
+  buildFlightDetails,
+  buildFlightSummary,
+  buildPetRelocationDetails,
+  combineDateTime,
+  type RawFlight,
+} from "../lib/flight-utils";
+import { normalizeGuestText } from "../lib/travellers";
+import { hashPassword } from "../lib/auth";
+import {
+  ADMIN_PERMISSIONS,
+  DEFAULT_PERMISSIONS,
+} from "../lib/permissions";
+import { itineraryDays, itineraryItems, users } from "../lib/schema";
+import { bumpSyncVersion } from "../lib/sync";
+import { SEED_USERS } from "./users-data";
+import type { ItineraryItem } from "../lib/schema";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -11,201 +52,214 @@ if (!connectionString) {
 const client = postgres(connectionString, { prepare: false });
 const db = drizzle(client);
 
+type InsertedItem = ItineraryItem;
+
+function findItemId(
+  items: InsertedItem[],
+  category: string,
+  title: string,
+): number | undefined {
+  return items.find((i) => i.category === category && i.title === title)?.id;
+}
+
+function syncTimeFromLinkedItem(
+  link: (typeof ACTIVITY_LINKS)[string] | undefined,
+  linked: InsertedItem | undefined,
+  activityTime: string | null | undefined,
+  date: string,
+): Date | null {
+  if (activityTime) return combineActivityDatetime(date, activityTime);
+  if (!linked || !link) return null;
+
+  if (link.syncArrivalTime && linked.endDatetime) {
+    return new Date(linked.endDatetime);
+  }
+  if (link.syncDepartureTime && linked.startDatetime) {
+    return new Date(linked.startDatetime);
+  }
+
+  const flightDetails = linked.details as { arrivalTime?: string; departureTime?: string };
+  if (link.syncArrivalTime && flightDetails.arrivalTime) {
+    return combineDateTime(
+      flightDetails.arrivalTime.includes("T")
+        ? flightDetails.arrivalTime.slice(0, 10)
+        : date,
+      flightDetails.arrivalTime,
+    );
+  }
+  if (link.syncDepartureTime && flightDetails.departureTime) {
+    return combineDateTime(date, flightDetails.departureTime);
+  }
+
+  return linked.startDatetime ? new Date(linked.startDatetime) : null;
+}
+
 async function seed() {
   console.log("Seeding database...");
 
   await db.delete(itineraryItems);
   await db.delete(itineraryDays);
+  await db.delete(users);
 
-  const days = await db
+  const userRows = await Promise.all(
+    SEED_USERS.map(async (entry) => ({
+      username: entry.username,
+      passwordHash: await hashPassword(entry.password),
+      isAdmin: entry.isAdmin ?? false,
+      permissions: entry.isAdmin ? ADMIN_PERMISSIONS : DEFAULT_PERMISSIONS,
+    })),
+  );
+  await db.insert(users).values(userRows);
+
+  const flights = flightData.flights as unknown as RawFlight[];
+  const accommodations =
+    accommodationData.accommodations as unknown as RawAccommodation[];
+  const carRentals = carRentalData.carRentals as unknown as RawCarRental[];
+  const dailyDays =
+    dailyItineraryData.dailyItinerary as unknown as RawDailyDay[];
+
+  const dailyByDate = Object.fromEntries(dailyDays.map((d) => [d.date, d]));
+
+  const uniqueDates = [
+    ...new Set([
+      ...flights.map((f) => f.date),
+      ...accommodations.map((a) => a.checkInDate),
+      ...accommodations.map((a) => a.checkOutDate).filter(Boolean) as string[],
+      ...carRentals.map((c) => c.pickupDate),
+      ...dailyDays.map((d) => d.date),
+    ]),
+  ].sort();
+
+  const insertedDays = await db
     .insert(itineraryDays)
-    .values([
-      {
-        dayNumber: 1,
-        date: "2026-06-26",
-        title: "Departure Day",
-        notes: "Fly from Kuala Lumpur to Bali",
-      },
-      {
-        dayNumber: 2,
-        date: "2026-06-27",
-        title: "Ubud Arrival",
-        notes: "Settle into villa and pick up rental car",
-      },
-      {
-        dayNumber: 3,
-        date: "2026-06-28",
-        title: "Wedding Eve",
-        notes: "Rehearsal dinner and family time",
-      },
-      {
-        dayNumber: 4,
-        date: "2026-06-29",
-        title: "Wedding Day",
-        notes: "The big day!",
-      },
-      {
-        dayNumber: 5,
-        date: "2026-06-30",
-        title: "Departure",
-        notes: "Return flights and car drop-off",
-      },
-    ])
+    .values(
+      uniqueDates.map((date, index) => {
+        const scheduleDay = dailyByDate[date];
+        return {
+          dayNumber: index + 1,
+          date,
+          title: scheduleDay?.title ?? scheduleDay?.day ?? undefined,
+          notes: null,
+        };
+      }),
+    )
     .returning();
 
-  const dayByNumber = Object.fromEntries(days.map((d) => [d.dayNumber, d.id]));
+  const dayIdByDate = Object.fromEntries(
+    insertedDays.map((day) => [day.date, day.id]),
+  );
 
-  await db.insert(itineraryItems).values([
-    {
-      dayId: dayByNumber[1],
-      category: "flight",
-      title: "MH850 — Kuala Lumpur to Denpasar",
-      summary: "Malaysia Airlines · KLIA to Ngurah Rai",
-      startDatetime: new Date("2026-06-26T08:30:00+08:00"),
-      endDatetime: new Date("2026-06-26T11:45:00+08:00"),
-      sortOrder: 1,
-      details: {
-        airline: "Malaysia Airlines",
-        flightNumber: "MH850",
-        departureAirport: "Kuala Lumpur International (KUL)",
-        arrivalAirport: "Ngurah Rai International (DPS)",
-        departureTime: "08:30",
-        arrivalTime: "11:45",
-        confirmationCode: "ABC123",
-        terminal: "KLIA Terminal 1",
-        seat: "12A, 12B",
-      },
-    },
-    {
-      dayId: dayByNumber[1],
-      category: "accommodation",
-      title: "Villa Seminyak — First Night",
-      summary: "Airbnb · 2 nights near Seminyak Beach",
-      startDatetime: new Date("2026-06-26T15:00:00+08:00"),
-      endDatetime: new Date("2026-06-28T11:00:00+08:00"),
-      sortOrder: 2,
-      details: {
-        platform: "Airbnb",
-        listingUrl: "https://www.airbnb.com/rooms/example-seminyak",
-        address: "Jl. Petitenget No.12, Seminyak, Bali",
-        lat: -8.6845,
-        lng: 115.1625,
-        checkInTime: "15:00",
-        checkOutTime: "11:00",
-        hostName: "Made",
-        confirmationCode: "HMXYZ789",
-        notes: "Gate code: 4521. Villa manager will meet you on arrival.",
-      },
-    },
-    {
-      dayId: dayByNumber[2],
-      category: "car_rental",
-      title: "Toyota Avanza — Bali Rental",
-      summary: "Avis · 4-day rental with airport pickup",
-      startDatetime: new Date("2026-06-27T09:00:00+08:00"),
-      endDatetime: new Date("2026-06-30T17:00:00+08:00"),
-      sortOrder: 1,
-      details: {
-        company: "Avis Bali",
-        vehicleModel: "Toyota Avanza (Automatic)",
-        pickupLocation: "Ngurah Rai Airport, Domestic Terminal Car Rental Counter",
-        pickupLat: -8.7482,
-        pickupLng: 115.1675,
-        pickupTime: "09:00",
-        returnLocation: "Ngurah Rai Airport, Domestic Terminal Car Rental Counter",
-        returnLat: -8.7482,
-        returnLng: 115.1675,
-        returnTime: "17:00",
-        confirmationCode: "AVIS-2026-4455",
-        notes: "International driving permit required. Full insurance included.",
-      },
-    },
-    {
-      dayId: dayByNumber[3],
-      category: "flight",
-      title: "Internal — Denpasar to Lombok (family)",
-      summary: "Garuda Indonesia · Day trip for some guests",
-      startDatetime: new Date("2026-06-28T07:00:00+08:00"),
-      endDatetime: new Date("2026-06-28T08:15:00+08:00"),
-      sortOrder: 1,
-      details: {
-        airline: "Garuda Indonesia",
-        flightNumber: "GA452",
-        departureAirport: "Ngurah Rai International (DPS)",
-        arrivalAirport: "Lombok International (LOP)",
-        departureTime: "07:00",
-        arrivalTime: "08:15",
-        confirmationCode: "GID98765",
-        terminal: "Domestic Terminal",
-      },
-    },
-    {
-      dayId: dayByNumber[3],
-      category: "accommodation",
-      title: "Ubud Jungle Villa — Wedding Week",
-      summary: "Airbnb · 3 nights in Ubud",
-      startDatetime: new Date("2026-06-28T14:00:00+08:00"),
-      endDatetime: new Date("2026-07-01T10:00:00+08:00"),
-      sortOrder: 2,
-      details: {
-        platform: "Airbnb",
-        listingUrl: "https://www.airbnb.com/rooms/example-ubud",
-        address: "Jalan Raya Sanggingan, Ubud, Gianyar, Bali",
-        lat: -8.5069,
-        lng: 115.2625,
-        checkInTime: "14:00",
-        checkOutTime: "10:00",
-        hostName: "Ketut",
-        confirmationCode: "HMUBUD456",
-        notes: "Wedding party villa. Pool and kitchen available.",
-      },
-    },
-    {
-      dayId: dayByNumber[4],
-      category: "car_rental",
-      title: "Toyota Innova — Wedding Day Transport",
-      summary: "Local hire with driver for wedding day",
-      startDatetime: new Date("2026-06-29T08:00:00+08:00"),
-      endDatetime: new Date("2026-06-29T23:00:00+08:00"),
-      sortOrder: 1,
-      details: {
-        company: "Bali Wedding Cars",
-        vehicleModel: "Toyota Innova Reborn with driver",
-        pickupLocation: "Ubud Jungle Villa, Jalan Raya Sanggingan",
-        pickupLat: -8.5069,
-        pickupLng: 115.2625,
-        pickupTime: "08:00",
-        returnLocation: "Ubud Jungle Villa, Jalan Raya Sanggingan",
-        returnLat: -8.5069,
-        returnLng: 115.2625,
-        returnTime: "23:00",
-        confirmationCode: "BWC-WED-001",
-        notes: "Includes decoration ribbon. Driver: Pak Wayan (+62 812-3456-7890).",
-      },
-    },
-    {
-      dayId: dayByNumber[5],
-      category: "flight",
-      title: "MH851 — Denpasar to Kuala Lumpur",
-      summary: "Malaysia Airlines · Return flight",
-      startDatetime: new Date("2026-06-30T19:30:00+08:00"),
-      endDatetime: new Date("2026-06-30T22:45:00+08:00"),
-      sortOrder: 1,
-      details: {
-        airline: "Malaysia Airlines",
-        flightNumber: "MH851",
-        departureAirport: "Ngurah Rai International (DPS)",
-        arrivalAirport: "Kuala Lumpur International (KUL)",
-        departureTime: "19:30",
-        arrivalTime: "22:45",
-        confirmationCode: "ABC124",
-        terminal: "International Terminal",
-        seat: "14C, 14D",
-      },
-    },
-  ]);
+  const flightRows = flights.map((flight, index) => {
+    const category = buildFlightCategory(flight);
+    const details =
+      category === "pet_relocation"
+        ? buildPetRelocationDetails(flight)
+        : buildFlightDetails(flight);
 
-  console.log("Seed complete: 5 days, 7 items (3 flights, 2 accommodation, 2 car rental).");
+    return {
+      dayId: dayIdByDate[flight.date],
+      category,
+      title: flight.label,
+      summary: buildFlightSummary(flight, category),
+      eventDate: flight.date,
+      startDatetime: combineDateTime(flight.date, flight.departureTime),
+      endDatetime: combineDateTime(
+        flight.arrivalTime?.includes("T")
+          ? flight.arrivalTime.slice(0, 10)
+          : flight.date,
+        flight.arrivalTime,
+      ),
+      sortOrder: 200 + index,
+      details,
+    };
+  });
+
+  const accommodationRows = accommodations.map((stay, index) => {
+    const details = buildAccommodationDetails(stay);
+    return {
+      dayId: dayIdByDate[stay.checkInDate],
+      category: "accommodation" as const,
+      title: stay.label,
+      summary: buildAccommodationSummary(stay),
+      eventDate: stay.checkInDate,
+      startDatetime: accommodationCheckInDatetime(stay.checkInDate),
+      endDatetime: accommodationCheckOutDatetime(stay.checkOutDate),
+      sortOrder: 300 + index,
+      details,
+    };
+  });
+
+  const carRentalRows = carRentals.map((rental, index) => {
+    const details = buildCarRentalDetails(rental);
+    return {
+      dayId: dayIdByDate[rental.pickupDate],
+      category: "car_rental" as const,
+      title: rental.label,
+      summary: buildCarRentalSummary(rental),
+      eventDate: rental.pickupDate,
+      startDatetime: carRentalPickupDatetime(rental.pickupDate, rental.pickupTime),
+      endDatetime: rental.returnDate
+        ? carRentalPickupDatetime(rental.returnDate, rental.returnTime)
+        : null,
+      sortOrder: 400 + index,
+      details,
+    };
+  });
+
+  const bookingItems = await db
+    .insert(itineraryItems)
+    .values([...flightRows, ...accommodationRows, ...carRentalRows])
+    .returning();
+
+  const activityRows = dailyDays.flatMap((day) =>
+    day.items.map((raw, index) => {
+      const link = ACTIVITY_LINKS[raw.id];
+      const linkedItemId = link
+        ? findItemId(bookingItems, link.category, link.title)
+        : undefined;
+      const linkedItem = linkedItemId
+        ? bookingItems.find((item) => item.id === linkedItemId)
+        : undefined;
+
+      const details = buildActivityDetails(raw, linkedItemId);
+      const startDatetime = syncTimeFromLinkedItem(
+        link,
+        linkedItem,
+        raw.time,
+        day.date,
+      );
+
+      return {
+        dayId: dayIdByDate[day.date],
+        category: "activity" as const,
+        title: normalizeGuestText(raw.title),
+        summary: buildActivitySummary(raw),
+        eventDate: day.date,
+        startDatetime,
+        endDatetime: null,
+        sortOrder: index,
+        details: {
+          ...details,
+          time:
+            startDatetime && link?.syncArrivalTime
+              ? startDatetime.toLocaleTimeString("en-GB", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                })
+              : (raw.time ?? details.time),
+        },
+      };
+    }),
+  );
+
+  await db.insert(itineraryItems).values(activityRows);
+
+  await bumpSyncVersion();
+
+  console.log(
+    `Seed complete: ${uniqueDates.length} days, ${activityRows.length} schedule items, ${bookingItems.length} bookings, ${SEED_USERS.length} users.`,
+  );
   await client.end();
 }
 

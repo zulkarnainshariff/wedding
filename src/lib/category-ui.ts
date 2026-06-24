@@ -1,5 +1,7 @@
 import {
+  CalendarDays,
   Car,
+  Cat,
   Home,
   LayoutGrid,
   Plane,
@@ -9,7 +11,9 @@ import {
 import type { Category } from "@/lib/types";
 
 export const CATEGORY_ICONS: Record<Category, LucideIcon> = {
+  activity: CalendarDays,
   flight: Plane,
+  pet_relocation: Cat,
   accommodation: Home,
   car_rental: Car,
   travel_insurance: Shield,
@@ -23,11 +27,23 @@ export const CATEGORY_STYLES: Record<
   Category,
   { bg: string; text: string; border: string; dot: string }
 > = {
+  activity: {
+    bg: "bg-indigo-50",
+    text: "text-indigo-700",
+    border: "border-indigo-200",
+    dot: "bg-indigo-500",
+  },
   flight: {
     bg: "bg-sky-50",
     text: "text-sky-700",
     border: "border-sky-200",
     dot: "bg-sky-500",
+  },
+  pet_relocation: {
+    bg: "bg-rose-50",
+    text: "text-rose-700",
+    border: "border-rose-200",
+    dot: "bg-rose-500",
   },
   accommodation: {
     bg: "bg-emerald-50",

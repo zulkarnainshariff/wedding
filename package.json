@@ -11,10 +11,19 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
+    "db:seed-users": "tsx src/db/seed-users.ts",
+    "db:seed-invitations": "tsx src/db/seed-invitations.ts",
+    "db:migrate-invitations": "tsx src/db/migrate-invitations.ts",
+    "db:migrate-guests": "tsx src/db/migrate-guests.ts",
+    "db:migrate-notifications-tasks": "tsx src/db/migrate-notifications-tasks.ts",
+    "db:migrate-task-updates": "tsx src/db/migrate-task-updates.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
+    "jose": "^6.2.3",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.21.0",
     "next": "16.2.9",
     "postgres": "^3.4.9",
@@ -23,6 +32,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

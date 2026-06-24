@@ -1,0 +1,90 @@
+{
+  "accommodations": [
+    {
+      "label": "VRBO in Lancaster",
+      "type": "vrbo",
+      "bookingStatus": "confirmed",
+      "location": "Lancaster / Peach Bottom, Pennsylvania",
+      "checkInDate": "2026-07-09",
+      "checkOutDate": "2026-07-14",
+      "guests": "All travellers",
+      "address": {
+        "fullAddress": "783 PA-272, Peach Bottom, PA 17563, USA"
+      },
+      "links": {
+        "listing": "https://www.vrbo.com/7158513ha?dateless=true",
+        "map": "https://www.google.com/maps/place/783+PA-272,+Peach+Bottom,+PA+17563,+USA/@39.8104886,-76.2283593,11.81z/data=!4m6!3m5!1s0x89c7cb7d4f36fae3:0xabeb11c1f71b162d!8m2!3d39.7736298!4d-76.1774246!16s%2Fg%2F11yf70dgsj?entry=ttu&g_ep=EgoyMDI2MDYyMS4wIKXMDSoASAFQAw%3D%3D"
+      },
+      "notes": []
+    },
+    {
+      "label": "Airbnb in Glenside",
+      "type": "airbnb",
+      "bookingStatus": "confirmed",
+      "location": "Glenside, Pennsylvania",
+      "checkInDate": "2026-07-14",
+      "checkOutDate": "2026-07-17",
+      "guests": ["Zaiton", "Asmah", "Kamal"],
+      "address": {
+        "fullAddress": "414 Monroe Avenue, Glenside, PA, USA"
+      },
+      "links": {
+        "listing": "https://www.airbnb.com.au/rooms/52026491?c=.pi80.pkTUVTU0FHSU5HX05FV19NRVNTQUdFX0VNQUlMX0RJR0VTVA%3D%3D&euid=c14aaa76-7b13-dcc3-b2cb-8b4b516fa098&source_impression_id=p3_1782140073_P3VtolUIW70ziM4z&_set_bev_on_new_domain=1782140100_EAZTE5OGM0M2Y1OD&set_everest_cookie_on_new_domain=1782140100.EAMzQzYTAyNTQ5NTk0YT.RXJsSalrMgXpeGCP77kksBJ54syQ9B1RFvebcrpqxhY",
+        "map": "https://www.google.com/maps/search/?api=1&query=414+Monroe+Avenue+Glenside+PA"
+      },
+      "notes": []
+    },
+    {
+      "label": "Nat's House",
+      "type": "private-home",
+      "bookingStatus": "private",
+      "location": "Pennsylvania, USA",
+      "checkInDate": "2026-07-14",
+      "checkOutDate": "2026-07-17",
+      "guests": "Everyone except Zaiton, Asmah and Kamal",
+      "address": null,
+      "links": {},
+      "notes": [
+        "The rest of the group will stay at Nat's house from 14 July to 17 July."
+      ]
+    },
+    {
+      "label": "Asmah's House",
+      "type": "private-home",
+      "bookingStatus": "private",
+      "location": "Oakville, Ontario, Canada",
+      "checkInDate": "2026-07-17",
+      "checkOutDate": null,
+      "guests": ["Zaiton"],
+      "address": {
+        "fullAddress": "226-180 Oak Park Boulevard, Oakville, Ontario L6H 0A6, Canada"
+      },
+      "links": {},
+      "notes": [
+        "Zaiton will stay at Asmah's house in Canada from 17 July onwards."
+      ]
+    },
+    {
+      "label": "Airbnb in Toronto / Oakville",
+      "type": "airbnb",
+      "bookingStatus": "suggested",
+      "location": "Toronto / Oakville, Ontario, Canada",
+      "checkInDate": "2026-07-28",
+      "checkOutDate": "2026-08-03",
+      "guests": "Rest of group excluding Zaiton",
+      "address": null,
+      "links": {},
+      "suggestions": [
+        {
+          "label": "Oakville — 3 guests",
+          "platform": "airbnb",
+          "url": "https://www.airbnb.com.au/rooms/1190566154847840219?adults=3&check_in=2026-07-28&check_out=2026-08-03&location=Oakville%2C%20Canada&search_mode=regular_search&source_impression_id=p3_1782092148_P3rxmWk_rTlQ1tfy&previous_page_section_name=1001&federated_search_id=a99723b4-6da3-4e4a-a2c3-2e0c0321d073&guests=3"
+        }
+      ],
+      "notes": [
+        "Location not confirmed yet.",
+        "Suggested listings only — not booked yet."
+      ]
+    }
+  ]
+}

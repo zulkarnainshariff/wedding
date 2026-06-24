@@ -1,0 +1,112 @@
+import { asc } from "drizzle-orm";
+import { NextResponse } from "next/server";
+import { hashPassword } from "@/lib/auth";
+import { requireAdminAccess, isAuthError } from "@/lib/api-auth";
+import { validatePassword } from "@/lib/password-policy";
+import { db } from "@/lib/db";
+import {
+  DEFAULT_PERMISSIONS,
+  normalizePermissions,
+  normalizeViewTravellers,
+  type UserPermissions,
+} from "@/lib/permissions";
+import { users } from "@/lib/schema";
+import { CATEGORIES, type Category } from "@/lib/types";
+
+function serializeUser(user: typeof users.$inferSelect) {
+  return {
+    id: user.id,
+    username: user.username,
+    isAdmin: user.isAdmin,
+    permissions: normalizePermissions(user.permissions, user.isAdmin, user.username),
+    createdAt: user.createdAt,
+  };
+}
+
+export async function GET() {
+  const user = await requireAdminAccess();
+  if (isAuthError(user)) return user;
+
+  const rows = await db.select().from(users).orderBy(asc(users.username));
+  return NextResponse.json(rows.map(serializeUser));
+}
+
+export async function POST(request: Request) {
+  const user = await requireAdminAccess();
+  if (isAuthError(user)) return user;
+
+  const body = await request.json();
+  const username = String(body.username ?? "").trim().toLowerCase();
+  const password = String(body.password ?? "");
+  const isAdmin = Boolean(body.isAdmin);
+
+  if (!username || !password) {
+    return NextResponse.json(
+      { error: "Username and password are required" },
+      { status: 400 },
+    );
+  }
+
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return NextResponse.json({ error: passwordError }, { status: 400 });
+  }
+
+  const permissions = parsePermissionsBody(body.permissions, isAdmin, username);
+  const passwordHash = await hashPassword(password);
+
+  try {
+    const [created] = await db
+      .insert(users)
+      .values({
+        username,
+        passwordHash,
+        isAdmin,
+        permissions,
+      })
+      .returning();
+
+    return NextResponse.json(serializeUser(created), { status: 201 });
+  } catch {
+    return NextResponse.json(
+      { error: "Username already exists" },
+      { status: 409 },
+    );
+  }
+}
+
+function parsePermissionsBody(
+  raw: unknown,
+  isAdmin: boolean,
+  username: string,
+): UserPermissions {
+  if (isAdmin) {
+    return normalizePermissions({}, true, username);
+  }
+
+  if (!raw || typeof raw !== "object") {
+    return normalizePermissions({}, false, username);
+  }
+
+  const value = raw as Partial<UserPermissions>;
+  const viewAllCategories = value.viewCategories === "all";
+  const viewCategories: UserPermissions["viewCategories"] = viewAllCategories
+    ? "all"
+    : Array.isArray(value.viewCategories)
+      ? value.viewCategories.filter((c): c is Category =>
+          CATEGORIES.includes(c as Category),
+        )
+      : DEFAULT_PERMISSIONS.viewCategories;
+
+  const viewTravellers =
+    value.viewTravellers === "all"
+      ? "all"
+      : normalizeViewTravellers(value.viewTravellers, username);
+
+  return {
+    viewCategories,
+    viewTravellers,
+    canEdit: Boolean(value.canEdit),
+    canManageUsers: Boolean(value.canManageUsers),
+  };
+}

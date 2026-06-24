@@ -1,0 +1,463 @@
+{
+  "dailyItinerary": [
+    {
+      "id": "2026-07-09",
+      "date": "2026-07-09",
+      "day": "Thursday",
+      "title": "Arrive in Philadelphia",
+      "items": [
+        {
+          "id": "arrive-phl",
+          "time": null,
+          "type": "flight-arrival",
+          "title": "Arrive in Philadelphia",
+          "description": "Arrive at Philadelphia International Airport.",
+          "participants": ["Zaiton", "Zulkarnain", "Nadya", "Nadra"],
+          "location": {
+            "name": "Philadelphia International Airport",
+            "airportCode": "PHL"
+          }
+        },
+        {
+          "id": "collect-rental-car",
+          "time": null,
+          "type": "car-rental",
+          "title": "Collect rental car",
+          "description": "Collect rental car after arriving in Philadelphia.",
+          "participants": ["Zaiton", "Zulkarnain", "Nadya", "Nadra"],
+          "location": {
+            "name": "Enterprise Rent-A-Car",
+            "mapLink": "https://www.google.com/maps/place/Enterprise+Rent-A-Car/@39.8822548,-75.2512353,15.11z/data=!4m6!3m5!1s0x89c6c49d8f66617b:0x13183a865ed18bbc!8m2!3d39.881925!4d-75.242409!16s%2Fg%2F1td4w6vj?entry=ttu&g_ep=EgoyMDI2MDYyMS4wIKXMDSoASAFQAw%3D%3D"
+          }
+        },
+        {
+          "id": "checkin-lancaster",
+          "time": null,
+          "type": "accommodation",
+          "title": "Check-in at accommodation in Lancaster",
+          "description": "Check-in at accommodation in Lancaster.",
+          "participants": ["Zaiton", "Zulkarnain", "Nadya", "Nadra"]
+        }
+      ]
+    },
+    {
+      "id": "2026-07-10",
+      "date": "2026-07-10",
+      "day": "Friday",
+      "title": "Lancaster Town Errands",
+      "items": [
+        {
+          "id": "lancaster-town",
+          "time": null,
+          "type": "outing",
+          "title": "Head to Lancaster town",
+          "description": "Head to the town in Lancaster.",
+          "participants": ["Zulkarnain", "Natalie", "Nadya", "Nadra"]
+        },
+        {
+          "id": "dry-cleaning-suit",
+          "time": null,
+          "type": "task",
+          "title": "Dry cleaning for wedding suit",
+          "description": "Get dry cleaning done for wedding suit.",
+          "participants": ["Zulkarnain"]
+        },
+        {
+          "id": "wedding-shoes-belt",
+          "time": null,
+          "type": "task",
+          "title": "Buy wedding shoes and belt",
+          "description": "Get wedding shoes and belt.",
+          "participants": ["Zulkarnain"]
+        }
+      ]
+    },
+    {
+      "id": "2026-07-11",
+      "date": "2026-07-11",
+      "day": "Saturday",
+      "title": "Unplanned",
+      "items": []
+    },
+    {
+      "id": "2026-07-12",
+      "date": "2026-07-12",
+      "day": "Sunday",
+      "title": "Free Day",
+      "items": []
+    },
+    {
+      "id": "2026-07-13",
+      "date": "2026-07-13",
+      "day": "Monday",
+      "title": "Baltimore and Washington DC Day Trip",
+      "items": [
+        {
+          "id": "leave-for-baltimore",
+          "time": "05:00",
+          "type": "travel",
+          "title": "Leave for Baltimore",
+          "description": "Leave for Baltimore.",
+          "participants": ["Zulkarnain", "Natalie", "Nadya", "Nadra"]
+        },
+        {
+          "id": "arrive-baltimore",
+          "time": "07:00",
+          "type": "arrival",
+          "title": "Arrive in Baltimore",
+          "description": "Arrive in Baltimore.",
+          "participants": ["Zulkarnain", "Natalie", "Nadya", "Nadra"]
+        },
+        {
+          "id": "park-car-spothero",
+          "time": null,
+          "type": "parking",
+          "title": "Park car with SpotHero",
+          "description": "Park car with SpotHero.",
+          "participants": ["Zulkarnain", "Natalie", "Nadya", "Nadra"]
+        },
+        {
+          "id": "train-to-washington-dc",
+          "time": null,
+          "type": "transport",
+          "title": "Train to Washington DC",
+          "description": "Take train to Washington DC.",
+          "participants": ["Zulkarnain", "Natalie", "Nadya", "Nadra"]
+        },
+        {
+          "id": "arrive-washington-dc",
+          "time": "09:00",
+          "type": "arrival",
+          "title": "Arrive at Washington DC",
+          "description": "Arrive at Washington DC.",
+          "participants": ["Zulkarnain", "Natalie", "Nadya", "Nadra"]
+        },
+        {
+          "id": "leave-washington-dc",
+          "time": "13:00",
+          "type": "travel",
+          "title": "Leave Washington DC",
+          "description": "Leave Washington DC.",
+          "participants": ["Zulkarnain", "Natalie", "Nadya", "Nadra"]
+        },
+        {
+          "id": "arrive-baltimore-return",
+          "time": "15:00",
+          "type": "arrival",
+          "title": "Arrive at Baltimore",
+          "description": "Arrive at Baltimore.",
+          "participants": ["Zulkarnain", "Natalie", "Nadya", "Nadra"]
+        },
+        {
+          "id": "drive-to-lancaster",
+          "time": "20:00",
+          "type": "travel",
+          "title": "Drive to Lancaster",
+          "description": "Drive to Lancaster.",
+          "participants": ["Zulkarnain", "Natalie", "Nadya", "Nadra"]
+        }
+      ]
+    },
+    {
+      "id": "2026-07-14",
+      "date": "2026-07-14",
+      "day": "Tuesday",
+      "title": "Checkout Lancaster and Check In Glenside",
+      "items": [
+        {
+          "id": "checkout-lancaster",
+          "time": "10:00",
+          "type": "accommodation",
+          "title": "Check out from Airbnb Lancaster",
+          "participants": ["All"]
+        },
+        {
+          "id": "collect-wedding-suit",
+          "time": null,
+          "type": "task",
+          "title": "Collect wedding suit",
+          "participants": ["Zulkarnain"]
+        },
+        {
+          "id": "checkin-glenside",
+          "time": "15:00",
+          "type": "accommodation",
+          "title": "Check in at Airbnb Glenside",
+          "participants": ["Zaiton", "Asmah", "Kamal"]
+        }
+      ]
+    },
+    {
+      "id": "2026-07-15",
+      "date": "2026-07-15",
+      "day": "Wednesday",
+      "title": "Asmah and Kamal Arrival",
+      "items": [
+        {
+          "id": "pickup-angah-kamal-phl",
+          "time": null,
+          "type": "airport-pickup",
+          "title": "Fetch Asmah and Kamal",
+          "participants": ["Zulkarnain", "Asmah", "Kamal"]
+        },
+        {
+          "id": "dinner-king-of-prussia",
+          "time": null,
+          "type": "meal",
+          "title": "Dinner at King of Prussia",
+          "participants": ["All"]
+        }
+      ]
+    },
+    {
+      "id": "2026-07-16",
+      "date": "2026-07-16",
+      "day": "Thursday",
+      "title": "Wedding Day",
+      "items": [
+        {
+          "id": "hair-appointment-girls",
+          "time": "13:00",
+          "type": "appointment",
+          "title": "Hair appointment",
+          "participants": ["Natalie", "Nadya", "Nadra"]
+        },
+        {
+          "id": "hair-appointment-zulkarnain",
+          "time": "14:00",
+          "type": "appointment",
+          "title": "Hair appointment for Zulkarnain",
+          "participants": ["Zulkarnain"]
+        },
+        {
+          "id": "couple-arrive-wedding-location",
+          "time": "17:00",
+          "type": "arrival",
+          "title": "Couple arrive at wedding location",
+          "participants": ["Natalie", "Zulkarnain"],
+          "location": {
+            "name": "Morris Arboretum & Gardens of the University of Pennsylvania",
+            "plusCode": "3QQH+76 Philadelphia, Pennsylvania, USA"
+          }
+        },
+        {
+          "id": "guests-arrive",
+          "time": "17:30",
+          "type": "arrival",
+          "title": "Guests arrive"
+        },
+        {
+          "id": "wedding-ceremony",
+          "time": "18:00",
+          "type": "ceremony",
+          "title": "Wedding ceremony",
+          "participants": ["All"]
+        }
+      ]
+    },
+    {
+      "id": "2026-07-17",
+      "date": "2026-07-17",
+      "day": "Friday",
+      "title": "Courthouse and Airport Drop-Off",
+      "items": [
+        {
+          "id": "checkout-glenside",
+          "time": "10:00",
+          "type": "accommodation",
+          "title": "Check out from Airbnb Glenside",
+          "participants": ["Zaiton", "Asmah", "Kamal"]
+        },
+        {
+          "id": "montgomery-county-courthouse",
+          "time": null,
+          "type": "official-appointment",
+          "title": "Montgomery County Courthouse",
+          "participants": ["Natalie", "Zulkarnain"]
+        },
+        {
+          "id": "lunch-king-of-prussia",
+          "time": null,
+          "type": "meal",
+          "title": "Lunch at King of Prussia",
+          "participants": ["All"]
+        },
+        {
+          "id": "dropoff-nenek-angah-kamal-phl",
+          "time": null,
+          "type": "airport-dropoff",
+          "title": "Drop off at PHL airport",
+          "participants": ["Zaiton", "Asmah", "Kamal", "Zulkarnain"]
+        }
+      ]
+    },
+    {
+      "id": "2026-07-18",
+      "date": "2026-07-18",
+      "day": "Saturday",
+      "title": "Delaware",
+      "items": [
+        {
+          "id": "delaware-day-1",
+          "type": "outing",
+          "title": "Delaware",
+          "participants": ["Natalie", "Zulkarnain", "Nadya", "Nadra"]
+        }
+      ]
+    },
+    {
+      "id": "2026-07-19",
+      "date": "2026-07-19",
+      "day": "Sunday",
+      "title": "Delaware",
+      "items": [
+        {
+          "id": "delaware-day-2",
+          "type": "outing",
+          "title": "Delaware",
+          "participants": ["Natalie", "Zulkarnain", "Nadya", "Nadra"]
+        }
+      ]
+    },
+    {
+      "id": "2026-07-20",
+      "date": "2026-07-20",
+      "day": "Monday",
+      "title": "Delaware",
+      "items": [
+        {
+          "id": "delaware-day-3",
+          "type": "outing",
+          "title": "Delaware",
+          "participants": ["Natalie", "Zulkarnain", "Nadya", "Nadra"]
+        }
+      ]
+    },
+    {
+      "id": "2026-07-21",
+      "date": "2026-07-21",
+      "day": "Tuesday",
+      "title": "Unplanned",
+      "items": []
+    },
+    {
+      "id": "2026-07-22",
+      "date": "2026-07-22",
+      "day": "Wednesday",
+      "title": "Unplanned",
+      "items": []
+    },
+    {
+      "id": "2026-07-23",
+      "date": "2026-07-23",
+      "day": "Thursday",
+      "title": "Unplanned",
+      "items": []
+    },
+    {
+      "id": "2026-07-24",
+      "date": "2026-07-24",
+      "day": "Friday",
+      "title": "Unplanned",
+      "items": []
+    },
+    {
+      "id": "2026-07-25",
+      "date": "2026-07-25",
+      "day": "Saturday",
+      "title": "Unplanned",
+      "items": []
+    },
+    {
+      "id": "2026-07-26",
+      "date": "2026-07-26",
+      "day": "Sunday",
+      "title": "Unplanned",
+      "items": []
+    },
+    {
+      "id": "2026-07-27",
+      "date": "2026-07-27",
+      "day": "Monday",
+      "title": "Unplanned",
+      "items": []
+    },
+    {
+      "id": "2026-07-28",
+      "date": "2026-07-28",
+      "day": "Tuesday",
+      "title": "Fly to Toronto",
+      "items": [
+        {
+          "id": "fly-to-toronto",
+          "type": "flight",
+          "title": "Fly to Toronto",
+          "participants": ["Natalie", "Zulkarnain", "Nadya", "Nadra"]
+        },
+        {
+          "id": "collect-rental-car-toronto",
+          "time": null,
+          "type": "car-rental",
+          "title": "Collect rental car in Toronto",
+          "description": "Collect rental car at Toronto Pearson (not booked yet).",
+          "participants": ["Natalie", "Zulkarnain", "Nadya", "Nadra"]
+        }
+      ]
+    },
+    {
+      "id": "2026-07-29",
+      "date": "2026-07-29",
+      "day": "Wednesday",
+      "title": "Toronto",
+      "items": []
+    },
+    {
+      "id": "2026-07-30",
+      "date": "2026-07-30",
+      "day": "Thursday",
+      "title": "Toronto",
+      "items": []
+    },
+    {
+      "id": "2026-07-31",
+      "date": "2026-07-31",
+      "day": "Friday",
+      "title": "Toronto",
+      "items": []
+    },
+    {
+      "id": "2026-08-01",
+      "date": "2026-08-01",
+      "day": "Saturday",
+      "title": "Toronto",
+      "items": []
+    },
+    {
+      "id": "2026-08-02",
+      "date": "2026-08-02",
+      "day": "Sunday",
+      "title": "Toronto",
+      "items": []
+    },
+    {
+      "id": "2026-08-03",
+      "date": "2026-08-03",
+      "day": "Monday",
+      "title": "Return Flights",
+      "items": [
+        {
+          "id": "return-melbourne",
+          "type": "flight",
+          "title": "Zaiton, Nadya and Nadra fly back to Melbourne",
+          "participants": ["Zaiton", "Nadya", "Nadra"]
+        },
+        {
+          "id": "return-philadelphia",
+          "type": "flight",
+          "title": "Zulkarnain and Natalie fly back to Philadelphia",
+          "participants": ["Zulkarnain", "Natalie"]
+        }
+      ]
+    }
+  ]
+}

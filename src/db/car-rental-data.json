@@ -1,0 +1,22 @@
+{
+  "carRentals": [
+    {
+      "label": "Enterprise Philadelphia",
+      "company": "Enterprise Rent-A-Car",
+      "bookingStatus": "suggested",
+      "pickupDate": "2026-07-09",
+      "pickupLocation": "Enterprise Rent-A-Car, Philadelphia International Airport area",
+      "mapUrl": "https://www.google.com/maps/place/Enterprise+Rent-A-Car/@39.8822548,-75.2512353,15.11z/data=!4m6!3m5!1s0x89c6c49d8f66617b:0x13183a865ed18bbc!8m2!3d39.881925!4d-75.242409!16s%2Fg%2F1td4w6vj?entry=ttu&g_ep=EgoyMDI2MDYyMS4wIKXMDSoASAFQAw%3D%3D",
+      "notes": ["Not booked yet — suggested pick-up location only."]
+    },
+    {
+      "label": "Enterprise Toronto Pearson",
+      "company": "Enterprise Rent-A-Car",
+      "bookingStatus": "suggested",
+      "pickupDate": "2026-07-28",
+      "pickupLocation": "Enterprise Rent-A-Car, Toronto Pearson International Airport",
+      "mapUrl": "https://www.google.com/maps/place/Enterprise+Rent-A-Car/@43.6835337,-79.6205887,16z/data=!4m10!1m2!2m1!1senterprise+car+rental+toronto+pearson+airport!3m6!1s0x882b34886c53516f:0xbbee86cbc502dff6!8m2!3d43.6835334!4d-79.6110618!15sCi1lbnRlcnByaXNlIGNhciByZW50YWwgdG9yb250byBwZWFyc29uIGFpcnBvcnQiA4gBAVovIi1lbnRlcnByaXNlIGNhciByZW50YWwgdG9yb250byBwZWFyc29uIGFpcnBvcnSSARFjYXJfcmVudGFsX2FnZW5jeZoBRENpOURRVWxSUVVOdlpFTm9kSGxqUmpsdlQyeENhV0pYUmxSWU0yUkpZbGhaTVZremNESlhWMVp2WVdwR2RGUXhSUkFC4AEA-gEECAAQOw!16s%2Fg%2F1q629d4pq?entry=ttu&g_ep=EgoyMDI2MDYyMS4wIKXMDSoASAFQAw%3D%3D",
+      "notes": ["Not booked yet — suggested pick-up location only."]
+    }
+  ]
+}
