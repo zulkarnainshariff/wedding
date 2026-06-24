@@ -21,6 +21,10 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Natalie & Zulkarnain",
   description: "Wedding invitations and family travel itinerary",
+  themeColor: "#1e3a5f",
+  appleWebApp: {
+    title: "N & Z",
+  },
 };
 
 export default function RootLayout({

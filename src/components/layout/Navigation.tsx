@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  CalendarDays,
   Heart,
   LayoutGrid,
   LogOut,
@@ -15,6 +14,7 @@ import {
   X,
   CheckSquare,
 } from "lucide-react";
+import { AppMark } from "@/components/ui/AppMark";
 import { SidebarSyncButton } from "@/components/auth/SidebarSyncButton";
 import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -148,8 +148,8 @@ export function Sidebar({ compact = false }: { compact?: boolean }) {
     >
       <div className={["border-b border-stone-200/80 p-4", compact ? "px-2" : ""].join(" ")}>
         <div className={["flex items-start gap-2", compact ? "flex-col items-center" : ""].join(" ")}>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1e3a5f] text-[#d4a853]">
-            <CalendarDays className="h-5 w-5" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm">
+            <AppMark size={40} />
           </div>
           {user && <NotificationBell compact={compact} />}
         </div>
