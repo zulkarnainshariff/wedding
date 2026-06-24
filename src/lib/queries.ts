@@ -1,6 +1,7 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray, isNull, and } from "drizzle-orm";
 import { getSessionUser } from "./auth";
 import { db } from "./db";
+import { buildDaysWithItems } from "./item-scheduling";
 import { filterItemsByPermission } from "./permissions";
 import { itineraryDays, itineraryItems } from "./schema";
 import { prepareDayItems, prepareScheduleDayItems } from "./timeline-utils";
@@ -30,14 +31,12 @@ export async function getTimeline() {
     await db
       .select()
       .from(itineraryItems)
+      .where(isNull(itineraryItems.parentItemId))
       .orderBy(asc(itineraryItems.startDatetime), asc(itineraryItems.sortOrder)),
     user,
   );
 
-  return days.map((day) => ({
-    ...day,
-    items: prepareDayItems(items.filter((item) => item.dayId === day.id)),
-  }));
+  return buildDaysWithItems(days, items, prepareDayItems);
 }
 
 export async function getScheduleByDate() {
@@ -47,17 +46,17 @@ export async function getScheduleByDate() {
     await db
       .select()
       .from(itineraryItems)
-      .where(inArray(itineraryItems.category, [...DAILY_SCHEDULE_CATEGORIES]))
+      .where(
+        and(
+          inArray(itineraryItems.category, [...DAILY_SCHEDULE_CATEGORIES]),
+          isNull(itineraryItems.parentItemId),
+        ),
+      )
       .orderBy(asc(itineraryItems.sortOrder), asc(itineraryItems.startDatetime)),
     user,
   );
 
-  return days.map((day) => ({
-    ...day,
-    items: prepareScheduleDayItems(
-      scheduleItems.filter((item) => item.dayId === day.id),
-    ),
-  }));
+  return buildDaysWithItems(days, scheduleItems, prepareScheduleDayItems);
 }
 
 export async function getItemsByCategory(category: Category) {
@@ -65,7 +64,12 @@ export async function getItemsByCategory(category: Category) {
   const items = await db
     .select()
     .from(itineraryItems)
-    .where(eq(itineraryItems.category, category))
+    .where(
+      and(
+        eq(itineraryItems.category, category),
+        isNull(itineraryItems.parentItemId),
+      ),
+    )
     .orderBy(asc(itineraryItems.startDatetime), asc(itineraryItems.sortOrder));
 
   return filterItemsByPermission(items, user);
@@ -76,6 +80,7 @@ export async function getAllItems() {
   const items = await db
     .select()
     .from(itineraryItems)
+    .where(isNull(itineraryItems.parentItemId))
     .orderBy(asc(itineraryItems.startDatetime), asc(itineraryItems.sortOrder));
 
   return filterItemsByPermission(items, user);

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Save, X } from "lucide-react";
+import { Save, Trash2, X } from "lucide-react";
 import { AdminItemDetailsForm } from "@/components/admin/AdminItemDetailsForm";
 import {
   buildItemApiPayload,
@@ -124,11 +124,13 @@ export function ItemEditView({
   item,
   onCancel,
   onSaved,
+  onDelete,
   modal = false,
 }: {
   item: ItineraryItem;
   onCancel: () => void;
   onSaved: () => void;
+  onDelete?: () => void;
   modal?: boolean;
 }) {
   const router = useRouter();
@@ -174,7 +176,7 @@ export function ItemEditView({
   }
 
   const actionButtons = (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       <button
         type="button"
         disabled={saving || !form.title.trim()}
@@ -191,6 +193,16 @@ export function ItemEditView({
       >
         Cancel
       </button>
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete
+        </button>
+      )}
     </div>
   );
 

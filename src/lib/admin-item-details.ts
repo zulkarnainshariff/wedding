@@ -1,4 +1,5 @@
 import type { AccommodationSuggestion, Category, FlightSegment } from "@/lib/types";
+import { formatFlightNumberDisplay, parseLegacyFlightNumber } from "@/lib/flight-numbers";
 import { buildLocationPayload, getItemLocation } from "@/lib/item-location";
 import { TRAVELLER_NAMES } from "@/lib/travellers";
 import type { UnitsPreference } from "@/lib/user-preferences";
@@ -25,6 +26,10 @@ const EMPTY_SIMPLE: Record<Category, Record<string, string>> = {
   flight: {
     from: "",
     to: "",
+    fromIata: "",
+    toIata: "",
+    marketingFlightNumber: "",
+    operatingFlightNumber: "",
     flightNumber: "",
     departureTime: "",
     arrivalTime: "",
@@ -32,6 +37,8 @@ const EMPTY_SIMPLE: Record<Category, Record<string, string>> = {
     aircraft: "",
     departureTerminal: "",
     arrivalTerminal: "",
+    departureGate: "",
+    arrivalGate: "",
     totalFlightTime: "",
   },
   pet_relocation: {
@@ -169,6 +176,25 @@ export function parseStructuredDetails(
     structured.travellers = Array.isArray(details.travellers)
       ? (details.travellers as string[])
       : [];
+    const legacy = parseLegacyFlightNumber(details.flightNumber as string | undefined);
+    if (!structured.simple.marketingFlightNumber) {
+      structured.simple.marketingFlightNumber =
+        (details.marketingFlightNumber as string | undefined) ||
+        legacy.marketing ||
+        "";
+    }
+    if (!structured.simple.operatingFlightNumber) {
+      structured.simple.operatingFlightNumber =
+        (details.operatingFlightNumber as string | undefined) ||
+        legacy.operating ||
+        "";
+    }
+    if (!structured.simple.fromIata && details.fromIata) {
+      structured.simple.fromIata = String(details.fromIata);
+    }
+    if (!structured.simple.toIata && details.toIata) {
+      structured.simple.toIata = String(details.toIata);
+    }
     structured.bookingReferences = recordsFromObject(
       details.bookingReferences as Record<string, string> | undefined,
     );
@@ -256,17 +282,47 @@ export function buildStructuredDetailsPayload(
         ? `${structured.simple.from} to ${structured.simple.to}`
         : "";
     payload.travellers = structured.travellers;
+    payload.marketingFlightNumber =
+      structured.simple.marketingFlightNumber.trim() || undefined;
+    payload.operatingFlightNumber =
+      structured.simple.operatingFlightNumber.trim() ||
+      structured.simple.marketingFlightNumber.trim() ||
+      undefined;
+    payload.fromIata = structured.simple.fromIata.trim().toUpperCase() || undefined;
+    payload.toIata = structured.simple.toIata.trim().toUpperCase() || undefined;
+    payload.flightNumber = formatFlightNumberDisplay(
+      payload.marketingFlightNumber as string | undefined,
+      payload.operatingFlightNumber as string | undefined,
+    );
     payload.departureTime = structured.simple.departureTime || null;
     payload.arrivalTime = structured.simple.arrivalTime || null;
+    payload.departureTerminal = structured.simple.departureTerminal || undefined;
+    payload.departureGate = structured.simple.departureGate || undefined;
+    payload.arrivalTerminal = structured.simple.arrivalTerminal || undefined;
+    payload.arrivalGate = structured.simple.arrivalGate || undefined;
     payload.status = structured.simple.status === "tbc" ? "tbc" : "confirmed";
     payload.bookingReferences = objectFromRecords(
       structured.bookingReferences,
     );
     payload.seats = objectFromRecords(structured.seats);
     payload.baggage = objectFromRecords(structured.baggage, true);
-    payload.segments = structured.segments.filter(
-      (segment) => segment.from || segment.to || segment.flightNumber,
-    );
+    payload.segments = structured.segments
+      .filter(
+        (segment) =>
+          segment.from ||
+          segment.to ||
+          segment.marketingFlightNumber ||
+          segment.operatingFlightNumber ||
+          segment.flightNumber,
+      )
+      .map((segment) => ({
+        ...segment,
+        flightNumber:
+          formatFlightNumberDisplay(
+            segment.marketingFlightNumber,
+            segment.operatingFlightNumber,
+          ) || segment.flightNumber,
+      }));
     delete payload.bookingReference;
   }
 

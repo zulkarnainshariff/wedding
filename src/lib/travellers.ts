@@ -11,8 +11,11 @@ export const TRAVELLER_NAMES = [
   "Natalie",
   "Nadya",
   "Nadra",
+  "Umar",
   "Asmah",
   "Kamal",
+  "Shireen",
+  "Zulfikar",
   "Everyone",
 ] as const;
 

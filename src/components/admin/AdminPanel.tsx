@@ -6,6 +6,7 @@ import { Plus, Save, Trash2 } from "lucide-react";
 import { AdminItemDetailsForm } from "./AdminItemDetailsForm";
 import { InvitationManagement } from "./InvitationManagement";
 import { TravelInsurancePanel } from "./TravelInsurancePanel";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { GuestListClient } from "@/components/guests/GuestListClient";
 import { TaskPermissionsPanel } from "./TaskPermissionsPanel";
 import { UserManagement, type ManagedUser } from "./UserManagement";
@@ -68,6 +69,9 @@ export function AdminPanel({
   const [editingDayId, setEditingDayId] = useState<number | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingDeleteItemId, setPendingDeleteItemId] = useState<number | null>(
+    null,
+  );
 
   const dayDirty = useMemo(
     () => JSON.stringify(dayForm) !== JSON.stringify(dayBaseline),
@@ -195,10 +199,22 @@ export function AdminPanel({
   }
 
   async function deleteItem(id: number) {
-    if (!confirm("Delete this item?")) return;
+    setPendingDeleteItemId(id);
+  }
+
+  async function confirmDeleteItem() {
+    if (pendingDeleteItemId == null) return;
+
+    const id = pendingDeleteItemId;
     setBusy(true);
-    await fetch(`/api/items/${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/items/${id}`, { method: "DELETE" });
     setBusy(false);
+    setPendingDeleteItemId(null);
+
+    if (!response.ok) {
+      alert("Could not delete this item.");
+      return;
+    }
     if (editingItemId === id) {
       const cleared = emptyItemForm();
       setItemForm(cleared);
@@ -231,7 +247,8 @@ export function AdminPanel({
   }
 
   return (
-    <PageShell
+    <>
+      <PageShell
       eyebrow="Manage"
       title="Edit Itinerary"
       toolbar={
@@ -559,5 +576,19 @@ export function AdminPanel({
         </div>
       )}
     </PageShell>
+
+      <ConfirmDialog
+        open={pendingDeleteItemId != null}
+        title="Delete item?"
+        message="This item will be permanently removed, including any sub-items and attached documents."
+        confirmLabel="Delete"
+        destructive
+        busy={busy}
+        onClose={() => {
+          if (!busy) setPendingDeleteItemId(null);
+        }}
+        onConfirm={() => void confirmDeleteItem()}
+      />
+    </>
   );
 }

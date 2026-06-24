@@ -35,6 +35,9 @@ yarn-error.log*
 !.env.example
 wedding_seed.sql
 
+# uploaded item documents (PDFs, etc.)
+/data/uploads/
+
 # vercel
 .vercel
 

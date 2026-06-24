@@ -88,7 +88,13 @@ export type TripProgress = {
   progressPercent: number;
   status: "upcoming" | "in-progress" | "complete";
   currentDayTitle: string | null;
+  daysUntilStart: number | null;
 };
+
+export function formatDaysUntilStart(days: number): string {
+  if (days === 1) return "1 day to go";
+  return `${days} days to go`;
+}
 
 export function computeTripProgress(
   days: Pick<ItineraryDay, "date" | "dayNumber" | "title">[],
@@ -147,5 +153,9 @@ export function computeTripProgress(
     progressPercent,
     status,
     currentDayTitle: currentDay?.title ?? null,
+    daysUntilStart:
+      status === "upcoming"
+        ? Math.round((startMs - currentMs) / (24 * 60 * 60 * 1000))
+        : null,
   };
 }

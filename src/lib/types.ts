@@ -10,14 +10,23 @@ export const CATEGORIES = [
 export type Category = (typeof CATEGORIES)[number];
 
 export type FlightSegment = {
+  /** Booked / airport display flight (e.g. QF1234). */
+  marketingFlightNumber?: string;
+  /** Operating flight used for live tracking (e.g. AA456). */
+  operatingFlightNumber?: string;
+  /** @deprecated Use marketingFlightNumber + operatingFlightNumber */
   flightNumber?: string;
   from?: string;
   to?: string;
+  fromIata?: string;
+  toIata?: string;
   departureTime?: string;
   arrivalTime?: string;
   flightTime?: string;
   departureTerminal?: string;
   arrivalTerminal?: string;
+  departureGate?: string;
+  arrivalGate?: string;
   aircraft?: string;
   transit?: string;
   airport?: string;
@@ -29,9 +38,14 @@ export type FlightDetails = {
   travellers: string[];
   passengers?: string[];
   cargoParty?: string[];
+  marketingFlightNumber?: string;
+  operatingFlightNumber?: string;
+  /** @deprecated Use marketingFlightNumber + operatingFlightNumber */
   flightNumber?: string | null;
   from: string;
   to: string;
+  fromIata?: string;
+  toIata?: string;
   departureTime?: string | null;
   arrivalTime?: string | null;
   totalFlightTime?: string;
@@ -43,6 +57,8 @@ export type FlightDetails = {
   aircraft?: string;
   departureTerminal?: string;
   arrivalTerminal?: string;
+  departureGate?: string;
+  arrivalGate?: string;
   segments?: FlightSegment[];
   notes?: string[];
   status: "confirmed" | "tbc";
@@ -116,6 +132,7 @@ export type ActivityDetails = {
   activityType: string;
   time?: string | null;
   description?: string;
+  notes?: string[];
   participants?: string[];
   location?: ActivityLocation;
   linkedItemId?: number;

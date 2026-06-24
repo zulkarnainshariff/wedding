@@ -4,6 +4,11 @@ import type { FlightDetails, FlightSegment } from "@/lib/types";
 import { formatTravellerLabel } from "@/lib/types";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { formatSeatsSummary, hasAssignedSeats } from "@/lib/seats";
+import {
+  formatFlightNumberDisplay,
+  normalizeFlightDetails,
+} from "@/lib/flight-numbers";
+import { FlightLiveStatusPanel } from "@/components/itinerary/FlightLiveStatus";
 
 function DetailRow({
   label,
@@ -55,17 +60,24 @@ function SegmentTimeline({ segments }: { segments: FlightSegment[] }) {
               className="rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3"
             >
               <p className="font-medium text-sky-900">
-                {segment.flightNumber} · {segment.from} → {segment.to}
+                {formatFlightNumberDisplay(
+                  segment.marketingFlightNumber,
+                  segment.operatingFlightNumber,
+                ) || segment.flightNumber}{" "}
+                · {segment.from}
+                {segment.fromIata ? ` (${segment.fromIata})` : ""} → {segment.to}
+                {segment.toIata ? ` (${segment.toIata})` : ""}
               </p>
               <p className="mt-1 text-sm text-stone-600">
                 {segment.departureTime && `Departs ${segment.departureTime}`}
                 {segment.arrivalTime && ` · Arrives ${segment.arrivalTime}`}
                 {segment.flightTime && ` · ${segment.flightTime}`}
               </p>
-              {(segment.departureTerminal || segment.arrivalTerminal) && (
+              {(segment.departureTerminal || segment.departureGate) && (
                 <p className="mt-1 text-xs text-stone-500">
-                  {segment.departureTerminal && `Dep. terminal ${segment.departureTerminal}`}
-                  {segment.arrivalTerminal && ` · Arr. terminal ${segment.arrivalTerminal}`}
+                  {segment.departureTerminal &&
+                    `Dep. terminal ${segment.departureTerminal}`}
+                  {segment.departureGate && ` · Dep. gate ${segment.departureGate}`}
                 </p>
               )}
               {segment.aircraft && (
@@ -123,56 +135,91 @@ function BaggageTable({
   );
 }
 
-export function FlightDetailView({ details }: { details: FlightDetails }) {
-  const passengers = details.passengers ?? details.travellers;
-  const bookingRefs = details.bookingReferences
-    ? Object.entries(details.bookingReferences)
+export function FlightDetailView({
+  details,
+  itemId,
+}: {
+  details: FlightDetails;
+  itemId?: number;
+}) {
+  const flight = normalizeFlightDetails(details);
+  const passengers = flight.passengers ?? flight.travellers;
+  const bookingRefs = flight.bookingReferences
+    ? Object.entries(flight.bookingReferences)
         .map(([name, ref]) => `${name}: ${ref}`)
         .join(" · ")
-    : details.bookingReference;
+    : flight.bookingReference;
+
+  const flightNumberLabel = formatFlightNumberDisplay(
+    flight.marketingFlightNumber,
+    flight.operatingFlightNumber,
+  );
 
   return (
     <div>
+      {itemId ? (
+        <FlightLiveStatusPanel
+          itemId={itemId}
+          marketingFlightNumber={flight.marketingFlightNumber}
+          operatingFlightNumber={flight.operatingFlightNumber}
+          savedDeparture={{
+            terminal: flight.departureTerminal,
+            gate: flight.departureGate,
+          }}
+        />
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2 border-b border-stone-100 py-3">
-        <StatusBadge status={details.status} />
+        <StatusBadge status={flight.status} />
       </div>
 
       <dl>
-        <DetailRow label="Route" value={`${details.from} → ${details.to}`} />
-        <DetailRow label="Day" value={details.dayOfWeek} />
-        <DetailRow label="Flight" value={details.flightNumber ?? undefined} />
-        <DetailRow label="Departure" value={details.departureTime ?? undefined} />
-        <DetailRow label="Arrival" value={details.arrivalTime ?? undefined} />
-        <DetailRow label="Duration" value={details.totalFlightTime ?? details.flightTime} />
-        <DetailRow label="Aircraft" value={details.aircraft} />
-        <DetailRow label="Dep. terminal" value={details.departureTerminal} />
-        <DetailRow label="Arr. terminal" value={details.arrivalTerminal} />
+        <DetailRow
+          label="Route"
+          value={`${flight.from}${flight.fromIata ? ` (${flight.fromIata})` : ""} → ${flight.to}${flight.toIata ? ` (${flight.toIata})` : ""}`}
+        />
+        <DetailRow label="Day" value={flight.dayOfWeek} />
+        <DetailRow label="Flight" value={flightNumberLabel ?? undefined} />
+        <DetailRow label="Departure" value={flight.departureTime ?? undefined} />
+        <DetailRow label="Arrival" value={flight.arrivalTime ?? undefined} />
+        <DetailRow label="Duration" value={flight.totalFlightTime ?? flight.flightTime} />
+        <DetailRow label="Aircraft" value={flight.aircraft} />
+        <DetailRow
+          label="Dep. terminal"
+          value={
+            flight.departureTerminal
+              ? `${flight.departureTerminal}${flight.departureGate ? ` · Gate ${flight.departureGate}` : ""}`
+              : flight.departureGate
+                ? `Gate ${flight.departureGate}`
+                : undefined
+          }
+        />
         <DetailRow
           label="Passengers"
           value={passengers.map((p) => formatTravellerLabel(p)).join(", ")}
         />
-        {details.cargoParty && details.cargoParty.length > 0 && (
+        {flight.cargoParty && flight.cargoParty.length > 0 && (
           <DetailRow
             label="Cargo (not passengers)"
-            value={details.cargoParty
-              .map((p) => formatTravellerLabel(p, true))
+            value={flight.cargoParty
+              ?.map((p) => formatTravellerLabel(p, true))
               .join(", ")}
           />
         )}
         <DetailRow label="Booking ref." value={bookingRefs} />
       </dl>
 
-      {details.segments && details.segments.length > 0 && (
-        <SegmentTimeline segments={details.segments} />
+      {flight.segments && flight.segments.length > 0 && (
+        <SegmentTimeline segments={flight.segments} />
       )}
 
-      <BaggageTable baggage={details.baggage} cargoParty={details.cargoParty} />
+      <BaggageTable baggage={flight.baggage} cargoParty={flight.cargoParty} />
 
       <div className="border-t border-stone-100 py-4">
         <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
           Seats
         </h3>
-        {hasAssignedSeats(details.seats) ? (
+        {hasAssignedSeats(flight.seats) ? (
           <div className="mt-3 overflow-hidden rounded-xl border border-stone-200">
             <table className="w-full text-sm">
               <thead className="bg-stone-50 text-left text-stone-500">
@@ -182,7 +229,7 @@ export function FlightDetailView({ details }: { details: FlightDetails }) {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(details.seats!).map(([name, seat]) => (
+                {Object.entries(flight.seats!).map(([name, seat]) => (
                   <tr key={name} className="border-t border-stone-100">
                     <td className="px-4 py-2 text-stone-800">
                       {formatTravellerLabel(name)}
@@ -196,20 +243,20 @@ export function FlightDetailView({ details }: { details: FlightDetails }) {
         ) : (
           <p className="mt-2 text-sm text-stone-500">
             {formatSeatsSummary(
-              details.seats,
-              details.passengers ?? details.travellers,
+              flight.seats,
+              flight.passengers ?? flight.travellers,
             )}
           </p>
         )}
       </div>
 
-      {details.notes && details.notes.length > 0 && (
+      {flight.notes && flight.notes.length > 0 && (
         <div className="border-t border-stone-100 py-4">
           <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
             Notes
           </h3>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-700">
-            {details.notes.map((note) => (
+            {flight.notes.map((note) => (
               <li key={note}>{note}</li>
             ))}
           </ul>

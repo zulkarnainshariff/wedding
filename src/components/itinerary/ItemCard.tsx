@@ -21,6 +21,7 @@ import {
 import type { ItineraryItem } from "@/lib/schema";
 import { ItemTaskIndicator } from "@/components/tasks/useTaskIndicators";
 import type { ItemTaskSummary } from "@/lib/task-queries";
+import { FlightProgressBar } from "@/components/itinerary/FlightProgressBar";
 import { useItineraryUI } from "./ItineraryUIContext";
 
 function StatusPill({ status }: { status?: "confirmed" | "tbc" }) {
@@ -113,21 +114,22 @@ function FlightDetailedPreview({
         value={formatClockTime(details.arrivalTime ?? undefined)}
       />
       <InlineDetail
-        label="Terminal"
+        label="Dep. terminal"
         value={
-          details.departureTerminal || details.arrivalTerminal
+          details.departureTerminal || details.departureGate
             ? [
-                details.departureTerminal && `Dep ${details.departureTerminal}`,
-                details.arrivalTerminal && `Arr ${details.arrivalTerminal}`,
+                details.departureTerminal &&
+                  `Terminal ${details.departureTerminal}`,
+                details.departureGate && `Gate ${details.departureGate}`,
               ]
                 .filter(Boolean)
                 .join(" · ")
-            : firstSegment
+            : firstSegment?.departureTerminal || firstSegment?.departureGate
               ? [
                   firstSegment.departureTerminal &&
-                    `Dep ${firstSegment.departureTerminal}`,
-                  firstSegment.arrivalTerminal &&
-                    `Arr ${firstSegment.arrivalTerminal}`,
+                    `Terminal ${firstSegment.departureTerminal}`,
+                  firstSegment.departureGate &&
+                    `Gate ${firstSegment.departureGate}`,
                 ]
                   .filter(Boolean)
                   .join(" · ")
@@ -257,6 +259,8 @@ export function ItemCard({
           {displayTime && (viewMode === "condensed" || category === "activity") && (
             <p className="mt-2 text-xs text-stone-400">{displayTime}</p>
           )}
+
+          {category === "flight" && <FlightProgressBar item={item} />}
 
           {viewMode === "condensed" &&
             category !== "activity" &&
