@@ -2,8 +2,8 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import type { GuestListAccess } from "@/lib/guest-list-types";
 import {
-  canEditItinerary,
-  canManageUsers,
+  canEditAllGuestLists,
+  canViewAllGuestLists,
   type SessionUser,
 } from "@/lib/permissions";
 import {
@@ -14,38 +14,30 @@ import {
   weddingEvents,
 } from "@/lib/schema";
 
-/** Bride and groom always see every guest list (both celebrations). */
-export const GUEST_LIST_HOST_USERNAMES = new Set(["natalie", "zulkarnain"]);
-
-function hasFullGuestListAccess(user: SessionUser): boolean {
-  return (
-    user.isAdmin ||
-    canManageUsers(user) ||
-    canEditItinerary(user) ||
-    GUEST_LIST_HOST_USERNAMES.has(user.username.toLowerCase())
-  );
-}
-
-async function getAllGuestListAccess(): Promise<GuestListAccess[]> {
+async function getAllGuestListAccess(
+  user: SessionUser,
+): Promise<GuestListAccess[]> {
   const events = await db
     .select()
     .from(weddingEvents)
     .orderBy(asc(weddingEvents.sortOrder));
+
+  const canEdit = canEditAllGuestLists(user);
 
   return events.map((event) => ({
     eventId: event.id,
     eventSlug: event.slug,
     eventName: event.name,
     canView: true,
-    canEdit: true,
+    canEdit,
   }));
 }
 
 export async function getGuestListAccessForUser(
   user: SessionUser,
 ): Promise<GuestListAccess[]> {
-  if (hasFullGuestListAccess(user)) {
-    return getAllGuestListAccess();
+  if (canViewAllGuestLists(user)) {
+    return getAllGuestListAccess(user);
   }
 
   const rows = await db
@@ -67,7 +59,7 @@ export async function canViewGuestList(
   user: SessionUser,
   eventId: number,
 ): Promise<boolean> {
-  if (hasFullGuestListAccess(user)) return true;
+  if (canViewAllGuestLists(user)) return true;
   const [row] = await db
     .select()
     .from(guestListPermissions)
@@ -85,7 +77,7 @@ export async function canEditGuestList(
   user: SessionUser,
   eventId: number,
 ): Promise<boolean> {
-  if (hasFullGuestListAccess(user)) return true;
+  if (canEditAllGuestLists(user)) return true;
   const [row] = await db
     .select()
     .from(guestListPermissions)

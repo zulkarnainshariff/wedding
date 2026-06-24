@@ -3,7 +3,12 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { hashPassword } from "../lib/auth";
-import { ADMIN_PERMISSIONS, DEFAULT_PERMISSIONS } from "../lib/permissions";
+import {
+  ADMIN_PERMISSIONS,
+  DEFAULT_PERMISSIONS,
+  normalizePermissions,
+  type UserPermissions,
+} from "../lib/permissions";
 import { users } from "../lib/schema";
 import { SEED_USERS } from "./users-data";
 
@@ -14,6 +19,15 @@ if (!connectionString) {
 
 const client = postgres(connectionString, { prepare: false });
 const db = drizzle(client);
+
+function seedPermissionsFor(entry: (typeof SEED_USERS)[number]): UserPermissions {
+  if (entry.isAdmin) return ADMIN_PERMISSIONS;
+  return normalizePermissions(
+    { ...DEFAULT_PERMISSIONS, ...entry.permissions },
+    false,
+    entry.username,
+  );
+}
 
 async function seedUsers() {
   console.log("Seeding users...");
@@ -41,6 +55,9 @@ async function seedUsers() {
         .set({
           passwordHash,
           tokenVersion: existing.tokenVersion + 1,
+          ...(entry.permissions
+            ? { permissions: seedPermissionsFor(entry) }
+            : {}),
         })
         .where(eq(users.id, existing.id));
 
@@ -54,7 +71,7 @@ async function seedUsers() {
       username: entry.username,
       passwordHash,
       isAdmin: entry.isAdmin ?? false,
-      permissions: entry.isAdmin ? ADMIN_PERMISSIONS : DEFAULT_PERMISSIONS,
+      permissions: seedPermissionsFor(entry),
     });
 
     created += 1;

@@ -24,6 +24,8 @@ const EMPTY_FORM = {
   viewAllTravellers: true,
   viewTravellers: [] as string[],
   canEdit: false,
+  canViewAllGuestLists: false,
+  canEditAllGuestLists: false,
 };
 
 function formatTravellerAccess(permissions: UserPermissions): string {
@@ -74,6 +76,8 @@ export function UserManagement({
           ? []
           : [...user.permissions.viewTravellers],
       canEdit: user.permissions.canEdit,
+      canViewAllGuestLists: Boolean(user.permissions.canViewAllGuestLists),
+      canEditAllGuestLists: Boolean(user.permissions.canEditAllGuestLists),
     });
     setError(null);
   }
@@ -95,6 +99,9 @@ export function UserManagement({
         form.isAdmin || form.viewAllTravellers ? "all" : form.viewTravellers,
       canEdit: form.isAdmin || form.canEdit,
       canManageUsers: form.isAdmin,
+      canViewAllGuestLists:
+        form.isAdmin || form.canViewAllGuestLists || form.canEditAllGuestLists,
+      canEditAllGuestLists: form.isAdmin || form.canEditAllGuestLists,
     };
 
     try {
@@ -255,6 +262,12 @@ export function UserManagement({
                   viewAllCategories: e.target.checked ? true : current.viewAllCategories,
                   viewAllTravellers: e.target.checked ? true : current.viewAllTravellers,
                   canEdit: e.target.checked ? true : current.canEdit,
+                  canViewAllGuestLists: e.target.checked
+                    ? true
+                    : current.canViewAllGuestLists,
+                  canEditAllGuestLists: e.target.checked
+                    ? true
+                    : current.canEditAllGuestLists,
                 }))
               }
             />
@@ -275,6 +288,41 @@ export function UserManagement({
                   }
                 />
                 Can edit itinerary
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-stone-700">
+                <input
+                  type="checkbox"
+                  checked={form.canViewAllGuestLists}
+                  onChange={(e) =>
+                    setForm((current) => ({
+                      ...current,
+                      canViewAllGuestLists: e.target.checked,
+                      canEditAllGuestLists: e.target.checked
+                        ? current.canEditAllGuestLists
+                        : false,
+                    }))
+                  }
+                />
+                Can view all guest lists
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-stone-700">
+                <input
+                  type="checkbox"
+                  checked={form.canEditAllGuestLists}
+                  disabled={!form.canViewAllGuestLists}
+                  onChange={(e) =>
+                    setForm((current) => ({
+                      ...current,
+                      canEditAllGuestLists: e.target.checked,
+                      canViewAllGuestLists: e.target.checked
+                        ? true
+                        : current.canViewAllGuestLists,
+                    }))
+                  }
+                />
+                Can edit all guest lists
               </label>
 
               <label className="flex items-center gap-2 text-sm text-stone-700">
@@ -412,6 +460,11 @@ export function UserManagement({
                             .join(", ")}`,
                       `Itineraries: ${formatTravellerAccess(user.permissions)}`,
                       user.permissions.canEdit ? "Can edit" : "Read only",
+                      user.permissions.canViewAllGuestLists
+                        ? user.permissions.canEditAllGuestLists
+                          ? "All guest lists (edit)"
+                          : "All guest lists (view)"
+                        : "Guest lists: per event",
                     ].join(" · ")}
               </p>
             </div>
