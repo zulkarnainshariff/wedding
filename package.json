@@ -17,6 +17,7 @@
     "db:migrate-guests": "tsx src/db/migrate-guests.ts",
     "db:migrate-notifications-tasks": "tsx src/db/migrate-notifications-tasks.ts",
     "db:migrate-task-updates": "tsx src/db/migrate-task-updates.ts",
+    "db:dump-seed": "bash scripts/dump-wedding-seed.sh",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

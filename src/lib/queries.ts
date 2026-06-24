@@ -1,10 +1,12 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { getSessionUser } from "./auth";
 import { db } from "./db";
 import { filterItemsByPermission } from "./permissions";
 import { itineraryDays, itineraryItems } from "./schema";
-import { prepareDayItems } from "./timeline-utils";
+import { prepareDayItems, prepareScheduleDayItems } from "./timeline-utils";
 import type { Category } from "./types";
+
+const DAILY_SCHEDULE_CATEGORIES = ["activity", "flight", "pet_relocation"] as const;
 
 async function getAuthorizedUser() {
   const user = await getSessionUser();
@@ -41,18 +43,20 @@ export async function getTimeline() {
 export async function getScheduleByDate() {
   const user = await getAuthorizedUser();
   const days = await getDays();
-  const activities = filterItemsByPermission(
+  const scheduleItems = filterItemsByPermission(
     await db
       .select()
       .from(itineraryItems)
-      .where(eq(itineraryItems.category, "activity"))
+      .where(inArray(itineraryItems.category, [...DAILY_SCHEDULE_CATEGORIES]))
       .orderBy(asc(itineraryItems.sortOrder), asc(itineraryItems.startDatetime)),
     user,
-  ).filter((item) => item.category === "activity");
+  );
 
   return days.map((day) => ({
     ...day,
-    items: activities.filter((item) => item.dayId === day.id),
+    items: prepareScheduleDayItems(
+      scheduleItems.filter((item) => item.dayId === day.id),
+    ),
   }));
 }
 

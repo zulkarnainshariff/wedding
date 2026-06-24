@@ -1,15 +1,34 @@
+import type { UserPermissions } from "../lib/permissions";
+
 export type SeedUser = {
   username: string;
   password: string;
   isAdmin?: boolean;
   /** Update password and invalidate sessions when user already exists */
   updateIfExists?: boolean;
+  permissions?: Partial<UserPermissions>;
 };
 
 export const SEED_USERS: SeedUser[] = [
   { username: "admin", password: "nafeesa", isAdmin: true },
-  { username: "zulkarnain", password: "nafeesa" },
-  { username: "natalie", password: "sweetpea", updateIfExists: true },
+  {
+    username: "zulkarnain",
+    password: "nafeesa",
+    permissions: {
+      canEdit: true,
+      canViewAllGuestLists: true,
+      canEditAllGuestLists: true,
+    },
+  },
+  {
+    username: "natalie",
+    password: "sweetpea",
+    updateIfExists: true,
+    permissions: {
+      canViewAllGuestLists: true,
+      canEditAllGuestLists: true,
+    },
+  },
   { username: "zulfikar", password: "nafeesa" },
   { username: "nadya", password: "nafeesa" },
   { username: "nadra", password: "nafeesa" },
