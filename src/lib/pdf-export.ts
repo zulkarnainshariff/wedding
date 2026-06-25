@@ -1,5 +1,6 @@
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
-import { resolveFlightSchedule, formatStoredClockForPdf } from "@/lib/flight-datetime";
+import { formatClockTimeWithPrefs } from "@/lib/display-format";
+import { resolveFlightSchedule } from "@/lib/flight-datetime";
 import {
   formatFlightNumberDisplay,
   normalizeFlightDetails,
@@ -16,11 +17,18 @@ import {
   type FlightDetails,
   type FlightSegment,
 } from "@/lib/types";
+import {
+  DEFAULT_USER_PREFERENCES,
+  type UserPreferences,
+} from "@/lib/user-preferences";
 
 export type ExportOptions = {
   categories: Category[];
   groupByDay: boolean;
+  preferences?: UserPreferences;
 };
+
+let activePdfPreferences = DEFAULT_USER_PREFERENCES;
 
 const PAGE_MARGIN = 14;
 const LINE_HEIGHT = 3.3;
@@ -350,7 +358,7 @@ function formatShortDailyDate(dateStr: string): string {
 
 function formatPdfClock(time: string | null | undefined): string {
   if (!time?.trim()) return "TBC";
-  return formatStoredClockForPdf(time);
+  return formatClockTimeWithPrefs(time, activePdfPreferences);
 }
 
 function buildSimpleRouteAirports(
@@ -785,15 +793,8 @@ function formatStayRange(item: ItineraryItem): string {
 
 function formatActivityTime(time: string | null | undefined): string {
   if (!time?.trim()) return "";
-  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
-  if (!match) return time.trim();
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (minute === 0) {
-    const suffix = hour >= 12 ? "pm" : "am";
-    return `${hour % 12 || 12}${suffix}`;
-  }
-  return time.trim();
+  const formatted = formatClockTimeWithPrefs(time, activePdfPreferences);
+  return formatted === "—" ? time.trim() : formatted;
 }
 
 function normalizeActivityText(value: string): string {
@@ -858,6 +859,8 @@ function renderItinerary(
   items: ItineraryItem[],
   options: ExportOptions,
 ): void {
+  activePdfPreferences = options.preferences ?? DEFAULT_USER_PREFERENCES;
+
   const dayById = Object.fromEntries(days.map((day) => [day.id, day]));
   const filtered = items.filter((item) =>
     options.categories.includes(item.category as Category),

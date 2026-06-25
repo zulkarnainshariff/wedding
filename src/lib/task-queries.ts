@@ -194,10 +194,6 @@ export async function getTaskNoteCounts(taskIds: number[]) {
 
 export async function getVisibleTasks(user: SessionUser) {
   const permissions = await getTaskPermissionsForUser(user);
-  const eventIds = permissions.map((entry) => entry.eventId);
-  if (!eventIds.length && !user.isAdmin) {
-    return [];
-  }
 
   const allTasks = await db
     .select({

@@ -11,12 +11,15 @@ export async function GET() {
   let taskPermissions: Awaited<ReturnType<typeof getTaskPermissionsForUser>> = [];
 
   try {
-    [guestListAccess, taskPermissions] = await Promise.all([
-      getGuestListAccessForUser(user),
-      getTaskPermissionsForUser(user),
-    ]);
+    guestListAccess = await getGuestListAccessForUser(user);
   } catch (error) {
-    console.error("Failed to load user access metadata:", error);
+    console.error("Failed to load guest list access:", error);
+  }
+
+  try {
+    taskPermissions = await getTaskPermissionsForUser(user);
+  } catch (error) {
+    console.error("Failed to load task permissions:", error);
   }
 
   return NextResponse.json({
