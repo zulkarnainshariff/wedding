@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -28,6 +28,7 @@ export function ItemCompleteToggle({
   compact?: boolean;
 }) {
   const router = useRouter();
+  const [, startTransition] = useTransition();
   const { canEdit } = useAuth();
   const { refreshSelectedItem, selectedItemId } = useItineraryUI();
   const [busy, setBusy] = useState(false);
@@ -35,8 +36,9 @@ export function ItemCompleteToggle({
   const [confirmUndoOpen, setConfirmUndoOpen] = useState(false);
 
   useEffect(() => {
+    if (confirmUndoOpen || busy) return;
     setCompleted(isItemCompleted(item));
-  }, [item]);
+  }, [item.id, item.details, confirmUndoOpen, busy]);
 
   const completion = getItemCompletion(item.details);
 
@@ -44,7 +46,9 @@ export function ItemCompleteToggle({
     if (!canEdit || busy) return;
 
     setBusy(true);
-    setCompleted(nextCompleted);
+    if (nextCompleted) {
+      setCompleted(true);
+    }
 
     try {
       const response = await fetch(`/api/items/${item.id}/complete`, {
@@ -54,17 +58,22 @@ export function ItemCompleteToggle({
       });
 
       if (!response.ok) {
-        setCompleted(!nextCompleted);
+        setCompleted(isItemCompleted(item));
         return;
       }
 
+      setCompleted(nextCompleted);
       setConfirmUndoOpen(false);
-      router.refresh();
+
       if (selectedItemId === item.id) {
-        await refreshSelectedItem();
+        await refreshSelectedItem({ silent: true });
       }
+
+      startTransition(() => {
+        router.refresh();
+      });
     } catch {
-      setCompleted(!nextCompleted);
+      setCompleted(isItemCompleted(item));
     } finally {
       setBusy(false);
     }
@@ -76,7 +85,7 @@ export function ItemCompleteToggle({
     if (!canEdit || busy) return;
 
     if (completed) {
-      setConfirmUndoOpen(true);
+      queueMicrotask(() => setConfirmUndoOpen(true));
       return;
     }
 

@@ -25,7 +25,7 @@ type ItineraryUIContextValue = {
   loadingItem: boolean;
   itemLoadError: ItemLoadError;
   isClosingItem: boolean;
-  refreshSelectedItem: () => Promise<void>;
+  refreshSelectedItem: (options?: { silent?: boolean }) => Promise<void>;
 };
 
 const ItineraryUIContext = createContext<ItineraryUIContextValue | null>(null);
@@ -76,10 +76,12 @@ export function ItineraryUIProvider({ children }: { children: React.ReactNode })
     [pathname, router, searchParams],
   );
 
-  const refreshSelectedItem = useCallback(async () => {
+  const refreshSelectedItem = useCallback(async (options?: { silent?: boolean }) => {
     if (!selectedItemId || Number.isNaN(selectedItemId)) return;
 
-    setLoadingItem(true);
+    if (!options?.silent) {
+      setLoadingItem(true);
+    }
     try {
       const response = await fetch(`/api/items/${selectedItemId}`);
       if (response.ok) {
@@ -103,7 +105,9 @@ export function ItineraryUIProvider({ children }: { children: React.ReactNode })
       setItemLoadError(null);
       setSelectedItem(getCachedItem(selectedItemId));
     } finally {
-      setLoadingItem(false);
+      if (!options?.silent) {
+        setLoadingItem(false);
+      }
     }
   }, [selectedItemId, getCachedItem]);
 

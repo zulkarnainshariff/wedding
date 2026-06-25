@@ -26,6 +26,7 @@ async function main() {
       can_assign boolean NOT NULL DEFAULT false,
       can_assign_for_others boolean NOT NULL DEFAULT false,
       can_view_others_tasks boolean NOT NULL DEFAULT false,
+      viewable_user_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
       UNIQUE (user_id, event_id)
     )
   `;

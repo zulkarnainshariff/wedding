@@ -3,6 +3,7 @@ import {
   type UnitsPreference,
   type UserPreferences,
 } from "./user-preferences";
+import { parseStoredClockTime } from "./flight-datetime";
 
 export function formatDateTimeWithPrefs(
   iso: string | Date | null | undefined,
@@ -27,19 +28,19 @@ export function formatClockTimeWithPrefs(
 ): string {
   if (!time) return "—";
 
+  const parsed = parseStoredClockTime(time);
   let hours: number;
   let minutes: number;
 
-  if (time.includes("T")) {
-    const d = new Date(time);
-    if (Number.isNaN(d.getTime())) return time;
-    hours = d.getHours();
-    minutes = d.getMinutes();
+  if (parsed) {
+    const [h, m] = parsed.clock.split(":");
+    hours = Number(h);
+    minutes = Number(m);
   } else {
     const [h, m] = time.split(":");
     hours = Number(h);
     minutes = Number(m ?? 0);
-    if (Number.isNaN(hours)) return time;
+    if (Number.isNaN(hours)) return "—";
   }
 
   if (preferences.timeFormat === "12h") {

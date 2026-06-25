@@ -1,4 +1,5 @@
 import type { Category, FlightDetails, PetRelocationDetails } from "./types";
+import { parseStoredClockTime } from "./flight-datetime";
 import {
   normalizeNotes,
   normalizeTravellerList,
@@ -64,8 +65,19 @@ export function combineDateTime(
   time: string | null | undefined,
 ): Date | null {
   if (!time) return new Date(`${date}T12:00:00`);
-  if (time.includes("T")) return new Date(time);
+  const parsed = parseStoredClockTime(time);
+  if (parsed) {
+    const useDate = parsed.embeddedDate ?? date;
+    return new Date(`${useDate}T${parsed.clock}:00`);
+  }
   return new Date(`${date}T${time}:00`);
+}
+
+function normalizeClockField(
+  value: string | null | undefined,
+): string | null | undefined {
+  if (!value) return value;
+  return parseStoredClockTime(value)?.clock ?? value;
 }
 
 export function buildFlightCategory(flight: RawFlight): Category {
@@ -101,8 +113,8 @@ export function buildFlightDetails(flight: RawFlight): FlightDetails {
     flightNumber: flight.flightNumber,
     from: flight.from,
     to: flight.to,
-    departureTime: flight.departureTime,
-    arrivalTime: flight.arrivalTime,
+    departureTime: normalizeClockField(flight.departureTime),
+    arrivalTime: normalizeClockField(flight.arrivalTime),
     totalFlightTime: flight.totalFlightTime,
     flightTime: flight.flightTime,
     bookingReference: flight.bookingReference,
@@ -116,7 +128,15 @@ export function buildFlightDetails(flight: RawFlight): FlightDetails {
     aircraft: flight.aircraft,
     departureTerminal: flight.departureTerminal,
     arrivalTerminal: flight.arrivalTerminal,
-    segments: flight.segments,
+    segments: flight.segments?.map((segment) =>
+      segment.transit
+        ? segment
+        : {
+            ...segment,
+            departureTime: normalizeClockField(segment.departureTime) ?? segment.departureTime,
+            arrivalTime: normalizeClockField(segment.arrivalTime) ?? segment.arrivalTime,
+          },
+    ),
     notes: normalizeNotes(flight.notes),
     status: isTbcFlight(flight) ? "tbc" : "confirmed",
   };

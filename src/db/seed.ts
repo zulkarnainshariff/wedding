@@ -33,6 +33,7 @@ import {
   combineDateTime,
   type RawFlight,
 } from "../lib/flight-utils";
+import { parseStoredClockTime, resolveFlightSchedule } from "../lib/flight-datetime";
 import { normalizeGuestText } from "../lib/travellers";
 import { hashPassword } from "../lib/auth";
 import {
@@ -80,10 +81,9 @@ function syncTimeFromLinkedItem(
 
   const flightDetails = linked.details as { arrivalTime?: string; departureTime?: string };
   if (link.syncArrivalTime && flightDetails.arrivalTime) {
+    const parsed = parseStoredClockTime(flightDetails.arrivalTime);
     return combineDateTime(
-      flightDetails.arrivalTime.includes("T")
-        ? flightDetails.arrivalTime.slice(0, 10)
-        : date,
+      parsed?.embeddedDate ?? date,
       flightDetails.arrivalTime,
     );
   }
@@ -156,19 +156,23 @@ async function seed() {
         ? buildPetRelocationDetails(flight)
         : buildFlightDetails(flight);
 
+    const schedule =
+      category === "flight"
+        ? resolveFlightSchedule({ eventDate: flight.date, details })
+        : null;
+
     return {
       dayId: dayIdByDate[flight.date],
       category,
       title: flight.label,
       summary: buildFlightSummary(flight, category),
-      eventDate: flight.date,
-      startDatetime: combineDateTime(flight.date, flight.departureTime),
-      endDatetime: combineDateTime(
-        flight.arrivalTime?.includes("T")
-          ? flight.arrivalTime.slice(0, 10)
-          : flight.date,
-        flight.arrivalTime,
-      ),
+      eventDate: schedule?.eventDate ?? flight.date,
+      startDatetime:
+        schedule?.startDatetime ??
+        combineDateTime(flight.date, flight.departureTime),
+      endDatetime:
+        schedule?.endDatetime ??
+        combineDateTime(flight.date, flight.arrivalTime),
       sortOrder: 200 + index,
       details,
     };

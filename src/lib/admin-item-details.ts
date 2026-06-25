@@ -218,9 +218,21 @@ export function parseStructuredDetails(
   }
 
   if (category === "accommodation") {
-    structured.participants = [];
     if (Array.isArray(details.guests)) {
+      structured.participants = details.guests as string[];
       structured.simple.guests = (details.guests as string[]).join(", ");
+    } else if (typeof details.guests === "string" && details.guests.trim()) {
+      structured.simple.guests = details.guests;
+      const parts = details.guests
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      const knownGuests = parts.filter((name) =>
+        (TRAVELLER_NAMES as readonly string[]).includes(name),
+      );
+      if (knownGuests.length > 0) {
+        structured.participants = knownGuests;
+      }
     }
     structured.suggestions = Array.isArray(details.suggestions)
       ? (details.suggestions as AccommodationSuggestion[])
@@ -327,9 +339,14 @@ export function buildStructuredDetailsPayload(
   }
 
   if (category === "accommodation") {
-    payload.guests = structured.simple.guests.includes(",")
-      ? structured.simple.guests.split(",").map((s) => s.trim()).filter(Boolean)
-      : structured.simple.guests;
+    payload.guests = structured.participants.length
+      ? structured.participants
+      : structured.simple.guests.includes(",")
+        ? structured.simple.guests
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : structured.simple.guests || undefined;
     payload.suggestions = structured.suggestions.filter((s) => s.label && s.url);
   }
 

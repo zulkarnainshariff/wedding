@@ -381,6 +381,7 @@ function InsuranceDetail({ details }: { details: TravelInsuranceDetails }) {
 function ItemDetailHeader({
   item,
   category,
+  activityType,
   styles,
   Icon,
   sharedLocation,
@@ -392,6 +393,7 @@ function ItemDetailHeader({
 }: {
   item: ItineraryItem;
   category: string;
+  activityType?: string | null;
   styles: { bg: string; text: string };
   Icon: React.ComponentType<{ className?: string }>;
   sharedLocation: ReturnType<typeof getItemLocation>;
@@ -407,31 +409,44 @@ function ItemDetailHeader({
   const flightSchedule =
     category === "flight" ? formatFlightSchedule(item) : null;
 
+  const categoryLabel =
+    category === "activity" && activityType === "sub_item"
+      ? "Sub-itinerary"
+      : CATEGORY_META[category as Category]?.label;
+
   return (
     <>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
           <div
             className={[
-              "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl",
+              "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-14 sm:w-14",
               styles.bg,
               styles.text,
             ].join(" ")}
           >
-            <Icon className="h-7 w-7" />
+            <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold tracking-wide text-stone-400 uppercase">
-              {CATEGORY_META[category as Category]?.label}
+              {categoryLabel}
             </p>
-            <h1 className="mt-1 font-serif text-2xl text-[#1e3a5f] sm:text-3xl">
+            <h1 className="mt-1 break-words font-serif text-xl text-[#1e3a5f] sm:text-3xl">
               {item.title}
             </h1>
-            {item.summary && (
-              <p className="mt-2 text-stone-500">{item.summary}</p>
-            )}
+            {item.summary && category === "flight" ? (
+              <div className="mt-2 space-y-0.5 text-sm text-stone-500">
+                {item.summary.split(" · ").map((part, index) => (
+                  <p key={`${index}-${part}`} className="break-words">
+                    {part}
+                  </p>
+                ))}
+              </div>
+            ) : item.summary ? (
+              <p className="mt-2 break-words text-stone-500">{item.summary}</p>
+            ) : null}
             {sharedLocation?.name && (
-              <p className="mt-2 text-sm">
+              <p className="mt-2 break-words text-sm">
                 {sharedLocation.mapLink ? (
                   <MapLink label={sharedLocation.name} href={sharedLocation.mapLink} />
                 ) : (
@@ -441,7 +456,7 @@ function ItemDetailHeader({
             )}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-stretch sm:self-start">
           <ItemCompleteToggle item={item} />
           {onEdit && (
             <button
@@ -450,7 +465,7 @@ function ItemDetailHeader({
               className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-[#1e3a5f]/30 hover:text-[#1e3a5f]"
             >
               <Pencil className="h-4 w-4" />
-              Edit
+              <span className="hidden sm:inline">Edit</span>
             </button>
           )}
           {onDelete && (
@@ -460,7 +475,7 @@ function ItemDetailHeader({
               className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
             >
               <Trash2 className="h-4 w-4" />
-              Delete
+              <span className="hidden sm:inline">Delete</span>
             </button>
           )}
           {onClose && (
@@ -573,6 +588,7 @@ export function ItemDetailView({
     <ItemDetailHeader
       item={item}
       category={category}
+      activityType={activityDetails?.activityType}
       styles={styles}
       Icon={Icon}
       sharedLocation={sharedLocation}

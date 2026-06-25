@@ -5,9 +5,15 @@ import {
   extractItemTravellers,
   travellerMatchesUsername,
 } from "@/lib/item-travellers";
+import {
+  parseCoveredTravellers,
+  parseExtraViewers,
+} from "@/lib/item-document-utils";
 import type { ItemDocument, ItineraryItem } from "@/lib/schema";
 import type { SessionUser } from "@/lib/permissions";
 import { normalizeTravellerName } from "@/lib/travellers";
+
+export { parseExtraViewers, parseCoveredTravellers } from "@/lib/item-document-utils";
 
 export const UPLOAD_ROOT = path.join(process.cwd(), "data", "uploads");
 export const MAX_DOCUMENT_BYTES = 12 * 1024 * 1024;
@@ -18,14 +24,6 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/png",
   "image/webp",
 ]);
-
-export function parseExtraViewers(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter((entry): entry is string => typeof entry === "string")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
-}
 
 export function travellerInParty(
   travellerName: string,
@@ -54,12 +52,19 @@ export function canViewDocument(
   if (doc.uploadedByUserId === user.id) return true;
 
   const party = extractItemTravellers(item.details, item.category);
-  const docOwnerInParty = travellerInParty(doc.travellerName, party);
+  const coveredTravellers = parseCoveredTravellers(doc);
+  const docOwnerInParty = coveredTravellers.some((name) =>
+    travellerInParty(name, party),
+  );
   const userInParty = party.some((member) =>
     travellerMatchesUsername(member, user.username),
   );
 
-  if (travellerMatchesUsername(doc.travellerName, user.username)) {
+  if (
+    coveredTravellers.some((name) =>
+      travellerMatchesUsername(name, user.username),
+    )
+  ) {
     return true;
   }
 
@@ -124,9 +129,4 @@ export async function deleteDocumentFile(storageKey: string): Promise<void> {
   } catch {
     // File may already be gone.
   }
-}
-
-export function extractTravellerOptions(item: ItineraryItem): string[] {
-  const names = extractItemTravellers(item.details, item.category);
-  return [...new Set(names.map(normalizeTravellerName))].sort();
 }

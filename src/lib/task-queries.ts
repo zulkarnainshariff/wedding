@@ -25,6 +25,40 @@ export type ItemTaskSummary = {
 const assigneeUser = alias(users, "assignee_user");
 const assignerUser = alias(users, "assigner_user");
 
+type TaskVisibilityTarget = {
+  eventId: number;
+  assigneeUserId: number;
+  createdByUserId: number;
+};
+
+function normalizeViewableUserIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((entry) => Number(entry)).filter((id) => id > 0))];
+}
+
+export function canViewTaskWithPermissions(
+  user: SessionUser,
+  task: TaskVisibilityTarget,
+  permissions: TaskPermissionAccess[],
+): boolean {
+  if (task.assigneeUserId === user.id) return true;
+  if (task.createdByUserId === user.id) return true;
+  if (user.isAdmin) return true;
+
+  const perm = permissions.find((entry) => entry.eventId === task.eventId);
+  if (!perm) return false;
+  if (perm.canViewOthersTasks) return true;
+  return perm.viewableUserIds.includes(task.assigneeUserId);
+}
+
+export async function canViewTask(
+  user: SessionUser,
+  task: TaskVisibilityTarget,
+): Promise<boolean> {
+  const permissions = await getTaskPermissionsForUser(user);
+  return canViewTaskWithPermissions(user, task, permissions);
+}
+
 export async function canAssignOnAnyEvent(user: SessionUser) {
   if (user.isAdmin) return true;
   const permissions = await getTaskPermissionsForUser(user);
@@ -54,6 +88,7 @@ export async function getTaskPermissionsForUser(
       canAssign: true,
       canAssignForOthers: true,
       canViewOthersTasks: true,
+      viewableUserIds: [],
     }));
   }
 
@@ -65,14 +100,24 @@ export async function getTaskPermissionsForUser(
       canAssign: taskPermissions.canAssign,
       canAssignForOthers: taskPermissions.canAssignForOthers,
       canViewOthersTasks: taskPermissions.canViewOthersTasks,
+      viewableUserIds: taskPermissions.viewableUserIds,
     })
     .from(taskPermissions)
     .innerJoin(weddingEvents, eq(taskPermissions.eventId, weddingEvents.id))
     .where(eq(taskPermissions.userId, user.id));
 
-  return rows.filter(
-    (row) => row.canAssign || row.canAssignForOthers || row.canViewOthersTasks,
-  );
+  return rows
+    .map((row) => ({
+      ...row,
+      viewableUserIds: normalizeViewableUserIds(row.viewableUserIds),
+    }))
+    .filter(
+      (row) =>
+        row.canAssign ||
+        row.canAssignForOthers ||
+        row.canViewOthersTasks ||
+        row.viewableUserIds.length > 0,
+    );
 }
 
 export async function canAssignTasks(user: SessionUser, eventId: number) {
@@ -170,13 +215,9 @@ export async function getVisibleTasks(user: SessionUser) {
     .leftJoin(itineraryItems, eq(tasks.itemId, itineraryItems.id))
     .orderBy(asc(tasks.dueAt), asc(tasks.id));
 
-  const visible = allTasks.filter(({ task }) => {
-    if (task.assigneeUserId === user.id) return true;
-    if (user.isAdmin) return true;
-    const perm = permissions.find((entry) => entry.eventId === task.eventId);
-    if (!perm) return false;
-    return perm.canViewOthersTasks || perm.canAssignForOthers;
-  });
+  const visible = allTasks.filter(({ task }) =>
+    canViewTaskWithPermissions(user, task, permissions),
+  );
 
   const noteCounts = await getTaskNoteCounts(visible.map(({ task }) => task.id));
   const notePreviews = await getTaskNotePreviews(visible.map(({ task }) => task.id));
@@ -269,14 +310,8 @@ export async function getTaskIndicators(user: SessionUser) {
     }
     if (task.assigneeUserId === user.id) {
       summary.mine += 1;
-    } else {
-      const perm = permissions.find((entry) => entry.eventId === task.eventId);
-      const canSeeOthers =
-        user.isAdmin ||
-        perm?.canViewOthersTasks ||
-        perm?.canAssignForOthers ||
-        task.createdByUserId === user.id;
-      if (canSeeOthers) summary.assignees.add(assignee);
+    } else if (canViewTaskWithPermissions(user, task, permissions)) {
+      summary.assignees.add(assignee);
     }
     itemSummaries[task.itemId] = summary;
   }

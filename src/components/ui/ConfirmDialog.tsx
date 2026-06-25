@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 export function ConfirmDialog({
@@ -23,12 +25,29 @@ export function ConfirmDialog({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const openedAtRef = useRef(0);
+
+  useEffect(() => {
+    if (open) {
+      openedAtRef.current = Date.now();
+    }
+  }, [open]);
+
   if (!open) return null;
 
-  return (
+  function handleBackdropClose() {
+    if (Date.now() - openedAtRef.current < 200) return;
+    if (!busy) onClose();
+  }
+
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-      onClick={onClose}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          handleBackdropClose();
+        }
+      }}
       role="presentation"
     >
       <div className="absolute inset-0 bg-stone-900/45 backdrop-blur-[2px]" />
@@ -86,6 +105,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

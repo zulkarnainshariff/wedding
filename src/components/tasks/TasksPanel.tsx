@@ -66,7 +66,9 @@ export function TasksPanel() {
   const canViewOthers = useMemo(
     () =>
       user?.isAdmin ||
-      taskPermissions.some((entry) => entry.canViewOthersTasks),
+      taskPermissions.some(
+        (entry) => entry.canViewOthersTasks || entry.viewableUserIds.length > 0,
+      ),
     [user?.isAdmin, taskPermissions],
   );
 
@@ -586,7 +588,9 @@ export function TasksPanel() {
     <SectionShell title="Tasks">
       {rootTasks.length === 0 ? (
         <p className="text-sm text-stone-500">
-          No tasks yet. Create tasks from an itinerary item&apos;s detail view.
+          {canAssign
+            ? "No tasks yet. Create tasks from an itinerary item's detail view."
+            : "No tasks yet."}
         </p>
       ) : (
         <div className="divide-y divide-stone-100">

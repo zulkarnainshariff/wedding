@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Save, Trash2, X } from "lucide-react";
 import { AdminItemDetailsForm } from "@/components/admin/AdminItemDetailsForm";
@@ -142,6 +142,7 @@ export function ItemEditView({
   modal?: boolean;
 }) {
   const router = useRouter();
+  const [, startTransition] = useTransition();
   const [form, setForm] = useState<ItemFormState>(() => itemToForm(item));
   const [days, setDays] = useState<ItineraryDay[]>([]);
   const [allItems, setAllItems] = useState<ItineraryItem[]>([]);
@@ -179,7 +180,9 @@ export function ItemEditView({
       return;
     }
 
-    router.refresh();
+    startTransition(() => {
+      router.refresh();
+    });
     onSaved();
   }
 

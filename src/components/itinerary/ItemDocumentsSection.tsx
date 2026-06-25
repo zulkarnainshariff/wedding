@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FileText, Trash2, Upload } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { parseCoveredTravellers, extractTravellerOptions } from "@/lib/item-document-utils";
 import type { ItemDocument, ItineraryItem } from "@/lib/schema";
-import { TRAVELLER_NAMES } from "@/lib/travellers";
 
 export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
   const { canEdit } = useAuth();
@@ -12,9 +12,14 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [travellerName, setTravellerName] = useState("");
+  const [coveredTravellers, setCoveredTravellers] = useState<string[]>([]);
   const [label, setLabel] = useState("ESTA");
   const [extraViewers, setExtraViewers] = useState("");
+
+  const travellerOptions = useMemo(
+    () => extractTravellerOptions(item),
+    [item],
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -32,13 +37,21 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
     void refresh();
   }, [refresh]);
 
+  function toggleTraveller(name: string) {
+    setCoveredTravellers((current) =>
+      current.includes(name)
+        ? current.filter((entry) => entry !== name)
+        : [...current, name],
+    );
+  }
+
   async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const fileInput = form.elements.namedItem("file") as HTMLInputElement;
     const file = fileInput.files?.[0];
-    if (!file || !travellerName) {
-      setError("Choose a traveller and file.");
+    if (!file || coveredTravellers.length === 0) {
+      setError("Choose at least one traveller and a file.");
       return;
     }
 
@@ -47,7 +60,8 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
 
     const body = new FormData();
     body.append("file", file);
-    body.append("travellerName", travellerName);
+    body.append("travellerName", coveredTravellers[0]);
+    body.append("coveredTravellers", coveredTravellers.join(","));
     body.append("label", label);
     body.append("extraViewers", extraViewers);
 
@@ -67,6 +81,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
     }
 
     fileInput.value = "";
+    setCoveredTravellers([]);
     setExtraViewers("");
     await refresh();
   }
@@ -80,13 +95,6 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
       await refresh();
     }
   }
-
-  const grouped = documents.reduce<Record<string, ItemDocument[]>>((acc, doc) => {
-    const key = doc.travellerName;
-    acc[key] = acc[key] ?? [];
-    acc[key].push(doc);
-    return acc;
-  }, {});
 
   return (
     <div className="border-t border-stone-100 py-4">
@@ -103,73 +111,83 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
       ) : documents.length === 0 ? (
         <p className="mt-3 text-sm text-stone-400">No documents uploaded yet.</p>
       ) : (
-        <div className="mt-3 space-y-4">
-          {Object.entries(grouped).map(([traveller, docs]) => (
-            <div key={traveller}>
-              <p className="text-sm font-medium text-stone-700">{traveller}</p>
-              <ul className="mt-2 space-y-2">
-                {docs.map((doc) => (
-                  <li
-                    key={doc.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2"
+        <ul className="mt-3 space-y-2">
+          {documents.map((doc) => {
+            const covered = parseCoveredTravellers(doc);
+            return (
+              <li
+                key={doc.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <a
+                    href={`/api/items/documents/${doc.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-w-0 items-center gap-2 text-sm text-[#1e3a5f] hover:underline"
                   >
-                    <a
-                      href={`/api/items/documents/${doc.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-w-0 items-center gap-2 text-sm text-[#1e3a5f] hover:underline"
-                    >
-                      <FileText className="h-4 w-4 shrink-0" />
-                      <span className="truncate">
-                        {doc.label} · {doc.fileName}
-                      </span>
-                    </a>
-                    {canEdit && (
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(doc.id)}
-                        className="shrink-0 rounded-lg border border-red-200 p-1.5 text-red-600 hover:bg-red-50"
-                        aria-label="Delete document"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
+                    <FileText className="h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {doc.label} · {doc.fileName}
+                    </span>
+                  </a>
+                  <p className="mt-1 text-xs text-stone-500">
+                    Covers: {covered.join(", ")}
+                  </p>
+                </div>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(doc.id)}
+                    className="shrink-0 rounded-lg border border-red-200 p-1.5 text-red-600 hover:bg-red-50"
+                    aria-label="Delete document"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
 
       {canEdit && (
-        <form onSubmit={(e) => void handleUpload(e)} className="mt-4 space-y-3 rounded-xl border border-dashed border-stone-300 bg-white p-4">
+        <form
+          onSubmit={(e) => void handleUpload(e)}
+          className="mt-4 space-y-3 rounded-xl border border-dashed border-stone-300 bg-white p-4"
+        >
           <p className="text-sm font-medium text-stone-700">Upload document</p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="mb-1 block text-stone-500">Traveller</span>
-              <select
-                value={travellerName}
-                onChange={(e) => setTravellerName(e.target.value)}
-                className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                required
-              >
-                <option value="">Select…</option>
-                {TRAVELLER_NAMES.filter((name) => name !== "Everyone").map(
-                  (name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ),
-                )}
-              </select>
-            </label>
+            <div className="text-sm sm:col-span-2">
+              <p className="mb-2 text-stone-500">Covers travellers</p>
+              {travellerOptions.length === 0 ? (
+                <p className="text-sm text-stone-400">
+                  No travellers listed on this item yet.
+                </p>
+              ) : (
+                <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-stone-200 p-2">
+                  {travellerOptions.map((name) => (
+                    <label
+                      key={name}
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={coveredTravellers.includes(name)}
+                        onChange={() => toggleTraveller(name)}
+                      />
+                      <span>{name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
             <label className="block text-sm">
               <span className="mb-1 block text-stone-500">Label</span>
               <input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder="ESTA, boarding pass…"
+                placeholder="ESTA, boarding pass, policy PDF…"
                 className="w-full rounded-lg border border-stone-200 px-3 py-2"
               />
             </label>
@@ -180,7 +198,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
               <input
                 value={extraViewers}
                 onChange={(e) => setExtraViewers(e.target.value)}
-                placeholder="shireen, zulfikar"
+                placeholder="Enter usernames allowed to view this document, separated by commas"
                 className="w-full rounded-lg border border-stone-200 px-3 py-2"
               />
             </label>

@@ -185,7 +185,9 @@ export function ItemCard({
   const linkedItemId = activityDetails?.linkedItemId;
 
   const categoryLabel =
-    category === "activity"
+    category === "activity" && activityDetails?.activityType === "sub_item"
+      ? null
+      : category === "activity"
       ? ACTIVITY_TYPE_LABELS[activityDetails?.activityType ?? ""] ??
         "Schedule"
       : category === "pet_relocation"
@@ -215,12 +217,12 @@ export function ItemCard({
         completed ? "border-emerald-200 bg-emerald-50/40" : "",
       ].join(" ")}
     >
-      <button
-        type="button"
-        onClick={() => openItem(item.id)}
-        className="w-full rounded-2xl p-4 text-left"
-      >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-1.5 p-4">
+        <button
+          type="button"
+          onClick={() => openItem(item.id)}
+          className="flex min-w-0 flex-1 items-start gap-3 text-left"
+        >
         <div
           className={[
             "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
@@ -232,12 +234,14 @@ export function ItemCard({
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div>
+          <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[11px] font-semibold tracking-wide text-stone-400 uppercase">
-                  {categoryLabel}
-                </p>
+                {categoryLabel && (
+                  <p className="text-[11px] font-semibold tracking-wide text-stone-400 uppercase">
+                    {categoryLabel}
+                  </p>
+                )}
                 <StatusPill status={status} />
                 <BookingStatusPill status={stayDetails?.bookingStatus} />
                 <BookingStatusPill status={carDetails?.bookingStatus} />
@@ -252,7 +256,7 @@ export function ItemCard({
               </div>
               <h3
                 className={[
-                  "mt-0.5 font-medium group-hover:text-[#1e3a5f]",
+                  "mt-0.5 break-words font-medium group-hover:text-[#1e3a5f]",
                   completed
                     ? "text-stone-500 line-through decoration-emerald-600/40"
                     : "text-stone-900",
@@ -261,15 +265,20 @@ export function ItemCard({
                 {item.title}
               </h3>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <ItemCompleteToggle item={item} compact />
-              <ChevronRight className="h-4 w-4 text-stone-300 group-hover:text-[#d4a853]" />
-            </div>
+            <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-stone-300 group-hover:text-[#d4a853]" />
           </div>
 
-          {item.summary && (
-            <p className="mt-1 text-sm text-stone-500">{item.summary}</p>
-          )}
+          {item.summary && category === "flight" ? (
+            <div className="mt-1 space-y-0.5 text-sm text-stone-500">
+              {item.summary.split(" · ").map((part, index) => (
+                <p key={`${index}-${part}`} className="break-words">
+                  {part}
+                </p>
+              ))}
+            </div>
+          ) : item.summary ? (
+            <p className="mt-1 break-words text-sm text-stone-500">{item.summary}</p>
+          ) : null}
 
           {itemLocation?.name && (
             <p className="mt-1 text-sm">
@@ -396,8 +405,12 @@ export function ItemCard({
             </div>
           )}
         </div>
+        </button>
+
+        <div className="shrink-0 self-start pt-0.5">
+          <ItemCompleteToggle item={item} compact />
+        </div>
       </div>
-      </button>
 
       <SubItemCascade
         subItems={subItems}
