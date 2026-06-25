@@ -36,7 +36,11 @@ export function TaskPermissionsPanel({
     try {
       const response = await fetch(`/api/tasks/events/${eventId}/permissions`);
       if (!response.ok) {
-        setError("Failed to load task permissions.");
+        setError(
+          response.status === 403
+            ? "You don't have permission to manage task access."
+            : "Failed to load task permissions.",
+        );
         return;
       }
       const data = await response.json();

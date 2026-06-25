@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { canManageUsers } from "@/lib/permissions";
 import { getAuthUser } from "@/lib/api-auth";
+import { ensureTaskViewPermissionsSchema } from "@/lib/ensure-task-permissions-schema";
 import { getAllUsersBrief, getTaskPermissionsAdmin } from "@/lib/task-queries";
 import { db } from "@/lib/db";
 import { taskPermissions } from "@/lib/schema";
@@ -16,12 +17,25 @@ export async function GET(_request: Request, { params }: Params) {
 
   const { eventId: rawId } = await params;
   const eventId = Number(rawId);
-  const [permissions, users] = await Promise.all([
-    getTaskPermissionsAdmin(eventId),
-    getAllUsersBrief(),
-  ]);
+  if (!Number.isFinite(eventId) || eventId <= 0) {
+    return NextResponse.json({ error: "Invalid event" }, { status: 400 });
+  }
 
-  return NextResponse.json({ permissions, users });
+  try {
+    await ensureTaskViewPermissionsSchema();
+    const [permissions, users] = await Promise.all([
+      getTaskPermissionsAdmin(eventId),
+      getAllUsersBrief(),
+    ]);
+
+    return NextResponse.json({ permissions, users });
+  } catch (error) {
+    console.error("GET task permissions failed:", error);
+    return NextResponse.json(
+      { error: "Failed to load task permissions" },
+      { status: 500 },
+    );
+  }
 }
 
 export async function PUT(request: Request, { params }: Params) {
@@ -32,6 +46,10 @@ export async function PUT(request: Request, { params }: Params) {
 
   const { eventId: rawId } = await params;
   const eventId = Number(rawId);
+  if (!Number.isFinite(eventId) || eventId <= 0) {
+    return NextResponse.json({ error: "Invalid event" }, { status: 400 });
+  }
+
   const body = await request.json();
   const entries: {
     userId: number;
@@ -41,31 +59,41 @@ export async function PUT(request: Request, { params }: Params) {
     viewableUserIds: number[];
   }[] = Array.isArray(body.permissions) ? body.permissions : [];
 
-  await db.delete(taskPermissions).where(eq(taskPermissions.eventId, eventId));
+  try {
+    await ensureTaskViewPermissionsSchema();
 
-  const active = entries.filter(
-    (entry) =>
-      entry.canAssign ||
-      entry.canAssignForOthers ||
-      entry.canViewOthersTasks ||
-      (Array.isArray(entry.viewableUserIds) && entry.viewableUserIds.length > 0),
-  );
+    await db.delete(taskPermissions).where(eq(taskPermissions.eventId, eventId));
 
-  if (active.length) {
-    await db.insert(taskPermissions).values(
-      active.map((entry) => ({
-        eventId,
-        userId: entry.userId,
-        canAssign: entry.canAssign,
-        canAssignForOthers: entry.canAssignForOthers,
-        canViewOthersTasks: entry.canViewOthersTasks,
-        viewableUserIds: entry.canViewOthersTasks
-          ? []
-          : [...new Set(entry.viewableUserIds.map((id) => Number(id)).filter((id) => id > 0))],
-      })),
+    const active = entries.filter(
+      (entry) =>
+        entry.canAssign ||
+        entry.canAssignForOthers ||
+        entry.canViewOthersTasks ||
+        (Array.isArray(entry.viewableUserIds) && entry.viewableUserIds.length > 0),
+    );
+
+    if (active.length) {
+      await db.insert(taskPermissions).values(
+        active.map((entry) => ({
+          eventId,
+          userId: entry.userId,
+          canAssign: entry.canAssign,
+          canAssignForOthers: entry.canAssignForOthers,
+          canViewOthersTasks: entry.canViewOthersTasks,
+          viewableUserIds: entry.canViewOthersTasks
+            ? []
+            : [...new Set(entry.viewableUserIds.map((id) => Number(id)).filter((id) => id > 0))],
+        })),
+      );
+    }
+
+    const permissions = await getTaskPermissionsAdmin(eventId);
+    return NextResponse.json(permissions);
+  } catch (error) {
+    console.error("PUT task permissions failed:", error);
+    return NextResponse.json(
+      { error: "Failed to save task permissions" },
+      { status: 500 },
     );
   }
-
-  const permissions = await getTaskPermissionsAdmin(eventId);
-  return NextResponse.json(permissions);
 }

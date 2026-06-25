@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
+import { ensureTaskViewPermissionsSchema } from "@/lib/ensure-task-permissions-schema";
 import type { TaskPermissionAccess } from "@/lib/task-types";
 import type { SessionUser } from "@/lib/permissions";
 import {
@@ -76,6 +77,8 @@ export async function resolveAssignEventId(user: SessionUser) {
 export async function getTaskPermissionsForUser(
   user: SessionUser,
 ): Promise<TaskPermissionAccess[]> {
+  await ensureTaskViewPermissionsSchema();
+
   if (user.isAdmin) {
     const events = await db
       .select()
@@ -374,6 +377,8 @@ export async function getAllUsersBrief() {
 }
 
 export async function getTaskPermissionsAdmin(eventId: number) {
+  await ensureTaskViewPermissionsSchema();
+
   return db
     .select()
     .from(taskPermissions)
