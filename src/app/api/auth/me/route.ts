@@ -7,10 +7,17 @@ export async function GET() {
   const user = await requireAuth();
   if (isAuthError(user)) return user;
 
-  const [guestListAccess, taskPermissions] = await Promise.all([
-    getGuestListAccessForUser(user),
-    getTaskPermissionsForUser(user),
-  ]);
+  let guestListAccess: Awaited<ReturnType<typeof getGuestListAccessForUser>> = [];
+  let taskPermissions: Awaited<ReturnType<typeof getTaskPermissionsForUser>> = [];
+
+  try {
+    [guestListAccess, taskPermissions] = await Promise.all([
+      getGuestListAccessForUser(user),
+      getTaskPermissionsForUser(user),
+    ]);
+  } catch (error) {
+    console.error("Failed to load user access metadata:", error);
+  }
 
   return NextResponse.json({
     user: {

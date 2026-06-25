@@ -39,7 +39,10 @@ const BASE_NAV_ITEMS: { href: string; label: string; category?: Category | "all"
   ];
 
 function useNavItems() {
-  const { user, canView, isAdmin, canEdit, canManageUsers, guestListAccess } = useAuth();
+  const { user, canView, isAdmin, canEdit, canManageUsers, guestListAccess, loading } =
+    useAuth();
+
+  if (loading) return null;
 
   return BASE_NAV_ITEMS.filter((item) => {
     if (!user) return false;
@@ -164,9 +167,20 @@ export function Sidebar({ compact = false }: { compact?: boolean }) {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {navItems.map((item) => (
-          <NavLink key={item.href} {...item} compact={compact} />
-        ))}
+        {navItems === null ? (
+          <div className="space-y-1">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-10 animate-pulse rounded-xl bg-stone-200/70"
+              />
+            ))}
+          </div>
+        ) : (
+          navItems.map((item) => (
+            <NavLink key={item.href} {...item} compact={compact} />
+          ))
+        )}
       </nav>
 
       <div className="border-t border-stone-200/80 p-3 space-y-1">
@@ -269,9 +283,20 @@ export function MobileDrawer({
           </button>
         </div>
         <nav className="space-y-1 p-3">
-          {navItems.map((item) => (
-            <NavLink key={item.href} {...item} onNavigate={onClose} />
-          ))}
+          {navItems === null ? (
+            <div className="space-y-1">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="h-10 animate-pulse rounded-xl bg-stone-200/70"
+                />
+              ))}
+            </div>
+          ) : (
+            navItems.map((item) => (
+              <NavLink key={item.href} {...item} onNavigate={onClose} />
+            ))
+          )}
           <div className="px-3 pt-2">
             <ExportPdfPanel />
           </div>
