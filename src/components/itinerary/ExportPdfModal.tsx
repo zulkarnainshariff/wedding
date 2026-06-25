@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { ArrowLeft, Download, Eye, X } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   buildItineraryPdfBlob,
   downloadItineraryPdf,
   itineraryPdfFilename,
   type ExportOptions,
 } from "@/lib/pdf-export";
+import { DEFAULT_USER_PREFERENCES } from "@/lib/user-preferences";
 import { CATEGORIES, CATEGORY_META, type Category } from "@/lib/types";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
 
@@ -19,6 +21,7 @@ type Props = {
 const DEFAULT_CATEGORIES = [...CATEGORIES];
 
 export function ExportPdfModal({ open, onClose }: Props) {
+  const { user } = useAuth();
   const [selected, setSelected] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [groupByDay, setGroupByDay] = useState(true);
   const [step, setStep] = useState<"options" | "preview">("options");
@@ -76,7 +79,11 @@ export function ExportPdfModal({ open, onClose }: Props) {
     setError(null);
     try {
       const { days, items } = await loadData();
-      const options: ExportOptions = { categories: selected, groupByDay };
+      const options: ExportOptions = {
+        categories: selected,
+        groupByDay,
+        preferences: user?.preferences ?? DEFAULT_USER_PREFERENCES,
+      };
       const blob = await buildItineraryPdfBlob(days, items, options);
 
       if (previewUrl) URL.revokeObjectURL(previewUrl);

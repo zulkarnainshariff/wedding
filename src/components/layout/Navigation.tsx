@@ -20,6 +20,7 @@ import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigationGuard } from "@/components/layout/NavigationGuard";
 import { CATEGORY_ICONS } from "@/lib/category-ui";
+import { canViewAllGuestLists } from "@/lib/permissions";
 import { ExportPdfPanel } from "@/components/itinerary/ExportPdfPanel";
 import { DevModePanel } from "@/components/itinerary/DevModePanel";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -48,7 +49,11 @@ function useNavItems() {
     if (!user) return false;
     if (item.category === "invitations") return true;
     if (item.category === "guests") {
-      return isAdmin || (guestListAccess?.length ?? 0) > 0;
+      return (
+        isAdmin ||
+        (guestListAccess?.length ?? 0) > 0 ||
+        (user ? canViewAllGuestLists(user) : false)
+      );
     }
     if (item.category === "tasks") return true;
     if (item.category === "all") return true;
