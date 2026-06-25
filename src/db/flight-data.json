@@ -134,7 +134,7 @@
       "from": "YYZ",
       "to": "MEL",
       "departureTime": "17:50",
-      "arrivalTime": "2026-08-05T07:50",
+      "arrivalTime": "07:50",
       "bookingReference": "HP6VXW",
       "notes": ["Wheelchair assistance requested for Zaiton"],
       "baggage": {
@@ -172,7 +172,7 @@
           "from": "LAX",
           "to": "MEL",
           "departureTime": "23:05",
-          "arrivalTime": "2026-08-05T07:50",
+          "arrivalTime": "07:50",
           "aircraft": "A350-900"
         }
       ]

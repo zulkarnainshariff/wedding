@@ -19,7 +19,7 @@ export function DevModePanel({ compact = false }: { compact?: boolean }) {
         type="button"
         onClick={() => setOpen(true)}
         className={[
-          "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+          "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
           devMode
             ? "bg-amber-100 text-amber-900 hover:bg-amber-200/80"
             : "text-stone-600 hover:bg-stone-100",

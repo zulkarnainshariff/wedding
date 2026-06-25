@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SubItemRow } from "@/components/itinerary/SubItemDisplay";
+import { getSubItemFormPlaceholders } from "@/lib/sub-item-placeholders";
 import type { ItineraryItem } from "@/lib/schema";
 
 function SubItemDetailRow({
@@ -79,6 +80,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   const [saving, setSaving] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const placeholders = getSubItemFormPlaceholders(item);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -183,7 +185,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Visit Washington Monument"
+                  placeholder={placeholders.title}
                   className="w-full rounded-lg border border-stone-200 px-3 py-2"
                   required
                 />
@@ -202,7 +204,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
                 <input
                   value={locationName}
                   onChange={(e) => setLocationName(e.target.value)}
-                  placeholder="Washington Monument"
+                  placeholder={placeholders.locationName}
                   className="w-full rounded-lg border border-stone-200 px-3 py-2"
                 />
               </label>
@@ -214,7 +216,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
                   type="url"
                   value={locationMapUrl}
                   onChange={(e) => setLocationMapUrl(e.target.value)}
-                  placeholder="https://maps.google.com/..."
+                  placeholder={placeholders.locationMapUrl}
                   className="w-full rounded-lg border border-stone-200 px-3 py-2"
                 />
               </label>

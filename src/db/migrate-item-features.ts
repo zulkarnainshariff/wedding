@@ -15,6 +15,7 @@ async function main() {
       id serial PRIMARY KEY,
       item_id integer NOT NULL REFERENCES itinerary_items(id) ON DELETE CASCADE,
       traveller_name text NOT NULL,
+      covers_travellers jsonb NOT NULL DEFAULT '[]'::jsonb,
       label text NOT NULL,
       file_name text NOT NULL,
       storage_key text NOT NULL UNIQUE,
@@ -34,6 +35,17 @@ async function main() {
   await sql`
     CREATE INDEX IF NOT EXISTS itinerary_items_parent_item_id_idx
     ON itinerary_items (parent_item_id)
+  `;
+
+  await sql`
+    ALTER TABLE item_documents
+    ADD COLUMN IF NOT EXISTS covers_travellers jsonb NOT NULL DEFAULT '[]'::jsonb
+  `;
+
+  await sql`
+    UPDATE item_documents
+    SET covers_travellers = jsonb_build_array(traveller_name)
+    WHERE covers_travellers = '[]'::jsonb
   `;
 
   console.log("Item features migration complete.");

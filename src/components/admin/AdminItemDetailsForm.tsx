@@ -98,9 +98,11 @@ function SystemUserMultiSelect({
 }
 
 function ParticipantMultiSelect({
+  label = "Participants",
   value,
   onChange,
 }: {
+  label?: string;
   value: string[];
   onChange: (value: string[]) => void;
 }) {
@@ -108,7 +110,7 @@ function ParticipantMultiSelect({
 
   return (
     <div className="text-sm sm:col-span-2">
-      <p className="mb-2 text-stone-500">Participants</p>
+      <p className="mb-2 text-stone-500">{label}</p>
       <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-stone-200 p-2">
         {options.map((name) => (
           <label
@@ -555,7 +557,16 @@ export function AdminItemDetailsForm({
             </select>
           </label>
           <TextInput label="Stay name" value={structured.simple.location} onChange={(v) => setSimple("location", v)} />
-          <TextInput label="Guests" value={structured.simple.guests} onChange={(v) => setSimple("guests", v)} />
+          <ParticipantMultiSelect
+            label="Guests staying"
+            value={structured.participants}
+            onChange={(participants) => onChange({ ...structured, participants })}
+          />
+          <TextInput
+            label="Guests note (optional)"
+            value={structured.simple.guests}
+            onChange={(v) => setSimple("guests", v)}
+          />
           <TextInput label="Address" value={structured.simple.address} onChange={(v) => setSimple("address", v)} />
           <TextInput label="Listing URL" value={structured.simple.listingUrl} onChange={(v) => setSimple("listingUrl", v)} type="url" />
           <TextInput label="Check-in date" value={structured.simple.checkInDate} onChange={(v) => setSimple("checkInDate", v)} type="date" />

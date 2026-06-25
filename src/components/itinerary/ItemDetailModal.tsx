@@ -80,26 +80,26 @@ export function ItemDetailModal() {
           role="dialog"
           aria-modal="true"
         >
-          {loadingItem && (
+          {loadingItem && !selectedItem && (
             <div className="rounded-3xl border border-stone-200 bg-white p-10 text-center text-stone-500">
               Loading...
             </div>
           )}
 
-          {!loadingItem && selectedItem && editing && canEdit && (
+          {selectedItem && editing && canEdit && (
             <ItemEditView
               item={selectedItem}
               modal
               onCancel={() => setEditing(false)}
               onSaved={() => {
                 setEditing(false);
-                void refreshSelectedItem();
+                void refreshSelectedItem({ silent: true });
               }}
               onDelete={requestDelete}
             />
           )}
 
-          {!loadingItem && selectedItem && !editing && (
+          {selectedItem && !editing && (
             <ItemDetailView
               item={selectedItem}
               onClose={handleClose}

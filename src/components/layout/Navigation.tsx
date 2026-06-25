@@ -110,7 +110,7 @@ function NavLink({
         onNavigate?.();
       }}
       className={[
-        "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+        "group flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
         active
           ? "bg-[#1e3a5f] text-white shadow-md shadow-[#1e3a5f]/20"
           : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",
@@ -183,7 +183,7 @@ export function Sidebar({ compact = false }: { compact?: boolean }) {
           type="button"
           onClick={() => setLogoutOpen(true)}
           className={[
-            "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-100",
+            "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-100",
             compact ? "justify-center px-2" : "",
           ].join(" ")}
           title={compact ? "Log out" : undefined}

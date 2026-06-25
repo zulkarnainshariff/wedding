@@ -69,6 +69,20 @@ export async function POST(request: Request, { params }: Params) {
   const formData = await request.formData();
   const file = formData.get("file");
   const travellerName = String(formData.get("travellerName") ?? "").trim();
+  const coveredRaw = String(formData.get("coveredTravellers") ?? "").trim();
+  const coveredFromField = coveredRaw
+    ? coveredRaw
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    : travellerName
+      ? [travellerName]
+      : [];
+  const coversTravellers = [
+    ...new Set(
+      coveredFromField.map((name) => normalizeTravellerName(name)).filter(Boolean),
+    ),
+  ];
   const label = String(formData.get("label") ?? "").trim() || "Document";
   const extraViewers = parseExtraViewers(
     String(formData.get("extraViewers") ?? "")
@@ -80,12 +94,16 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "File is required" }, { status: 400 });
   }
 
-  if (!travellerName) {
+  if (!travellerName && coversTravellers.length === 0) {
     return NextResponse.json(
-      { error: "Traveller name is required" },
+      { error: "At least one traveller is required" },
       { status: 400 },
     );
   }
+
+  const primaryTraveller = normalizeTravellerName(
+    travellerName || coversTravellers[0],
+  );
 
   if (!isAllowedDocumentMime(file.type)) {
     return NextResponse.json(
@@ -110,7 +128,9 @@ export async function POST(request: Request, { params }: Params) {
     .insert(itemDocuments)
     .values({
       itemId,
-      travellerName: normalizeTravellerName(travellerName),
+      travellerName: primaryTraveller,
+      coversTravellers:
+        coversTravellers.length > 0 ? coversTravellers : [primaryTraveller],
       label,
       fileName: file.name,
       storageKey,

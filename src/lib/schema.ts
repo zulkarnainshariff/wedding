@@ -42,6 +42,7 @@ export const itemDocuments = pgTable("item_documents", {
     .notNull()
     .references(() => itineraryItems.id, { onDelete: "cascade" }),
   travellerName: text("traveller_name").notNull(),
+  coversTravellers: jsonb("covers_travellers").notNull().default([]),
   label: text("label").notNull(),
   fileName: text("file_name").notNull(),
   storageKey: text("storage_key").notNull().unique(),
@@ -182,6 +183,10 @@ export const taskPermissions = pgTable("task_permissions", {
   canAssign: boolean("can_assign").default(false).notNull(),
   canAssignForOthers: boolean("can_assign_for_others").default(false).notNull(),
   canViewOthersTasks: boolean("can_view_others_tasks").default(false).notNull(),
+  viewableUserIds: jsonb("viewable_user_ids")
+    .$type<number[]>()
+    .default([])
+    .notNull(),
 });
 
 export const tasks = pgTable("tasks", {

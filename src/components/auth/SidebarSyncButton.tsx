@@ -33,7 +33,7 @@ export function SidebarSyncButton({ compact = false }: { compact?: boolean }) {
         disabled={syncing || isOffline}
         title={tooltip}
         className={[
-          "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-100 disabled:opacity-50",
+          "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50",
           compact ? "justify-center px-2" : "",
         ].join(" ")}
       >

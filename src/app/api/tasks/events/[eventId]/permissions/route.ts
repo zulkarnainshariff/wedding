@@ -38,12 +38,17 @@ export async function PUT(request: Request, { params }: Params) {
     canAssign: boolean;
     canAssignForOthers: boolean;
     canViewOthersTasks: boolean;
+    viewableUserIds: number[];
   }[] = Array.isArray(body.permissions) ? body.permissions : [];
 
   await db.delete(taskPermissions).where(eq(taskPermissions.eventId, eventId));
 
   const active = entries.filter(
-    (entry) => entry.canAssign || entry.canAssignForOthers || entry.canViewOthersTasks,
+    (entry) =>
+      entry.canAssign ||
+      entry.canAssignForOthers ||
+      entry.canViewOthersTasks ||
+      (Array.isArray(entry.viewableUserIds) && entry.viewableUserIds.length > 0),
   );
 
   if (active.length) {
@@ -54,6 +59,9 @@ export async function PUT(request: Request, { params }: Params) {
         canAssign: entry.canAssign,
         canAssignForOthers: entry.canAssignForOthers,
         canViewOthersTasks: entry.canViewOthersTasks,
+        viewableUserIds: entry.canViewOthersTasks
+          ? []
+          : [...new Set(entry.viewableUserIds.map((id) => Number(id)).filter((id) => id > 0))],
       })),
     );
   }

@@ -45,6 +45,10 @@ const AIRPORT_TIMEZONES: Record<string, string> = {
   LAS: "America/Los_Angeles",
   MIA: "America/New_York",
   ATL: "America/New_York",
+  YYZ: "America/Toronto",
+  YUL: "America/Toronto",
+  YVR: "America/Vancouver",
+  SLC: "America/Denver",
 };
 
 export function getAirportTimezone(iata?: string | null): string | null {

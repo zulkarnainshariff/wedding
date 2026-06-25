@@ -156,4 +156,5 @@ export const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   "official-appointment": "Official appointment",
   "airport-dropoff": "Airport drop-off",
   flight: "Flight",
+  sub_item: "Sub-itinerary",
 };

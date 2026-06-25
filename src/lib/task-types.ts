@@ -21,6 +21,7 @@ export type TaskPermissionAccess = {
   canAssign: boolean;
   canAssignForOthers: boolean;
   canViewOthersTasks: boolean;
+  viewableUserIds: number[];
 };
 
 export function isTaskStatus(value: string): value is TaskStatus {

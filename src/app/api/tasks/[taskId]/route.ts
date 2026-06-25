@@ -4,6 +4,7 @@ import { isAuthError, requireAuth } from "@/lib/api-auth";
 import { createNotification } from "@/lib/notification-service";
 import {
   canAssignTasks,
+  canViewTask,
   getTaskWithDetails,
 } from "@/lib/task-queries";
 import { isTaskStatus } from "@/lib/task-types";
@@ -53,11 +54,7 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const canAccess =
-    user.isAdmin ||
-    details.task.assigneeUserId === user.id ||
-    details.task.createdByUserId === user.id ||
-    (await canAssignTasks(user, details.task.eventId));
+  const canAccess = await canViewTask(user, details.task);
 
   if (!canAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
