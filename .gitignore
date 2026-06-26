@@ -37,6 +37,7 @@ wedding_seed.sql
 
 # uploaded item documents (PDFs, etc.)
 /data/uploads/
+/data/airport-timezone-cache.json
 
 # vercel
 .vercel

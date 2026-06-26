@@ -4,6 +4,13 @@ import {
   resolveOperatingFlightNumber,
 } from "@/lib/flight-numbers";
 import { resolveFlightSchedule } from "@/lib/flight-datetime";
+import {
+  parseFlightInstant,
+  pickApiScheduleInstant,
+  pickArrivalInstant,
+  pickDepartureInstant,
+  type FlightTimingSnapshot,
+} from "@/lib/flight-instant-picker";
 import { getItemCalendarDate } from "@/lib/item-scheduling";
 import { getTodayDate, toDateString } from "@/lib/trip-time";
 import type { ItineraryItem } from "@/lib/schema";
@@ -58,6 +65,8 @@ type FlightTrackingSnapshot = {
 type FlightTrackingState = {
   completedTriggers: FetchTrigger[];
   delayRetryAt?: string | null;
+  /** ISO time when the current ETA is reached — re-fetch live status if not landed. */
+  etaCheckAt?: string | null;
   snapshot?: FlightTrackingSnapshot;
 };
 
@@ -85,6 +94,39 @@ type AviationStackFlight = {
   };
 };
 
+type AirlabsFlight = {
+  flight_iata?: string;
+  status?: string;
+  dep_iata?: string;
+  dep_terminal?: string | null;
+  dep_gate?: string | null;
+  dep_time?: string | null;
+  dep_time_utc?: string | null;
+  dep_estimated?: string | null;
+  dep_estimated_utc?: string | null;
+  dep_actual?: string | null;
+  dep_actual_utc?: string | null;
+  dep_delayed?: number | null;
+  arr_iata?: string;
+  arr_terminal?: string | null;
+  arr_gate?: string | null;
+  arr_baggage?: string | null;
+  arr_time?: string | null;
+  arr_time_utc?: string | null;
+  arr_estimated?: string | null;
+  arr_estimated_utc?: string | null;
+  arr_actual?: string | null;
+  arr_actual_utc?: string | null;
+  arr_delayed?: number | null;
+};
+
+function hasFlightTrackingApiKey(): boolean {
+  return Boolean(
+    process.env.AIRLABS_API_KEY?.trim() ||
+      process.env.AVIATIONSTACK_ACCESS_KEY?.trim(),
+  );
+}
+
 const TRACKING_KEY = "_flightTracking";
 
 function readTrackingState(details: FlightDetails): FlightTrackingState {
@@ -106,6 +148,7 @@ function readTrackingState(details: FlightDetails): FlightTrackingState {
         )
       : [],
     delayRetryAt: value.delayRetryAt ?? null,
+    etaCheckAt: value.etaCheckAt ?? null,
     snapshot: value.snapshot,
   };
 }
@@ -134,18 +177,17 @@ export function isFlightTrackingDay(
   const today = toDateString(effectiveDate);
   if (flightDate === today) return true;
 
-  if (item.startDatetime && item.endDatetime) {
-    const schedule = resolveFlightSchedule({
-      eventDate: item.eventDate,
-      startDatetime: item.startDatetime,
-      endDatetime: item.endDatetime,
-      details: item.details,
-    });
-    const startAt = schedule.startDatetime ?? new Date(item.startDatetime);
-    const endAt = schedule.endDatetime ?? new Date(item.endDatetime);
+  const schedule = resolveFlightSchedule({
+    eventDate: item.eventDate,
+    startDatetime: item.startDatetime,
+    endDatetime: item.endDatetime,
+    details: item.details,
+  });
+
+  if (schedule.startDatetime && schedule.endDatetime) {
     const now = effectiveDate.getTime();
-    const start = startAt.getTime();
-    const end = endAt.getTime() + 2 * 60 * 60 * 1000;
+    const start = schedule.startDatetime.getTime() - 60 * 60 * 1000;
+    const end = schedule.endDatetime.getTime() + 6 * 60 * 60 * 1000;
     return now >= start && now <= end;
   }
 
@@ -204,6 +246,179 @@ function getScheduledArrival(item: ItineraryItem): Date | null {
 
 function normalizeOperatingFlightIata(value: string): string {
   return value.replace(/\s+/g, "").toUpperCase();
+}
+
+function airlabsUtcToIso(value?: string | null): string | null {
+  if (!value?.trim()) return null;
+  const trimmed = value.trim();
+  if (trimmed.includes("T")) return trimmed;
+  return `${trimmed.replace(" ", "T")}:00Z`;
+}
+
+function mapAirlabsStatus(status?: string): string {
+  switch (status?.toLowerCase()) {
+    case "en-route":
+    case "active":
+      return "active";
+    case "landed":
+      return "landed";
+    case "scheduled":
+      return "scheduled";
+    case "cancelled":
+      return "cancelled";
+    case "diverted":
+      return "diverted";
+    default:
+      return status ?? "scheduled";
+  }
+}
+
+function mapAirlabsFlight(
+  flight: AirlabsFlight,
+  flightDate: string,
+): AviationStackFlight {
+  return {
+    flight_date: flightDate,
+    flight_status: mapAirlabsStatus(flight.status),
+    departure: {
+      iata: flight.dep_iata ?? null,
+      terminal: flight.dep_terminal ?? null,
+      gate: flight.dep_gate ?? null,
+      scheduled: airlabsUtcToIso(flight.dep_time_utc ?? flight.dep_time),
+      estimated: airlabsUtcToIso(
+        flight.dep_estimated_utc ?? flight.dep_estimated,
+      ),
+      actual: airlabsUtcToIso(flight.dep_actual_utc ?? flight.dep_actual),
+      delay: flight.dep_delayed ?? null,
+    },
+    arrival: {
+      iata: flight.arr_iata ?? null,
+      terminal: flight.arr_terminal ?? null,
+      gate: flight.arr_gate ?? null,
+      baggage: flight.arr_baggage ?? null,
+      scheduled: airlabsUtcToIso(flight.arr_time_utc ?? flight.arr_time),
+      estimated: airlabsUtcToIso(
+        flight.arr_estimated_utc ?? flight.arr_estimated,
+      ),
+      actual: airlabsUtcToIso(flight.arr_actual_utc ?? flight.arr_actual),
+      delay: flight.arr_delayed ?? null,
+    },
+  };
+}
+
+function parseAirlabsFlightPayload(payload: unknown): AirlabsFlight | null {
+  if (!payload || typeof payload !== "object") return null;
+  const record = payload as Record<string, unknown>;
+  if (record.response && typeof record.response === "object") {
+    return record.response as AirlabsFlight;
+  }
+  if (typeof record.flight_iata === "string") {
+    return record as AirlabsFlight;
+  }
+  if (Array.isArray(record.response) && record.response[0]) {
+    return record.response[0] as AirlabsFlight;
+  }
+  return null;
+}
+
+function matchesFlightRoute(
+  flight: AirlabsFlight,
+  depIata: string,
+  arrIata?: string | null,
+): boolean {
+  const depMatch =
+    !flight.dep_iata ||
+    flight.dep_iata.trim().toUpperCase() === depIata.trim().toUpperCase();
+  const arrMatch =
+    !arrIata?.trim() ||
+    !flight.arr_iata ||
+    flight.arr_iata.trim().toUpperCase() === arrIata.trim().toUpperCase();
+  return depMatch && arrMatch;
+}
+
+async function fetchFromAirlabs(input: {
+  operatingFlightNumber: string;
+  depIata: string;
+  flightDate: string;
+  arrIata?: string | null;
+}): Promise<AviationStackFlight | null> {
+  const apiKey = process.env.AIRLABS_API_KEY?.trim();
+  if (!apiKey) return null;
+
+  const flightIata = normalizeOperatingFlightIata(input.operatingFlightNumber);
+
+  const flightParams = new URLSearchParams({
+    api_key: apiKey,
+    flight_iata: flightIata,
+  });
+  const flightResponse = await fetch(
+    `https://airlabs.co/api/v9/flight?${flightParams.toString()}`,
+    { cache: "no-store" },
+  );
+  const flightPayload = (await flightResponse.json()) as {
+    error?: { message?: string };
+  } & AirlabsFlight;
+
+  if (!flightResponse.ok) {
+    const detail = flightPayload.error?.message ?? `HTTP ${flightResponse.status}`;
+    throw new Error(`AirLabs: ${detail}`);
+  }
+
+  const liveFlight = parseAirlabsFlightPayload(flightPayload);
+  if (
+    liveFlight?.flight_iata &&
+    matchesFlightRoute(liveFlight, input.depIata, input.arrIata)
+  ) {
+    return mapAirlabsFlight(liveFlight, input.flightDate);
+  }
+
+  const scheduleParams = new URLSearchParams({
+    api_key: apiKey,
+    dep_iata: input.depIata,
+    flight_iata: flightIata,
+    limit: "10",
+  });
+
+  const scheduleResponse = await fetch(
+    `https://airlabs.co/api/v9/schedules?${scheduleParams.toString()}`,
+    { cache: "no-store" },
+  );
+  const schedulePayload = (await scheduleResponse.json()) as {
+    error?: { message?: string };
+    response?: AirlabsFlight[];
+  };
+
+  if (!scheduleResponse.ok) {
+    const detail = schedulePayload.error?.message ?? `HTTP ${scheduleResponse.status}`;
+    throw new Error(`AirLabs: ${detail}`);
+  }
+
+  const scheduleMatches = (schedulePayload.response ?? []).filter((flight) =>
+    matchesFlightRoute(flight, input.depIata, input.arrIata),
+  );
+  if (scheduleMatches.length > 0) {
+    return mapAirlabsFlight(scheduleMatches[0], input.flightDate);
+  }
+
+  return null;
+}
+
+async function fetchLiveFlight(input: {
+  operatingFlightNumber: string;
+  depIata: string;
+  flightDate: string;
+  arrIata?: string | null;
+}): Promise<AviationStackFlight | null> {
+  if (process.env.AIRLABS_API_KEY?.trim()) {
+    const airlabs = await fetchFromAirlabs(input);
+    if (airlabs) return airlabs;
+  }
+
+  if (process.env.AVIATIONSTACK_ACCESS_KEY?.trim()) {
+    return fetchFromAviationStack(input);
+  }
+
+  return null;
 }
 
 async function fetchFromAviationStack(input: {
@@ -270,52 +485,61 @@ function buildSnapshot(flight: AviationStackFlight): FlightTrackingSnapshot {
 }
 
 function parseInstant(value?: string | null): Date | null {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  return parseFlightInstant(value);
 }
 
-/** AviationStack free tier often returns local airport times mis-tagged as UTC. */
-function pickApiScheduleInstant(
-  api: Date | null,
-  itemAnchor: Date | null,
-): Date | null {
-  if (!api) return null;
-  if (!itemAnchor) return api;
-  if (Math.abs(api.getTime() - itemAnchor.getTime()) > 3 * 60 * 60 * 1000) {
-    return itemAnchor;
+function isFlightActiveInAir(snapshot?: FlightTrackingSnapshot): boolean {
+  if (!snapshot) return false;
+  const status = snapshot.flightStatus?.toLowerCase();
+  return status === "active" || status === "en-route";
+}
+
+function isFlightLanded(snapshot?: FlightTrackingSnapshot): boolean {
+  if (!snapshot) return false;
+  if (snapshot.flightStatus === "landed") return true;
+  return Boolean(snapshot.arrival?.actual);
+}
+
+function syncEtaCheckAt(
+  state: FlightTrackingState,
+  item: ItineraryItem,
+): FlightTrackingState {
+  if (isFlightLanded(state.snapshot)) {
+    return { ...state, etaCheckAt: null };
   }
-  return api;
+
+  const arrivalInstant = pickArrivalInstant(
+    item,
+    state.snapshot as FlightTimingSnapshot | undefined,
+  );
+  if (!arrivalInstant) {
+    return { ...state, etaCheckAt: null };
+  }
+
+  return { ...state, etaCheckAt: arrivalInstant.toISOString() };
 }
 
-function pickDepartureInstant(
+function isEtaRefreshDue(
+  now: Date,
   item: ItineraryItem,
-  snapshot?: FlightTrackingSnapshot,
-): Date | null {
-  const itemStd = getScheduledDeparture(item);
-  const actual = parseInstant(snapshot?.departure?.actual);
-  if (actual) return actual;
-  if (itemStd) return itemStd;
-  return pickApiScheduleInstant(
-    parseInstant(snapshot?.departure?.estimated) ??
-      parseInstant(snapshot?.departure?.scheduled),
-    itemStd,
-  );
-}
+  state: FlightTrackingState,
+): boolean {
+  if (isFlightLanded(state.snapshot)) return false;
 
-function pickArrivalInstant(
-  item: ItineraryItem,
-  snapshot?: FlightTrackingSnapshot,
-): Date | null {
-  const itemSta = getScheduledArrival(item);
-  const actual = parseInstant(snapshot?.arrival?.actual);
-  if (actual) return actual;
-  if (itemSta) return itemSta;
-  return pickApiScheduleInstant(
-    parseInstant(snapshot?.arrival?.estimated) ??
-      parseInstant(snapshot?.arrival?.scheduled),
-    itemSta,
+  const etaCheckAtMs = state.etaCheckAt
+    ? new Date(state.etaCheckAt).getTime()
+    : null;
+  if (etaCheckAtMs != null && now.getTime() >= etaCheckAtMs) {
+    return true;
+  }
+
+  const arrivalInstant = pickArrivalInstant(
+    item,
+    state.snapshot as FlightTimingSnapshot | undefined,
   );
+  if (!arrivalInstant) return false;
+
+  return now.getTime() >= arrivalInstant.getTime();
 }
 
 function inferStatus(
@@ -323,33 +547,29 @@ function inferStatus(
   item: ItineraryItem,
   snapshot?: FlightTrackingSnapshot,
 ): string | undefined {
-  const std = getScheduledDeparture(item);
-  const sta = getScheduledArrival(item);
-  const nowMs = now.getTime();
-  const landedBufferMs = 10 * 60 * 1000;
-
-  if (snapshot?.flightStatus === "landed") return "landed";
-  if (snapshot?.arrival?.actual) return "landed";
-
-  if (sta && nowMs > sta.getTime() + landedBufferMs) {
-    return "landed";
-  }
+  if (isFlightLanded(snapshot)) return "landed";
 
   if (snapshot?.flightStatus === "cancelled") return "cancelled";
   if (snapshot?.flightStatus === "diverted") return "diverted";
 
+  const std = getScheduledDeparture(item);
+  const sta = getScheduledArrival(item);
+  const nowMs = now.getTime();
+  const landedBufferMs = 15 * 60 * 1000;
+
   if (std && nowMs < std.getTime()) return "scheduled";
 
-  if (
-    snapshot?.flightStatus === "active" &&
-    sta &&
-    nowMs <= sta.getTime() + landedBufferMs
-  ) {
+  if (isFlightActiveInAir(snapshot)) return "active";
+
+  if (std && nowMs >= std.getTime()) {
+    if (snapshot && !isFlightLanded(snapshot)) {
+      return "active";
+    }
+    if (sta && nowMs > sta.getTime() + landedBufferMs) {
+      return "landed";
+    }
     return "active";
   }
-
-  if (sta && nowMs > sta.getTime()) return "landed";
-  if (std && nowMs >= std.getTime()) return "active";
 
   return snapshot?.flightStatus ?? "scheduled";
 }
@@ -362,8 +582,14 @@ function computeDisplayTiming(
   const status = inferStatus(now, item, snapshot);
   const std = getScheduledDeparture(item);
   const sta = getScheduledArrival(item);
-  const departureInstant = pickDepartureInstant(item, snapshot);
-  const arrivalInstant = pickArrivalInstant(item, snapshot);
+  const departureInstant = pickDepartureInstant(
+    item,
+    snapshot as FlightTimingSnapshot | undefined,
+  );
+  const arrivalInstant = pickArrivalInstant(
+    item,
+    snapshot as FlightTimingSnapshot | undefined,
+  );
 
   if (status === "landed") {
     const elapsed =
@@ -472,16 +698,33 @@ function enrichEndpoint(
   };
 }
 
-function endpointsFromDetails(details: FlightDetails): {
+function endpointsFromDetails(
+  details: FlightDetails,
+  item: ItineraryItem,
+): {
   departure?: FlightLiveEndpoint;
   arrival?: FlightLiveEndpoint;
 } {
+  const scheduledEndpoint = (when: Date | null): FlightLiveEndpoint | undefined => {
+    if (!when) return undefined;
+    const iso = when.toISOString();
+    return {
+      terminal: null,
+      gate: null,
+      baggageCarousel: null,
+      scheduled: iso,
+      estimated: iso,
+      actual: null,
+      delayMinutes: null,
+    };
+  };
+
   return {
-    departure: enrichEndpoint(undefined, {
+    departure: enrichEndpoint(scheduledEndpoint(getScheduledDeparture(item)), {
       gate: details.departureGate,
       terminal: details.departureTerminal,
     }),
-    arrival: enrichEndpoint(undefined, {
+    arrival: enrichEndpoint(scheduledEndpoint(getScheduledArrival(item)), {
       gate: details.arrivalGate,
       terminal: details.arrivalTerminal,
     }),
@@ -540,7 +783,11 @@ export function mergeLiveGateUpdates(
   let changed = false;
 
   const assign = (
-    key: "departureTerminal" | "departureGate",
+    key:
+      | "departureTerminal"
+      | "departureGate"
+      | "arrivalTerminal"
+      | "arrivalGate",
     value?: string | null,
   ) => {
     const trimmed = value?.trim();
@@ -551,6 +798,8 @@ export function mergeLiveGateUpdates(
 
   assign("departureTerminal", live.departure?.terminal);
   assign("departureGate", live.departure?.gate);
+  assign("arrivalTerminal", live.arrival?.terminal);
+  assign("arrivalGate", live.arrival?.gate);
 
   return { details: next, changed };
 }
@@ -569,11 +818,78 @@ export async function getFlightLiveStatus(
   let workingDetails = details;
 
   if (!isFlightTrackingDay(item, effectiveDate)) {
+    const now = effectiveDate;
+    const schedule = resolveFlightSchedule({
+      eventDate: item.eventDate,
+      startDatetime: item.startDatetime,
+      endDatetime: item.endDatetime,
+      details: item.details,
+    });
+    const timingPreview = computeDisplayTiming(now, item, trackingState.snapshot);
+    const operatingFlightNumber = resolveOperatingFlightNumber(details);
+    const depIata = normalizeFlightIata(details.fromIata);
+    const flightDate = getItemCalendarDate(item);
+    const recentLanding =
+      !trackingState.snapshot &&
+      timingPreview.flightStatus === "landed" &&
+      schedule.endDatetime &&
+      now.getTime() > schedule.endDatetime.getTime() &&
+      now.getTime() - schedule.endDatetime.getTime() < 72 * 60 * 60 * 1000;
+
+    if (
+      recentLanding &&
+      hasFlightTrackingApiKey() &&
+      operatingFlightNumber &&
+      depIata &&
+      flightDate
+    ) {
+      try {
+        const flight = await fetchLiveFlight({
+          operatingFlightNumber,
+          depIata,
+          flightDate,
+          arrIata: normalizeFlightIata(details.toIata),
+        });
+        if (flight) {
+          trackingState = syncEtaCheckAt(
+            {
+              ...trackingState,
+              snapshot: buildSnapshot(flight),
+            },
+            item,
+          );
+        }
+      } catch {
+        // Fall back to schedule-only display below.
+      }
+    }
+
+    if (trackingState.snapshot) {
+      trackingState = syncEtaCheckAt(trackingState, item);
+      return {
+        status: {
+          ...buildStatusFromSnapshot(item, details, trackingState, {
+            computedOnly: true,
+          }),
+          message: "Last live update from travel day.",
+        },
+        trackingState,
+        details: withTrackingState(workingDetails, trackingState),
+      };
+    }
+
+    const timing = computeDisplayTiming(now, item);
+    const endpoints = endpointsFromDetails(details, item);
     return {
       status: {
-        available: false,
-        reason: "outside_window",
-        message: "Live tracking is available on the day of travel.",
+        available: true,
+        computedOnly: true,
+        marketingFlightNumber: details.marketingFlightNumber ?? null,
+        operatingFlightNumber,
+        departure: endpoints.departure,
+        arrival: endpoints.arrival,
+        ...timing,
+        message: "Live gate and baggage updates appear on the day of travel.",
       },
       trackingState,
       details: workingDetails,
@@ -619,13 +935,13 @@ export async function getFlightLiveStatus(
     };
   }
 
-  if (!process.env.AVIATIONSTACK_ACCESS_KEY?.trim()) {
+  if (!hasFlightTrackingApiKey()) {
     return {
       status: {
         available: false,
         reason: "no_api_key",
         message:
-          "Live tracking needs a free API key. Add AVIATIONSTACK_ACCESS_KEY to .env.local, then restart the dev server.",
+          "Live tracking needs an API key. Add AIRLABS_API_KEY or AVIATIONSTACK_ACCESS_KEY to .env, then restart the server.",
       },
       trackingState,
       details: workingDetails,
@@ -634,10 +950,25 @@ export async function getFlightLiveStatus(
 
   const now = new Date();
   const triggers = dueTriggers(now, item, trackingState);
+  const timingPreview = computeDisplayTiming(now, item, trackingState.snapshot);
+  const snapshotAgeMs = trackingState.snapshot?.fetchedAt
+    ? now.getTime() - new Date(trackingState.snapshot.fetchedAt).getTime()
+    : Number.POSITIVE_INFINITY;
+  const shouldRefreshActive =
+    timingPreview.flightStatus === "active" &&
+    snapshotAgeMs > 5 * 60 * 1000;
+  const etaRefreshDue = isEtaRefreshDue(now, item, trackingState);
+  const shouldBootstrapLive =
+    isFlightTrackingDay(item, now) && !trackingState.snapshot;
 
-  if (triggers.length > 0) {
+  if (
+    triggers.length > 0 ||
+    shouldRefreshActive ||
+    etaRefreshDue ||
+    shouldBootstrapLive
+  ) {
     try {
-      const flight = await fetchFromAviationStack({
+      const flight = await fetchLiveFlight({
         operatingFlightNumber,
         depIata,
         flightDate,
@@ -646,13 +977,20 @@ export async function getFlightLiveStatus(
 
       if (flight) {
         const snapshot = buildSnapshot(flight);
-        trackingState = {
-          ...trackingState,
-          snapshot,
-          completedTriggers: [
-            ...new Set([...trackingState.completedTriggers, ...triggers]),
-          ],
-        };
+        trackingState = syncEtaCheckAt(
+          {
+            ...trackingState,
+            snapshot,
+            completedTriggers: [
+              ...new Set([
+                ...trackingState.completedTriggers,
+                ...triggers,
+                ...(shouldRefreshActive ? (["midflight"] as FetchTrigger[]) : []),
+              ]),
+            ],
+          },
+          item,
+        );
 
         if (
           triggers.includes("after_std_5") &&
@@ -704,7 +1042,7 @@ export async function getFlightLiveStatus(
 
   if (!trackingState.snapshot) {
     const timing = computeDisplayTiming(now, item);
-    const endpoints = endpointsFromDetails(details);
+    const endpoints = endpointsFromDetails(details, item);
     return {
       status: {
         available: true,
@@ -723,19 +1061,28 @@ export async function getFlightLiveStatus(
     };
   }
 
+  trackingState = syncEtaCheckAt(trackingState, item);
   workingDetails = withTrackingState(workingDetails, trackingState);
 
   return {
     status: buildStatusFromSnapshot(item, details, trackingState, {
-      computedOnly: triggers.length === 0,
+      computedOnly:
+        triggers.length === 0 &&
+        !shouldRefreshActive &&
+        !etaRefreshDue &&
+        !shouldBootstrapLive,
     }),
     trackingState,
     details: workingDetails,
   };
 }
 
-export function formatFlightDuration(totalMinutes: number | null | undefined) {
+export function formatFlightDuration(
+  totalMinutes: number | null | undefined,
+  options?: { zeroLabel?: string },
+) {
   if (totalMinutes == null) return null;
+  if (totalMinutes === 0 && options?.zeroLabel) return options.zeroLabel;
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   if (hours <= 0) return `${minutes}m`;

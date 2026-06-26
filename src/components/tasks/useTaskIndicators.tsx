@@ -69,9 +69,11 @@ export function ItemTaskIndicator({
       <span
         className={[
           "inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1",
-          summary.mine > 0
-            ? "bg-amber-50 text-amber-900 ring-amber-200"
-            : "bg-sky-50 text-sky-900 ring-sky-200",
+          summary.hasUrgent
+            ? "bg-red-50 text-red-800 ring-red-200"
+            : summary.mine > 0
+              ? "bg-amber-50 text-amber-900 ring-amber-200"
+              : "bg-sky-50 text-sky-900 ring-sky-200",
         ].join(" ")}
         title={summary.label}
       >

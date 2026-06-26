@@ -4,7 +4,7 @@ import {
   parseStructuredDetails,
   type StructuredItemDetails,
 } from "@/lib/admin-item-details";
-import { flightFormDatetimes } from "@/lib/flight-datetime";
+import { flightFormDatetimes, resolveFlightSchedule } from "@/lib/flight-datetime";
 import { wallClockToDate } from "@/lib/item-schedule-datetime";
 import type { Category } from "@/lib/types";
 import type { ItineraryItem } from "@/lib/schema";
@@ -71,11 +71,37 @@ function syncStructuredTimes(
       const [, time] = endDatetime.split("T");
       if (time) nextSimple.arrivalTime = time.slice(0, 5);
     }
+
+    const resolved = resolveFlightSchedule({
+      eventDate: nextEventDate,
+      startDatetime: startIso,
+      endDatetime: endIso,
+      details: {
+        ...structured.simple,
+        ...nextSimple,
+        departureTime: nextSimple.departureTime,
+        arrivalTime: nextSimple.arrivalTime,
+      },
+    });
+
     return {
       structured: { ...structured, simple: nextSimple },
-      eventDate: nextEventDate,
-      startIso: null,
-      endIso: null,
+      eventDate: resolved.eventDate ?? nextEventDate,
+      startIso:
+        resolved.startDatetime?.toISOString() ??
+        startIso ??
+        (nextEventDate && nextSimple.departureTime
+          ? isoFromDateAndClock(nextEventDate, nextSimple.departureTime)
+          : null),
+      endIso:
+        resolved.endDatetime?.toISOString() ??
+        endIso ??
+        (nextEventDate && nextSimple.arrivalTime
+          ? isoFromDateAndClock(
+              nextEventDate,
+              nextSimple.arrivalTime,
+            )
+          : null),
     };
   }
 

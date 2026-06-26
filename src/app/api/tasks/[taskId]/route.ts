@@ -14,7 +14,9 @@ import { taskNotes, taskReminders, tasks } from "@/lib/schema";
 type Params = { params: Promise<{ taskId: string }> };
 
 function taskHref(task: { id: number; itemId: number | null }) {
-  return task.itemId ? `/itinerary?item=${task.itemId}` : `/tasks?task=${task.id}`;
+  return task.itemId
+    ? `/itinerary?item=${task.itemId}&task=${task.id}`
+    : `/tasks?task=${task.id}`;
 }
 
 async function notifyCounterparty(
@@ -134,6 +136,10 @@ export async function PUT(request: Request, { params }: Params) {
         patch.assigneeUserId = nextAssignee;
         taskWasEdited = true;
       }
+    }
+    if (body.isUrgent !== undefined) {
+      patch.isUrgent = Boolean(body.isUrgent);
+      taskWasEdited = true;
     }
   } else if (isAssignee && details.task.allowAssigneeEdit) {
     if (body.title) {

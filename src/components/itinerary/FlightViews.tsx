@@ -166,6 +166,10 @@ export function FlightDetailView({
             terminal: flight.departureTerminal,
             gate: flight.departureGate,
           }}
+          savedArrival={{
+            terminal: flight.arrivalTerminal,
+            gate: flight.arrivalGate,
+          }}
         />
       ) : null}
 
@@ -191,6 +195,16 @@ export function FlightDetailView({
               ? `${flight.departureTerminal}${flight.departureGate ? ` · Gate ${flight.departureGate}` : ""}`
               : flight.departureGate
                 ? `Gate ${flight.departureGate}`
+                : undefined
+          }
+        />
+        <DetailRow
+          label="Arr. terminal"
+          value={
+            flight.arrivalTerminal
+              ? `${flight.arrivalTerminal}${flight.arrivalGate ? ` · Gate ${flight.arrivalGate}` : ""}`
+              : flight.arrivalGate
+                ? `Gate ${flight.arrivalGate}`
                 : undefined
           }
         />

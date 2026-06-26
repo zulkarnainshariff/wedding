@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     type: body.isUrgent ? "task_urgent" : "task_assigned",
     title: body.isUrgent ? "Urgent task assigned" : "New task assigned",
     body: body.title,
-    href: `/itinerary?item=${itemId}`,
+    href: `/itinerary?item=${itemId}&task=${created.id}`,
     metadata: { taskId: created.id, urgent: Boolean(body.isUrgent), itemId },
   });
 
