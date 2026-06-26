@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireEditAccess, isAuthError } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { applyItemDatetimeOverrides } from "@/lib/item-schedule-datetime";
+import { enrichFlightTimezoneDetails } from "@/lib/airport-timezone-resolver";
 import { normalizeItemSchedule } from "@/lib/item-scheduling";
 import { filterItemsByPermission } from "@/lib/permissions";
 import { itineraryDays, itineraryItems } from "@/lib/schema";
@@ -45,7 +46,14 @@ export async function POST(request: Request) {
   const user = await requireEditAccess();
   if (isAuthError(user)) return user;
 
-  const body = applyItemDatetimeOverrides(await request.json());
+  let body = await request.json();
+  if (body.category === "flight" && body.details && typeof body.details === "object") {
+    body = {
+      ...body,
+      details: await enrichFlightTimezoneDetails(body.details),
+    };
+  }
+  body = applyItemDatetimeOverrides(body);
 
   if (!body.category || !body.title) {
     return NextResponse.json(

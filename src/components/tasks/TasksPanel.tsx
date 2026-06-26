@@ -348,6 +348,14 @@ export function TasksPanel() {
     return null;
   }
 
+  function openTask(task: TaskRow) {
+    if (task.itemId) {
+      router.push(`/itinerary?item=${task.itemId}&task=${task.id}`);
+      return;
+    }
+    void toggleExpand(task.id);
+  }
+
   function renderTaskRow(task: TaskRow, depth = 0) {
     const isExpanded = expandedId === task.id;
     const taskDetails = details[task.id];
@@ -360,7 +368,7 @@ export function TasksPanel() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <button
               type="button"
-              onClick={() => void toggleExpand(task.id)}
+              onClick={() => openTask(task)}
               className="flex min-w-0 flex-1 items-start gap-2 text-left"
             >
               {isExpanded ? (
@@ -373,7 +381,7 @@ export function TasksPanel() {
                   {depth > 0 ? "↳ " : ""}
                   {task.title}
                   {task.isUrgent ? (
-                    <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
+                    <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">
                       Urgent
                     </span>
                   ) : null}

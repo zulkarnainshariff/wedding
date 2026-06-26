@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -101,6 +101,8 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
   const [cantCompleteReason, setCantCompleteReason] = useState<Record<number, string>>({});
   const [pendingCantCompleteId, setPendingCantCompleteId] = useState<number | null>(null);
   const [editingNotes, setEditingNotes] = useState<TaskNoteRow[] | null>(null);
+  const [focusTaskId, setFocusTaskId] = useState<number | null>(null);
+  const openedTaskRef = useRef<number | null>(null);
 
   const canAssign = taskPermissions.some(
     (entry) => entry.canAssign || entry.canAssignForOthers,
@@ -166,9 +168,52 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
     }
   }, [searchParams, canAssign, user]);
 
-  function clearCreateTaskParam() {
+  function canEditTask(task: ItemTaskRow) {
+    const isAssignee = task.assigneeUserId === user?.id;
+    const isAssigner = task.createdByUserId === user?.id;
+    const canEditAsAssigner =
+      canAssign &&
+      (user?.isAdmin ||
+        isAssigner ||
+        selectedPerm?.canAssign ||
+        selectedPerm?.canAssignForOthers);
+    const canEditAsAssignee = isAssignee && task.allowAssigneeEdit;
+    return Boolean(canEditAsAssigner || canEditAsAssignee);
+  }
+
+  useEffect(() => {
+    const taskParam = searchParams.get("task");
+    if (!taskParam) {
+      openedTaskRef.current = null;
+      setFocusTaskId(null);
+      return;
+    }
+    const taskId = Number(taskParam);
+    if (!taskId || openedTaskRef.current === taskId) return;
+
+    const task = tasks.find((row) => row.id === taskId);
+    if (!task) return;
+
+    openedTaskRef.current = taskId;
+    if (canEditTask(task)) {
+      void startEdit(task);
+      return;
+    }
+    setMode("list");
+    setFocusTaskId(taskId);
+  }, [searchParams, tasks, user, canAssign, selectedPerm]);
+
+  useEffect(() => {
+    if (!focusTaskId) return;
+    document
+      .getElementById(`task-row-${focusTaskId}`)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [focusTaskId, mode, tasks]);
+
+  function clearTaskQueryParams() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("createTask");
+    params.delete("task");
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
@@ -179,7 +224,8 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
     setEditingNotes(null);
     setForm(EMPTY_FORM);
     setError(null);
-    clearCreateTaskParam();
+    setFocusTaskId(null);
+    clearTaskQueryParams();
   }
 
   function startCreate() {
@@ -256,7 +302,10 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
         allowAssigneeEdit: form.allowAssigneeEdit,
         remindAt: form.remindAt || null,
         ...(canAssign
-          ? { assigneeUserId: Number(form.assigneeUserId) || editingTask.assigneeUserId }
+          ? {
+              assigneeUserId: Number(form.assigneeUserId) || editingTask.assigneeUserId,
+              isUrgent: form.isUrgent,
+            }
           : {}),
       }),
     });
@@ -381,11 +430,12 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
     const canEditAsAssignee = isAssignee && task.allowAssigneeEdit;
 
     return (
-      <div key={task.id}>
+      <div key={task.id} id={`task-row-${task.id}`}>
         <div
           className={[
             "flex flex-col gap-2 rounded-xl border border-stone-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
             depth > 0 ? "ml-6 border-dashed bg-stone-50/80" : "",
+            focusTaskId === task.id ? "ring-2 ring-amber-300" : "",
           ].join(" ")}
         >
           <div className="min-w-0">
@@ -393,7 +443,7 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
               {depth > 0 ? "↳ " : ""}
               {task.title}
               {task.isUrgent ? (
-                <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
+                <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">
                   Urgent
                 </span>
               ) : null}

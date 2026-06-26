@@ -1,10 +1,12 @@
 import { resolveFlightSchedule } from "@/lib/flight-datetime";
+import { pickArrivalInstant, pickDepartureInstant } from "@/lib/flight-instant-picker";
 import type { ItineraryItem } from "@/lib/schema";
 import { getFlightDetails } from "@/lib/types";
 
 type TrackingSnapshot = {
   departure?: { actual?: string | null };
-  arrival?: { actual?: string | null };
+  arrival?: { actual?: string | null; estimated?: string | null };
+  flightStatus?: string;
 };
 
 export type FlightProgress = {
@@ -50,12 +52,9 @@ export function computeFlightProgress(
   if (totalMs <= 0) return null;
 
   const snapshot = readTrackingSnapshot(item.details);
-  const departureInstant = snapshot?.departure?.actual
-    ? new Date(snapshot.departure.actual)
-    : scheduledStart;
-  const arrivalInstant = snapshot?.arrival?.actual
-    ? new Date(snapshot.arrival.actual)
-    : scheduledEnd;
+  const departureInstant =
+    pickDepartureInstant(item, snapshot) ?? scheduledStart;
+  const arrivalInstant = pickArrivalInstant(item, snapshot) ?? scheduledEnd;
 
   const nowMs = now.getTime();
   const startMs = departureInstant.getTime();
@@ -77,9 +76,15 @@ export function computeFlightProgress(
     "ARR";
 
   let phase: FlightProgress["phase"];
+  const isLiveActive =
+    snapshot?.flightStatus === "active" ||
+    snapshot?.flightStatus?.toLowerCase() === "en-route";
   if (nowMs < scheduledStart.getTime()) {
     phase = "upcoming";
-  } else if (nowMs > scheduledEnd.getTime() + 10 * 60_000) {
+  } else if (
+    snapshot?.arrival?.actual ||
+    (!isLiveActive && nowMs > scheduledEnd.getTime() + 15 * 60_000)
+  ) {
     phase = "landed";
   } else {
     phase = "active";
@@ -139,6 +144,10 @@ export function formatFlightProgressDuration(
 
 export function formatFlightProgressLabel(progress: FlightProgress): string {
   if (progress.phase === "landed") return "Landed";
+
+  if (progress.phase === "active" && progress.remainingMinutes === 0) {
+    return "Arriving soon";
+  }
 
   const duration = formatFlightProgressDuration(progress.remainingMinutes);
   if (!duration) return "—";

@@ -162,6 +162,19 @@ function calendarDateInTimezoneInternal(instant: Date, timeZone: string): string
   return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
 }
 
+function wallClockInstant(
+  dateStr: string,
+  timeStr: string | null | undefined,
+): Date | null {
+  if (!dateStr || !timeStr?.trim()) return null;
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const clock = parseClockTime(timeStr);
+  if ([year, month, day].some((part) => Number.isNaN(part)) || !clock) {
+    return null;
+  }
+  return new Date(year, month - 1, day, clock.hour, clock.minute, 0);
+}
+
 function resolveEndDatetime(
   startDatetime: Date | null,
   eventDate: string | null,
@@ -171,7 +184,7 @@ function resolveEndDatetime(
 ): { endDatetime: Date | null; arrivalDate: string | null } {
   const depParsed = parseStoredClockTime(departureTime);
   const arrParsed = parseStoredClockTime(arrivalTime);
-  if (!arrParsed?.clock || !arrivalTz) {
+  if (!arrParsed?.clock) {
     return { endDatetime: null, arrivalDate: null };
   }
 
@@ -187,6 +200,25 @@ function resolveEndDatetime(
 
   if (!arrivalDate) {
     return { endDatetime: null, arrivalDate: null };
+  }
+
+  if (!arrivalTz) {
+    let resolvedEnd = wallClockInstant(arrivalDate, arrParsed.clock);
+    let guard = 0;
+    while (
+      resolvedEnd &&
+      startDatetime &&
+      resolvedEnd.getTime() <= startDatetime.getTime() &&
+      guard < 4
+    ) {
+      arrivalDate = addDaysToDateString(arrivalDate, 1);
+      resolvedEnd = wallClockInstant(arrivalDate, arrParsed.clock);
+      guard += 1;
+    }
+    return {
+      endDatetime: resolvedEnd,
+      arrivalDate: resolvedEnd ? arrivalDate : null,
+    };
   }
 
   let resolvedEnd = zonedLocalToUtc(arrivalDate, arrParsed.clock, arrivalTz);
@@ -270,8 +302,14 @@ export function resolveFlightSchedule(
   const arrParsed = parseStoredClockTime(flight.arrivalTime);
   const departureTime = depParsed?.clock ?? null;
   const arrivalTime = arrParsed?.clock ?? null;
-  const departureTz = getAirportTimezone(flight.fromIata ?? flight.from);
-  const arrivalTz = getAirportTimezone(flight.toIata ?? flight.to);
+  const departureTz = getAirportTimezone(
+    flight.fromIata ?? flight.from,
+    flight.fromTimezone,
+  );
+  const arrivalTz = getAirportTimezone(
+    flight.toIata ?? flight.to,
+    flight.toTimezone,
+  );
   const travelDate = input.eventDate ?? fallbackDate(input);
 
   let startDatetime =
@@ -293,6 +331,9 @@ export function resolveFlightSchedule(
       startDatetime = resolvedStart;
       eventDate = calendarDateInTimezoneInternal(resolvedStart, departureTz);
     }
+  } else if (travelDate && departureTime && !startDatetime) {
+    startDatetime = wallClockInstant(travelDate, departureTime);
+    eventDate = travelDate;
   }
 
   const resolvedEnd = resolveEndDatetime(
@@ -370,7 +411,10 @@ export function formatFlightEndpointLabel(
     endpoint === "departure"
       ? flight?.departureTime
       : flight?.arrivalTime;
-  const timeZone = getAirportTimezone(iata);
+  const timeZone = getAirportTimezone(
+    iata,
+    endpoint === "departure" ? flight?.fromTimezone : flight?.toTimezone,
+  );
   const code = iata?.trim().toUpperCase();
 
   if (instant && timeZone) {
@@ -475,6 +519,14 @@ export function flightFormDatetimes(item: ItineraryItem): {
   startDatetime: string;
   endDatetime: string;
 } {
+  const toDatetimeLocal = (value: string | Date | null | undefined): string => {
+    if (!value) return "";
+    const d = typeof value === "string" ? new Date(value) : value;
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
   const flight = getFlightDetails(item.details);
   const schedule = resolveFlightSchedule({
     eventDate: item.eventDate,
@@ -483,18 +535,36 @@ export function flightFormDatetimes(item: ItineraryItem): {
     details: item.details,
   });
 
-  const departureTz = getAirportTimezone(flight?.fromIata ?? flight?.from);
-  const arrivalTz = getAirportTimezone(flight?.toIata ?? flight?.to);
+  const departureTz = getAirportTimezone(
+    flight?.fromIata ?? flight?.from,
+    flight?.fromTimezone,
+  );
+  const arrivalTz = getAirportTimezone(
+    flight?.toIata ?? flight?.to,
+    flight?.toTimezone,
+  );
+  const depParsed = parseStoredClockTime(flight?.departureTime);
+  const arrParsed = parseStoredClockTime(flight?.arrivalTime);
+  const depClock =
+    depParsed?.clock ?? flight?.departureTime?.trim().slice(0, 5) ?? null;
+  const arrClock =
+    arrParsed?.clock ?? flight?.arrivalTime?.trim().slice(0, 5) ?? null;
+  const arrivalDate =
+    schedule.arrivalDate ?? schedule.eventDate ?? item.eventDate ?? null;
 
   return {
     startDatetime:
       schedule.startDatetime && departureTz
         ? utcToDatetimeLocalInTimezone(schedule.startDatetime, departureTz)
-        : "",
+        : item.eventDate && depClock
+          ? `${item.eventDate}T${depClock}`
+          : toDatetimeLocal(item.startDatetime),
     endDatetime:
       schedule.endDatetime && arrivalTz
         ? utcToDatetimeLocalInTimezone(schedule.endDatetime, arrivalTz)
-        : "",
+        : arrivalDate && arrClock
+          ? `${arrivalDate}T${arrClock}`
+          : toDatetimeLocal(item.endDatetime),
   };
 }
 

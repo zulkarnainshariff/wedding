@@ -46,6 +46,8 @@ export type FlightDetails = {
   to: string;
   fromIata?: string;
   toIata?: string;
+  fromTimezone?: string;
+  toTimezone?: string;
   departureTime?: string | null;
   arrivalTime?: string | null;
   totalFlightTime?: string;

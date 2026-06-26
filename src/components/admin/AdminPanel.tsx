@@ -164,7 +164,15 @@ export function AdminPanel({
     setBusy(true);
     setStatus(null);
 
-    const payload = buildItemApiPayload(itemForm);
+    const day = itemForm.dayId
+      ? days.find((entry) => String(entry.id) === itemForm.dayId)
+      : undefined;
+    const formForSave =
+      day && !itemForm.startDatetime && !itemForm.eventDate
+        ? { ...itemForm, eventDate: day.date }
+        : itemForm;
+
+    const payload = buildItemApiPayload(formForSave);
 
     const res = editingItemId
       ? await fetch(`/api/items/${editingItemId}`, {

@@ -19,6 +19,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       SESSION_SECRET: ${SESSION_SECRET}
       AVIATIONSTACK_ACCESS_KEY: ${AVIATIONSTACK_ACCESS_KEY:-}
+      AIRLABS_API_KEY: ${AIRLABS_API_KEY:-}
     volumes:
       - wedding-uploads:/app/data/uploads
 

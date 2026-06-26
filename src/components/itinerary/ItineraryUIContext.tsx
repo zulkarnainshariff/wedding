@@ -63,6 +63,8 @@ export function ItineraryUIProvider({ children }: { children: React.ReactNode })
     setIsClosingItem(true);
     const params = new URLSearchParams(searchParams.toString());
     params.delete("item");
+    params.delete("task");
+    params.delete("createTask");
     const query = params.toString();
     router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }, [pathname, router, searchParams]);

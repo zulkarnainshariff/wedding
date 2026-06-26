@@ -20,6 +20,7 @@ export type ItemTaskSummary = {
   mine: number;
   label: string;
   hasNotes: boolean;
+  hasUrgent?: boolean;
   notePreview?: string;
 };
 
@@ -276,7 +277,7 @@ export async function getTaskIndicators(user: SessionUser) {
   const itemCounts: Record<number, number> = {};
   const itemSummaries: Record<
     number,
-    { count: number; mine: number; assignees: Set<string>; hasNotes: boolean; noteLines: string[] }
+    { count: number; mine: number; assignees: Set<string>; hasNotes: boolean; hasUrgent: boolean; noteLines: string[] }
   > = {};
 
   const noteCounts = await getTaskNoteCounts(
@@ -297,9 +298,11 @@ export async function getTaskIndicators(user: SessionUser) {
       mine: 0,
       assignees: new Set<string>(),
       hasNotes: false,
+      hasUrgent: false,
       noteLines: [],
     };
     summary.count += 1;
+    if (task.isUrgent) summary.hasUrgent = true;
     const preview = notePreviews.get(task.id);
     if (preview) {
       summary.hasNotes = true;
@@ -339,6 +342,7 @@ export async function getTaskIndicators(user: SessionUser) {
       mine: summary.mine,
       label,
       hasNotes: summary.hasNotes,
+      hasUrgent: summary.hasUrgent,
       notePreview: summary.noteLines.length
         ? summary.noteLines.join("\n\n")
         : undefined,

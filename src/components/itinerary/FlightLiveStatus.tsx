@@ -20,25 +20,33 @@ function Row({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-function DepartureGateRow({
+function GateRow({
+  label,
   endpoint,
   saved,
 }: {
-  endpoint?: { terminal?: string | null; gate?: string | null };
+  label: string;
+  endpoint?: {
+    terminal?: string | null;
+    gate?: string | null;
+    baggageCarousel?: string | null;
+  };
   saved?: { terminal?: string | null; gate?: string | null };
 }) {
   const terminal = endpoint?.terminal?.trim() || saved?.terminal?.trim();
   const gate = endpoint?.gate?.trim() || saved?.gate?.trim();
-  if (!terminal && !gate) return null;
+  const baggage = endpoint?.baggageCarousel?.trim();
+  if (!terminal && !gate && !baggage) return null;
 
   const value = [
     terminal ? `Terminal ${terminal}` : null,
     gate ? `Gate ${gate}` : null,
+    baggage ? `Baggage ${baggage}` : null,
   ]
     .filter(Boolean)
     .join(" · ");
 
-  return <Row label="Departure" value={value} />;
+  return <Row label={label} value={value} />;
 }
 
 export function FlightLiveStatusPanel({
@@ -46,11 +54,13 @@ export function FlightLiveStatusPanel({
   marketingFlightNumber,
   operatingFlightNumber,
   savedDeparture,
+  savedArrival,
 }: {
   itemId: number;
   marketingFlightNumber?: string | null;
   operatingFlightNumber?: string | null;
   savedDeparture?: { terminal?: string | null; gate?: string | null };
+  savedArrival?: { terminal?: string | null; gate?: string | null };
 }) {
   const [live, setLive] = useState<FlightLiveStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,14 +93,17 @@ export function FlightLiveStatusPanel({
     void refresh();
   }, [refresh]);
 
-  // Refresh computed elapsed/remaining from the server cache (no provider calls unless due).
+  // Refresh computed timing; poll faster when ETA hits zero but still in the air.
   useEffect(() => {
     if (!live?.available) return;
+    const atEta =
+      live.flightStatus === "active" && (live.remainingMinutes ?? 1) <= 0;
+    const intervalMs = atEta ? 30_000 : 60_000;
     const interval = window.setInterval(() => {
       void refresh();
-    }, 60 * 1000);
+    }, intervalMs);
     return () => window.clearInterval(interval);
-  }, [live?.available, refresh]);
+  }, [live?.available, live?.flightStatus, live?.remainingMinutes, refresh]);
 
   if (loading && !live) {
     return (
@@ -103,7 +116,6 @@ export function FlightLiveStatusPanel({
   if (!live) return null;
 
   if (!live.available) {
-    if (live.reason === "outside_window") return null;
     return (
       <div className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600">
         {live.message}
@@ -115,6 +127,28 @@ export function FlightLiveStatusPanel({
     marketingFlightNumber ?? live.marketingFlightNumber,
     operatingFlightNumber ?? live.operatingFlightNumber,
   );
+
+  const arrivalTimeLabel =
+    live.flightStatus === "landed"
+      ? "Arrived"
+      : live.flightStatus === "scheduled"
+        ? "Scheduled arrival"
+        : "Est. arrival";
+
+  const arrivalTimeValue =
+    live.flightStatus === "landed"
+      ? live.arrival?.actual
+        ? formatDateTime(live.arrival.actual)
+        : live.arrival?.estimated
+          ? formatDateTime(live.arrival.estimated)
+          : live.arrival?.scheduled
+            ? formatDateTime(live.arrival.scheduled)
+            : null
+      : live.arrival?.estimated
+        ? formatDateTime(live.arrival.estimated)
+        : live.arrival?.scheduled
+          ? formatDateTime(live.arrival.scheduled)
+          : null;
 
   return (
     <div className="mb-4 overflow-hidden rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 to-white">
@@ -138,10 +172,28 @@ export function FlightLiveStatusPanel({
           value={formatFlightStatusLabel(live.flightStatus)}
         />
         {live.flightStatus === "landed" && (
-          <Row
-            label="Flight time"
-            value={formatFlightDuration(live.elapsedMinutes)}
-          />
+          <>
+            <Row
+              label="Flight time"
+              value={formatFlightDuration(live.elapsedMinutes)}
+            />
+            <Row label={arrivalTimeLabel} value={arrivalTimeValue} />
+            <GateRow
+              label="Arrival"
+              endpoint={live.arrival}
+              saved={savedArrival}
+            />
+          </>
+        )}
+        {live.flightStatus === "scheduled" && (
+          <>
+            <Row label={arrivalTimeLabel} value={arrivalTimeValue} />
+            <GateRow
+              label="Arrival"
+              endpoint={live.arrival}
+              saved={savedArrival}
+            />
+          </>
         )}
         {live.flightStatus === "active" && (
           <>
@@ -149,23 +201,27 @@ export function FlightLiveStatusPanel({
               label="Time in air"
               value={formatFlightDuration(live.elapsedMinutes)}
             />
-            <Row
-              label="Est. arrival"
-              value={
-                live.arrival?.estimated
-                  ? formatDateTime(live.arrival.estimated)
-                  : live.arrival?.scheduled
-                    ? formatDateTime(live.arrival.scheduled)
-                    : null
-              }
-            />
+            <Row label={arrivalTimeLabel} value={arrivalTimeValue} />
             <Row
               label="Time remaining"
-              value={formatFlightDuration(live.remainingMinutes)}
+              value={formatFlightDuration(live.remainingMinutes, {
+                zeroLabel: "Arriving soon",
+              })}
+            />
+            <GateRow
+              label="Arrival"
+              endpoint={live.arrival}
+              saved={savedArrival}
             />
           </>
         )}
-        <DepartureGateRow endpoint={live.departure} saved={savedDeparture} />
+        <GateRow label="Departure" endpoint={live.departure} saved={savedDeparture} />
+        {live.arrival?.delayMinutes ? (
+          <Row
+            label="Arrival delay"
+            value={`${live.arrival.delayMinutes} min`}
+          />
+        ) : null}
         {live.departure?.delayMinutes ? (
           <Row
             label="Departure delay"

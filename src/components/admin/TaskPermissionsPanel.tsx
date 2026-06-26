@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
+import { ViewableUsersPicker } from "@/components/admin/ViewableUsersPicker";
 import { SectionShell } from "@/components/layout/PageShell";
 import type { WeddingEvent } from "@/lib/schema";
 
@@ -75,8 +76,14 @@ export function TaskPermissionsPanel({
 
   useEffect(() => {
     if (!selectedId) return;
+    setStatus(null);
+    setError(null);
     void loadPermissions(selectedId);
   }, [selectedId]);
+
+  function selectEvent(eventId: number) {
+    setSelectedId(eventId);
+  }
 
   function toggleViewableUser(rowUserId: number, targetUserId: number, checked: boolean) {
     setPermissions((current) =>
@@ -93,6 +100,7 @@ export function TaskPermissionsPanel({
   async function savePermissions() {
     if (!selectedId) return;
     setBusy(true);
+    setError(null);
     const response = await fetch(`/api/tasks/events/${selectedId}/permissions`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -119,7 +127,12 @@ export function TaskPermissionsPanel({
       setError("Failed to save task permissions.");
       return;
     }
-    setStatus("Task permissions saved.");
+    const eventName = initialEvents.find((event) => event.id === selectedId)?.name;
+    setStatus(
+      eventName
+        ? `Permissions saved for ${eventName}.`
+        : "Task permissions saved.",
+    );
     router.refresh();
   }
 
@@ -139,7 +152,7 @@ export function TaskPermissionsPanel({
               <button
                 key={event.id}
                 type="button"
-                onClick={() => setSelectedId(event.id)}
+                onClick={() => selectEvent(event.id)}
                 className={[
                   "rounded-full px-4 py-1.5 text-sm font-medium",
                   event.id === selectedId
@@ -230,22 +243,14 @@ export function TaskPermissionsPanel({
                 <p className="text-xs font-medium tracking-wide text-stone-400 uppercase">
                   Or view tasks assigned to
                 </p>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-                  {allUsers
-                    .filter((user) => user.id !== row.userId)
-                    .map((user) => (
-                      <label key={user.id} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={row.viewableUserIds.includes(user.id)}
-                          onChange={(e) =>
-                            toggleViewableUser(row.userId, user.id, e.target.checked)
-                          }
-                        />
-                        {user.username}
-                      </label>
-                    ))}
-                </div>
+                <ViewableUsersPicker
+                  rowUserId={row.userId}
+                  allUsers={allUsers}
+                  selectedIds={row.viewableUserIds}
+                  onToggle={(targetUserId, checked) =>
+                    toggleViewableUser(row.userId, targetUserId, checked)
+                  }
+                />
               </div>
             )}
           </div>
