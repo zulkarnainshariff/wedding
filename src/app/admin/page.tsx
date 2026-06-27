@@ -4,7 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canManageUsers, canEditItinerary, normalizePermissions } from "@/lib/permissions";
+import { canManageUsers, canEditItinerary, isSuperuser, normalizePermissions } from "@/lib/permissions";
 import { getDays, getAllItems } from "@/lib/queries";
 import { getAllInvitationEvents, getScheduleItemsForEventAdmin } from "@/lib/public-queries";
 import { users } from "@/lib/schema";
@@ -57,6 +57,7 @@ export default async function AdminPage() {
         initialUsers={initialUsers}
         showUserManagement={canManageUsers(sessionUser)}
         showFullAdmin={sessionUser.isAdmin}
+        showDiagnostics={isSuperuser(sessionUser)}
       />
     </AppShell>
   );

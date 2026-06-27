@@ -35,9 +35,7 @@ const EMPTY_SIMPLE: Record<Category, Record<string, string>> = {
     arrivalTime: "",
     status: "confirmed",
     aircraft: "",
-    departureTerminal: "",
     arrivalTerminal: "",
-    departureGate: "",
     arrivalGate: "",
     totalFlightTime: "",
   },
@@ -308,10 +306,10 @@ export function buildStructuredDetailsPayload(
     );
     payload.departureTime = structured.simple.departureTime || null;
     payload.arrivalTime = structured.simple.arrivalTime || null;
-    payload.departureTerminal = structured.simple.departureTerminal || undefined;
-    payload.departureGate = structured.simple.departureGate || undefined;
     payload.arrivalTerminal = structured.simple.arrivalTerminal || undefined;
     payload.arrivalGate = structured.simple.arrivalGate || undefined;
+    delete payload.departureTerminal;
+    delete payload.departureGate;
     payload.status = structured.simple.status === "tbc" ? "tbc" : "confirmed";
     payload.bookingReferences = objectFromRecords(
       structured.bookingReferences,

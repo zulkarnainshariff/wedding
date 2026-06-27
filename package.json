@@ -19,6 +19,7 @@
     "db:migrate-task-updates": "tsx src/db/migrate-task-updates.ts",
     "db:migrate-task-view-permissions": "tsx src/db/migrate-task-view-permissions.ts",
     "db:migrate-item-features": "tsx src/db/migrate-item-features.ts",
+    "db:migrate-system-logs": "tsx src/db/migrate-system-logs.ts",
     "db:dump-seed": "bash scripts/dump-wedding-seed.sh",
     "db:studio": "drizzle-kit studio"
   },

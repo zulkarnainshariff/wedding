@@ -1,0 +1,23 @@
+/** Application tables in dependency-safe dump order. */
+export const APPLICATION_TABLES = [
+  "users",
+  "itinerary_days",
+  "wedding_events",
+  "itinerary_items",
+  "item_documents",
+  "public_schedule_items",
+  "event_rsvp_settings",
+  "guest_list_permissions",
+  "guests",
+  "guest_members",
+  "task_permissions",
+  "tasks",
+  "task_notes",
+  "task_reminders",
+  "notifications",
+  "sync_metadata",
+  "login_logs",
+  "audit_logs",
+  "usage_logs",
+  "user_activity_sessions",
+] as const;

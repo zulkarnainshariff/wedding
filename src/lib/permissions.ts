@@ -8,6 +8,14 @@ import { CATEGORIES, type Category } from "./types";
 
 import type { UserPreferences } from "./user-preferences";
 
+import {
+  isAdminSession,
+  isSuperuserRole,
+  roleLevelFromDb,
+  ROLE_ADMIN,
+  ROLE_USER,
+} from "./role-levels";
+
 export type UserPermissions = {
   viewCategories: Category[] | "all";
   viewTravellers: string[] | "all";
@@ -20,6 +28,7 @@ export type UserPermissions = {
 export type SessionUser = {
   id: number;
   username: string;
+  roleLevel: number;
   isAdmin: boolean;
   permissions: UserPermissions;
   preferences: UserPreferences;
@@ -57,6 +66,14 @@ export function normalizeViewTravellers(
 
   const unique = [...new Set([username.toLowerCase(), ...values])];
   return unique;
+}
+
+export function isSuperuser(user: SessionUser): boolean {
+  return isSuperuserRole(user.roleLevel);
+}
+
+export function canManageAdmins(user: SessionUser): boolean {
+  return isSuperuser(user);
 }
 
 export function normalizePermissions(
@@ -99,22 +116,24 @@ export function canViewCategory(
   user: SessionUser,
   category: Category,
 ): boolean {
-  if (user.isAdmin) return true;
+  if (isAdminSession(user.roleLevel)) return true;
   const { viewCategories } = user.permissions;
   return viewCategories === "all" || viewCategories.includes(category);
 }
 
 export function canEditItinerary(user: SessionUser): boolean {
-  return user.isAdmin || user.permissions.canEdit;
+  return isAdminSession(user.roleLevel) || user.permissions.canEdit;
 }
 
 export function canManageUsers(user: SessionUser): boolean {
-  return user.isAdmin || Boolean(user.permissions.canManageUsers);
+  return (
+    isAdminSession(user.roleLevel) || Boolean(user.permissions.canManageUsers)
+  );
 }
 
 export function canViewAllGuestLists(user: SessionUser): boolean {
   return (
-    user.isAdmin ||
+    isAdminSession(user.roleLevel) ||
     canManageUsers(user) ||
     Boolean(user.permissions.canViewAllGuestLists)
   );
@@ -122,18 +141,20 @@ export function canViewAllGuestLists(user: SessionUser): boolean {
 
 export function canEditAllGuestLists(user: SessionUser): boolean {
   return (
-    user.isAdmin ||
+    isAdminSession(user.roleLevel) ||
     canManageUsers(user) ||
     Boolean(user.permissions.canEditAllGuestLists)
   );
 }
 
 export function receivesAllGuestListNotifications(user: {
+  roleLevel?: number;
   isAdmin: boolean;
   permissions: UserPermissions;
 }): boolean {
+  const level = user.roleLevel ?? (user.isAdmin ? ROLE_ADMIN : ROLE_USER);
   return (
-    user.isAdmin ||
+    isAdminSession(level) ||
     Boolean(user.permissions.canManageUsers) ||
     Boolean(
       user.permissions.canViewAllGuestLists ||
@@ -146,7 +167,7 @@ export function canViewItemTravellers(
   item: ItineraryItem,
   user: SessionUser,
 ): boolean {
-  if (user.isAdmin || user.permissions.viewTravellers === "all") {
+  if (isAdminSession(user.roleLevel) || user.permissions.viewTravellers === "all") {
     return true;
   }
 
@@ -181,7 +202,7 @@ export function filterItemsByPermission(
 }
 
 export function visibleCategories(user: SessionUser): Category[] | "all" {
-  if (user.isAdmin || user.permissions.viewCategories === "all") {
+  if (isAdminSession(user.roleLevel) || user.permissions.viewCategories === "all") {
     return "all";
   }
   return user.permissions.viewCategories;

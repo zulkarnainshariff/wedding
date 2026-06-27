@@ -15,7 +15,7 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { AppMark } from "@/components/ui/AppMark";
-import { SidebarSyncButton } from "@/components/auth/SidebarSyncButton";
+import { SidebarSyncIconButton } from "@/components/auth/SidebarSyncIconButton";
 import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigationGuard } from "@/components/layout/NavigationGuard";
@@ -24,24 +24,65 @@ import { canViewAllGuestLists } from "@/lib/permissions";
 import { ExportPdfPanel } from "@/components/itinerary/ExportPdfPanel";
 import { DevModePanel } from "@/components/itinerary/DevModePanel";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { CATEGORIES, CATEGORY_META, type Category } from "@/lib/types";
+import { CATEGORY_META, type Category } from "@/lib/types";
 
-const BASE_NAV_ITEMS: { href: string; label: string; category?: Category | "all" | "guests" | "invitations" | "tasks" }[] =
-  [
-    { href: "/itinerary", label: "View All", category: "all" },
-    ...CATEGORIES.map((category) => ({
-      href: `/itinerary/${category}`,
-      label: CATEGORY_META[category].label,
-      category,
-    })),
-    { href: "/invitation", label: "Invitations", category: "invitations" },
-    { href: "/guests", label: "Guest lists", category: "guests" },
-    { href: "/tasks", label: "Tasks", category: "tasks" },
-  ];
+const USERNAME_DISPLAY_MAX = 14;
+
+type NavCategory =
+  | Category
+  | "all"
+  | "guests"
+  | "invitations"
+  | "tasks"
+  | "flights_hub";
+
+const BASE_NAV_ITEMS: {
+  href: string;
+  label: string;
+  category?: NavCategory;
+}[] = [
+  {
+    href: "/itinerary/activity",
+    label: CATEGORY_META.activity.label,
+    category: "activity",
+  },
+  { href: "/itinerary", label: "View All", category: "all" },
+  { href: "/itinerary/flight", label: "Flights", category: "flights_hub" },
+  {
+    href: "/itinerary/accommodation",
+    label: CATEGORY_META.accommodation.label,
+    category: "accommodation",
+  },
+  {
+    href: "/itinerary/car_rental",
+    label: CATEGORY_META.car_rental.label,
+    category: "car_rental",
+  },
+  {
+    href: "/itinerary/travel_insurance",
+    label: CATEGORY_META.travel_insurance.label,
+    category: "travel_insurance",
+  },
+  { href: "/invitation", label: "Invitations", category: "invitations" },
+  { href: "/guests", label: "Guest lists", category: "guests" },
+  { href: "/tasks", label: "Tasks", category: "tasks" },
+];
+
+function formatUsername(username: string): string {
+  if (username.length <= USERNAME_DISPLAY_MAX) return username;
+  return `${username.slice(0, USERNAME_DISPLAY_MAX - 1)}…`;
+}
 
 function useNavItems() {
-  const { user, canView, isAdmin, canEdit, canManageUsers, guestListAccess, loading } =
-    useAuth();
+  const {
+    user,
+    canView,
+    isAdmin,
+    canEdit,
+    canManageUsers,
+    guestListAccess,
+    loading,
+  } = useAuth();
 
   if (loading) return null;
 
@@ -52,11 +93,14 @@ function useNavItems() {
       return (
         isAdmin ||
         (guestListAccess?.length ?? 0) > 0 ||
-        (user ? canViewAllGuestLists(user) : false)
+        canViewAllGuestLists(user)
       );
     }
     if (item.category === "tasks") return true;
     if (item.category === "all") return true;
+    if (item.category === "flights_hub") {
+      return canView("flight") || canView("pet_relocation");
+    }
     if (!item.category) return false;
     return canView(item.category);
   }).concat(
@@ -75,7 +119,7 @@ function NavLink({
 }: {
   href: string;
   label: string;
-  category?: Category | "all" | "guests" | "invitations" | "tasks";
+  category?: NavCategory | "guests" | "invitations" | "tasks";
   onNavigate?: () => void;
   compact?: boolean;
 }) {
@@ -89,8 +133,12 @@ function NavLink({
         : href === "/tasks"
           ? pathname.startsWith("/tasks")
           : category === "all"
-          ? pathname === "/itinerary"
-          : pathname === href || pathname.startsWith(`${href}/`);
+            ? pathname === "/itinerary"
+            : category === "flights_hub"
+              ? pathname === "/itinerary/flight" ||
+                pathname.startsWith("/itinerary/flight/") ||
+                pathname.startsWith("/itinerary/pet_relocation")
+              : pathname === href || pathname.startsWith(`${href}/`);
 
   const Icon =
     href === "/invitation"
@@ -100,12 +148,18 @@ function NavLink({
         : href === "/tasks"
           ? CheckSquare
           : href === "/admin"
-        ? Pencil
-        : href === "/settings"
-          ? Settings
-          : category && category !== "all" && category !== "guests" && category !== "invitations" && category !== "tasks"
-            ? CATEGORY_ICONS[category as Category]
-            : LayoutGrid;
+            ? Pencil
+            : href === "/settings"
+              ? Settings
+              : category === "flights_hub"
+                ? CATEGORY_ICONS.flight
+                : category &&
+                    category !== "all" &&
+                    category !== "guests" &&
+                    category !== "invitations" &&
+                    category !== "tasks"
+                  ? CATEGORY_ICONS[category as Category]
+                  : LayoutGrid;
 
   return (
     <Link
@@ -134,6 +188,20 @@ function NavLink({
       />
       {!compact && <span>{label}</span>}
     </Link>
+  );
+}
+
+function SignedInRow({ username }: { username: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-xl bg-stone-100 px-3 py-2 text-xs text-stone-600">
+      <span className="min-w-0 truncate">
+        Signed in as{" "}
+        <span className="font-medium" title={username}>
+          {formatUsername(username)}
+        </span>
+      </span>
+      <SidebarSyncIconButton />
+    </div>
   );
 }
 
@@ -188,16 +256,16 @@ export function Sidebar({ compact = false }: { compact?: boolean }) {
         )}
       </nav>
 
-      <div className="border-t border-stone-200/80 p-3 space-y-1">
+      <div className="space-y-1 border-t border-stone-200/80 p-3">
         <ExportPdfPanel compact={compact} />
         <DevModePanel compact={compact} />
-        <SidebarSyncButton compact={compact} />
-        <NavLink href="/settings" label="Settings" compact={compact} />
-        {!compact && user && (
-          <div className="rounded-xl bg-stone-100 px-3 py-2 text-xs text-stone-600">
-            Signed in as <span className="font-medium">{user.username}</span>
+        {!compact && user && <SignedInRow username={user.username} />}
+        {compact && user && (
+          <div className="flex justify-center py-1">
+            <SidebarSyncIconButton />
           </div>
         )}
+        <NavLink href="/settings" label="Settings" compact={compact} />
         <button
           type="button"
           onClick={() => setLogoutOpen(true)}
@@ -306,13 +374,8 @@ export function MobileDrawer({
             <ExportPdfPanel />
           </div>
           <DevModePanel />
-          <SidebarSyncButton />
+          {user && <SignedInRow username={user.username} />}
           <NavLink href="/settings" label="Settings" onNavigate={onClose} />
-          {user && (
-            <p className="px-3 pt-3 text-xs text-stone-500">
-              Signed in as {user.username}
-            </p>
-          )}
           <button
             type="button"
             onClick={() => setLogoutOpen(true)}
@@ -336,13 +399,18 @@ export function BottomNav() {
   const pathname = usePathname();
   const { canView } = useAuth();
   const tabs = [
+    { href: "/itinerary/activity", label: "Schedule", category: "activity" as const },
     { href: "/itinerary", label: "All", category: "all" as const },
-    { href: "/itinerary/flight", label: "Flights", category: "flight" as const },
-    { href: "/itinerary/pet_relocation", label: "Pets", category: "pet_relocation" as const },
+    { href: "/itinerary/flight", label: "Flights", category: "flights_hub" as const },
     { href: "/itinerary/accommodation", label: "Stay", category: "accommodation" as const },
     { href: "/itinerary/car_rental", label: "Cars", category: "car_rental" as const },
-    { href: "/itinerary/activity", label: "Schedule", category: "activity" as const },
-  ].filter((tab) => tab.category === "all" || canView(tab.category));
+  ].filter((tab) => {
+    if (tab.category === "all") return true;
+    if (tab.category === "flights_hub") {
+      return canView("flight") || canView("pet_relocation");
+    }
+    return canView(tab.category);
+  });
 
   return (
     <nav className="fixed right-0 bottom-0 left-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur md:hidden">
@@ -354,11 +422,16 @@ export function BottomNav() {
           const active =
             tab.category === "all"
               ? pathname === "/itinerary"
-              : pathname.startsWith(tab.href);
+              : tab.category === "flights_hub"
+                ? pathname.startsWith("/itinerary/flight") ||
+                  pathname.startsWith("/itinerary/pet_relocation")
+                : pathname.startsWith(tab.href);
           const Icon =
             tab.category === "all"
               ? LayoutGrid
-              : CATEGORY_ICONS[tab.category];
+              : tab.category === "flights_hub"
+                ? CATEGORY_ICONS.flight
+                : CATEGORY_ICONS[tab.category];
 
           return (
             <Link

@@ -6,10 +6,12 @@ import { validatePassword } from "@/lib/password-policy";
 import { db } from "@/lib/db";
 import {
   DEFAULT_PERMISSIONS,
+  isSuperuser,
   normalizePermissions,
   normalizeViewTravellers,
   type UserPermissions,
 } from "@/lib/permissions";
+import { roleLevelFromDb, ROLE_ADMIN, ROLE_USER } from "@/lib/role-levels";
 import { users } from "@/lib/schema";
 import { CATEGORIES, type Category } from "@/lib/types";
 
@@ -28,7 +30,10 @@ export async function GET() {
   if (isAuthError(user)) return user;
 
   const rows = await db.select().from(users).orderBy(asc(users.username));
-  return NextResponse.json(rows.map(serializeUser));
+  const visible = isSuperuser(user)
+    ? rows
+    : rows.filter((row) => roleLevelFromDb(row.roleLevel, row.isAdmin) !== 0);
+  return NextResponse.json(visible.map(serializeUser));
 }
 
 export async function POST(request: Request) {
@@ -39,6 +44,12 @@ export async function POST(request: Request) {
   const username = String(body.username ?? "").trim().toLowerCase();
   const password = String(body.password ?? "");
   const isAdmin = Boolean(body.isAdmin);
+  if (isAdmin && !isSuperuser(user)) {
+    return NextResponse.json(
+      { error: "Only platform operators can grant admin access" },
+      { status: 403 },
+    );
+  }
 
   if (!username || !password) {
     return NextResponse.json(
@@ -62,6 +73,7 @@ export async function POST(request: Request) {
         username,
         passwordHash,
         isAdmin,
+        roleLevel: isAdmin ? ROLE_ADMIN : ROLE_USER,
         permissions,
       })
       .returning();

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, DM_Sans } from "next/font/google";
+import { ActivityTracker } from "@/components/auth/ActivityTracker";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { TripTimeProvider } from "@/components/itinerary/TripTimeContext";
 import { OfflineSyncProvider } from "@/components/auth/OfflineSyncProvider";
@@ -39,6 +40,7 @@ export default function RootLayout({
           <TripTimeProvider>
             <OfflineSyncProvider>
               <NavigationGuardProvider>
+                <ActivityTracker />
                 {children}
                 <ServiceWorkerRegistration />
               </NavigationGuardProvider>

@@ -36,6 +36,16 @@ export async function requireAdminAccess(): Promise<SessionUser | NextResponse> 
   return user;
 }
 
+export async function requireSuperuserAccess(): Promise<SessionUser | NextResponse> {
+  const user = await requireAuth();
+  if (user instanceof NextResponse) return user;
+  const { isSuperuser } = await import("./permissions");
+  if (!isSuperuser(user)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return user;
+}
+
 export function isAuthError(
   value: SessionUser | NextResponse,
 ): value is NextResponse {

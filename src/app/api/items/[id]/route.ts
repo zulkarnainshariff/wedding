@@ -1,6 +1,7 @@
 import { asc, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireAuth, requireEditAccess, isAuthError } from "@/lib/api-auth";
+import { logAuditEvent } from "@/lib/activity-log";
 import { db } from "@/lib/db";
 import { deleteDocumentFile } from "@/lib/item-documents";
 import { applyItemDatetimeOverrides } from "@/lib/item-schedule-datetime";
@@ -97,6 +98,13 @@ export async function PUT(request: Request, { params }: Params) {
   }
 
   await bumpSyncVersion();
+  await logAuditEvent({
+    user,
+    action: "update",
+    resourceType: "item",
+    resourceId: item.id,
+    summary: `Updated ${item.category} item "${item.title}"`,
+  });
   return NextResponse.json(item);
 }
 
@@ -128,5 +136,12 @@ export async function DELETE(_request: Request, { params }: Params) {
   await Promise.all(docs.map((doc) => deleteDocumentFile(doc.storageKey)));
 
   await bumpSyncVersion();
+  await logAuditEvent({
+    user,
+    action: "delete",
+    resourceType: "item",
+    resourceId: item.id,
+    summary: `Deleted ${item.category} item "${item.title}"`,
+  });
   return NextResponse.json({ ok: true });
 }

@@ -12,9 +12,11 @@ import type { ItineraryItem } from "@/lib/schema";
 export function CategoryList({
   category,
   items,
+  embedded = false,
 }: {
   category: Category;
   items: ItineraryItem[];
+  embedded?: boolean;
 }) {
   const { effectiveDate, hidePast } = useTripTime();
   const meta = CATEGORY_META[category];
@@ -26,12 +28,8 @@ export function CategoryList({
 
   const visibleItems = filterPastItems(items, effectiveDate, hidePast);
 
-  return (
-    <PageShell
-      eyebrow="Category"
-      title={meta.plural}
-      toolbar={showViewToggle ? <ScheduleToolbar /> : undefined}
-    >
+  const list = (
+    <>
       {visibleItems.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-10 text-center text-stone-500">
           {hidePast
@@ -45,6 +43,20 @@ export function CategoryList({
           ))}
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return list;
+  }
+
+  return (
+    <PageShell
+      eyebrow="Category"
+      title={meta.plural}
+      toolbar={showViewToggle ? <ScheduleToolbar /> : undefined}
+    >
+      {list}
     </PageShell>
   );
 }

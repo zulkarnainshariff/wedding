@@ -1,6 +1,7 @@
 import { asc, eq, isNull, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireAuth, requireEditAccess, isAuthError } from "@/lib/api-auth";
+import { logAuditEvent } from "@/lib/activity-log";
 import { db } from "@/lib/db";
 import { applyItemDatetimeOverrides } from "@/lib/item-schedule-datetime";
 import { enrichFlightTimezoneDetails } from "@/lib/airport-timezone-resolver";
@@ -89,5 +90,12 @@ export async function POST(request: Request) {
     .returning();
 
   await bumpSyncVersion();
+  await logAuditEvent({
+    user,
+    action: "create",
+    resourceType: "item",
+    resourceId: item.id,
+    summary: `Created ${item.category} item "${item.title}"`,
+  });
   return NextResponse.json(item, { status: 201 });
 }

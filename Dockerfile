@@ -21,9 +21,13 @@ RUN npm run build
 FROM base AS runner
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV RUNNING_IN_CONTAINER=1
 
-RUN addgroup --system --gid 1001 nodejs \
-  && adduser --system --uid 1001 nextjs
+RUN apk add --no-cache postgresql-client openssh-client sshpass \
+  && addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 nextjs \
+  && mkdir -p /app/data/dumps /app/seeds \
+  && chown -R nextjs:nodejs /app/data /app/seeds
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
@@ -42,4 +46,4 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 
-CMD ["sh", "-c", "npm run db:push && npm run db:migrate-task-view-permissions"]
+CMD ["sh", "-c", "npm run db:push && npm run db:migrate-task-view-permissions && npm run db:migrate-system-logs"]

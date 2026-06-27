@@ -22,6 +22,8 @@ services:
       AIRLABS_API_KEY: ${AIRLABS_API_KEY:-}
     volumes:
       - wedding-uploads:/app/data/uploads
+      - wedding-dumps:/app/data/dumps
+      - wedding-seeds:/app/seeds
 
   migrate:
     build:
@@ -37,3 +39,5 @@ services:
 
 volumes:
   wedding-uploads:
+  wedding-dumps:
+  wedding-seeds:

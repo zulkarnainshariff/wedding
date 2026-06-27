@@ -175,8 +175,8 @@ export const CATEGORY_META: Record<
     color: "indigo",
   },
   flight: {
-    label: "Passenger Flights",
-    plural: "Passenger Flights",
+    label: "Flights",
+    plural: "Flights",
     shortLabel: "Flights",
     icon: "plane",
     color: "sky",

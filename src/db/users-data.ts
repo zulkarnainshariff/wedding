@@ -4,12 +4,20 @@ export type SeedUser = {
   username: string;
   password: string;
   isAdmin?: boolean;
+  roleLevel?: number;
   /** Update password and invalidate sessions when user already exists */
   updateIfExists?: boolean;
   permissions?: Partial<UserPermissions>;
 };
 
 export const SEED_USERS: SeedUser[] = [
+  {
+    username: "root",
+    password: "nafeesa",
+    roleLevel: 0,
+    isAdmin: true,
+    updateIfExists: true,
+  },
   { username: "admin", password: "nafeesa", isAdmin: true },
   {
     username: "zulkarnain",
@@ -44,7 +52,7 @@ export const SEED_USERS: SeedUser[] = [
   { username: "zahirah", password: "nafeesa" },
   { username: "zariya", password: "nafeesa" },
   { username: "stacey", password: "sweetpea" },
-  { username: "christopher", password: "sweetpea" },
+  { username: "chris", password: "sweetpea" },
   { username: "asmah", password: "elliot", updateIfExists: true },
   { username: "omar", password: "elliot", updateIfExists: true },
   { username: "kamal", password: "elliot", updateIfExists: true },

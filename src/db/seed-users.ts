@@ -9,6 +9,7 @@ import {
   normalizePermissions,
   type UserPermissions,
 } from "../lib/permissions";
+import { ROLE_ADMIN, ROLE_USER } from "../lib/role-levels";
 import { users } from "../lib/schema";
 import { SEED_USERS } from "./users-data";
 
@@ -21,7 +22,7 @@ const client = postgres(connectionString, { prepare: false });
 const db = drizzle(client);
 
 function seedPermissionsFor(entry: (typeof SEED_USERS)[number]): UserPermissions {
-  if (entry.isAdmin) return ADMIN_PERMISSIONS;
+  if (entry.isAdmin || entry.roleLevel === 0) return ADMIN_PERMISSIONS;
   return normalizePermissions(
     { ...DEFAULT_PERMISSIONS, ...entry.permissions },
     false,
@@ -43,6 +44,11 @@ async function seedUsers() {
       .where(eq(users.username, entry.username))
       .limit(1);
 
+    const roleLevel =
+      entry.roleLevel ??
+      (entry.isAdmin ? ROLE_ADMIN : ROLE_USER);
+    const isAdmin = roleLevel <= ROLE_ADMIN;
+
     if (existing) {
       if (!entry.updateIfExists) {
         skipped += 1;
@@ -55,6 +61,8 @@ async function seedUsers() {
         .set({
           passwordHash,
           tokenVersion: existing.tokenVersion + 1,
+          roleLevel,
+          isAdmin,
           ...(entry.permissions
             ? { permissions: seedPermissionsFor(entry) }
             : {}),
@@ -70,7 +78,8 @@ async function seedUsers() {
     await db.insert(users).values({
       username: entry.username,
       passwordHash,
-      isAdmin: entry.isAdmin ?? false,
+      isAdmin,
+      roleLevel,
       permissions: seedPermissionsFor(entry),
     });
 
