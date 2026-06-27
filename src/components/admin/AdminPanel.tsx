@@ -4,11 +4,13 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { AdminItemDetailsForm } from "./AdminItemDetailsForm";
+import { FlightScheduleTimes } from "./FlightScheduleTimes";
 import { InvitationManagement } from "./InvitationManagement";
 import { TravelInsurancePanel } from "./TravelInsurancePanel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { GuestListClient } from "@/components/guests/GuestListClient";
 import { TaskPermissionsPanel } from "./TaskPermissionsPanel";
+import { SystemDiagnosticsPanel } from "./SystemDiagnosticsPanel";
 import { UserManagement, type ManagedUser } from "./UserManagement";
 import {
   buildItemApiPayload,
@@ -22,7 +24,15 @@ import { PageShell, SectionShell } from "@/components/layout/PageShell";
 import { CATEGORY_META, CATEGORIES, type Category } from "@/lib/types";
 import type { ItineraryDay, ItineraryItem, PublicScheduleItemRow, WeddingEvent } from "@/lib/schema";
 
-type AdminTab = "days" | "items" | "users" | "invitations" | "guests" | "tasks" | "insurance";
+type AdminTab =
+  | "days"
+  | "items"
+  | "users"
+  | "invitations"
+  | "guests"
+  | "tasks"
+  | "insurance"
+  | "diagnostics";
 
 type EventWithSchedule = WeddingEvent & {
   schedule: PublicScheduleItemRow[];
@@ -49,6 +59,7 @@ export function AdminPanel({
   initialEvents = [],
   showUserManagement = false,
   showFullAdmin = true,
+  showDiagnostics = false,
 }: {
   initialDays: ItineraryDay[];
   initialItems: ItineraryItem[];
@@ -56,6 +67,7 @@ export function AdminPanel({
   initialEvents?: EventWithSchedule[];
   showUserManagement?: boolean;
   showFullAdmin?: boolean;
+  showDiagnostics?: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<AdminTab>(
@@ -97,6 +109,7 @@ export function AdminPanel({
         ["tasks", "Task access"],
         ["insurance", "Travel insurance"],
         ...(showUserManagement ? ([["users", "Users"]] as const) : []),
+        ...(showDiagnostics ? ([["diagnostics", "Diagnostics"]] as const) : []),
       ]
     : [["insurance", "Travel insurance"]];
 
@@ -172,7 +185,13 @@ export function AdminPanel({
         ? { ...itemForm, eventDate: day.date }
         : itemForm;
 
-    const payload = buildItemApiPayload(formForSave);
+    const existingItem = editingItemId
+      ? items.find((entry) => entry.id === editingItemId)
+      : undefined;
+    const payload = buildItemApiPayload(
+      formForSave,
+      existingItem?.details as Record<string, unknown> | undefined,
+    );
 
     const res = editingItemId
       ? await fetch(`/api/items/${editingItemId}`, {
@@ -283,7 +302,10 @@ export function AdminPanel({
     >
       {tab === "users" && showUserManagement && (
         <div className={TAB_CONTENT_CLASS}>
-          <UserManagement initialUsers={initialUsers} />
+          <UserManagement
+            initialUsers={initialUsers}
+            allowAdminPromotion={showDiagnostics}
+          />
         </div>
       )}
 
@@ -304,6 +326,12 @@ export function AdminPanel({
       {tab === "insurance" && (
         <div className={TAB_CONTENT_CLASS}>
           <TravelInsurancePanel initialItems={items} />
+        </div>
+      )}
+
+      {tab === "diagnostics" && showDiagnostics && (
+        <div className={TAB_CONTENT_CLASS}>
+          <SystemDiagnosticsPanel />
         </div>
       )}
 
@@ -481,37 +509,35 @@ export function AdminPanel({
                 />
               </label>
 
-              <label className="block text-sm">
-                <span className="mb-1 block text-stone-500">
-                  {itemForm.category === "flight"
-                    ? `Departs${itemForm.structured.simple.fromIata ? ` (${itemForm.structured.simple.fromIata})` : ""} — airport local`
-                    : "Start"}
-                </span>
-                <input
-                  type="datetime-local"
-                  value={itemForm.startDatetime}
-                  onChange={(e) =>
-                    setItemForm({ ...itemForm, startDatetime: e.target.value })
-                  }
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                />
-              </label>
+              {itemForm.category === "flight" ? (
+                <FlightScheduleTimes itemForm={itemForm} setItemForm={setItemForm} />
+              ) : (
+                <>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-stone-500">Start</span>
+                    <input
+                      type="datetime-local"
+                      value={itemForm.startDatetime}
+                      onChange={(e) =>
+                        setItemForm({ ...itemForm, startDatetime: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                    />
+                  </label>
 
-              <label className="block text-sm">
-                <span className="mb-1 block text-stone-500">
-                  {itemForm.category === "flight"
-                    ? `Arrives${itemForm.structured.simple.toIata ? ` (${itemForm.structured.simple.toIata})` : ""} — airport local`
-                    : "End"}
-                </span>
-                <input
-                  type="datetime-local"
-                  value={itemForm.endDatetime}
-                  onChange={(e) =>
-                    setItemForm({ ...itemForm, endDatetime: e.target.value })
-                  }
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                />
-              </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-stone-500">End</span>
+                    <input
+                      type="datetime-local"
+                      value={itemForm.endDatetime}
+                      onChange={(e) =>
+                        setItemForm({ ...itemForm, endDatetime: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                    />
+                  </label>
+                </>
+              )}
             </div>
 
             <h3 className="mt-6 text-sm font-semibold tracking-wide text-stone-600 uppercase">

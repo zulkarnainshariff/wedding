@@ -4,7 +4,8 @@ import { hashPassword } from "@/lib/auth";
 import { validatePassword } from "@/lib/password-policy";
 import { requireAdminAccess, isAuthError } from "@/lib/api-auth";
 import { db } from "@/lib/db";
-import { normalizePermissions, normalizeViewTravellers, type UserPermissions } from "@/lib/permissions";
+import { isSuperuser, normalizePermissions, normalizeViewTravellers, type UserPermissions } from "@/lib/permissions";
+import { ROLE_ADMIN, ROLE_USER, roleLevelFromDb } from "@/lib/role-levels";
 import { users } from "@/lib/schema";
 import { CATEGORIES, type Category } from "@/lib/types";
 
@@ -38,8 +39,28 @@ export async function PUT(request: Request, { params }: Params) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  if (existing.roleLevel === 0 && !isSuperuser(sessionUser)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const requestedAdmin = Boolean(body.isAdmin);
+  if (requestedAdmin && !isSuperuser(sessionUser)) {
+    return NextResponse.json(
+      { error: "Only platform operators can grant admin access" },
+      { status: 403 },
+    );
+  }
+
   const isAdmin =
-    userId === sessionUser.id ? existing.isAdmin : Boolean(body.isAdmin);
+    userId === sessionUser.id
+      ? existing.isAdmin
+      : requestedAdmin;
+  const roleLevel =
+    userId === sessionUser.id
+      ? roleLevelFromDb(existing.roleLevel, existing.isAdmin)
+      : isAdmin
+        ? ROLE_ADMIN
+        : ROLE_USER;
   const permissions = parsePermissionsBody(
     body.permissions,
     isAdmin,
@@ -58,6 +79,7 @@ export async function PUT(request: Request, { params }: Params) {
     .update(users)
     .set({
       isAdmin,
+      roleLevel,
       permissions,
       ...(password
         ? {
@@ -82,6 +104,23 @@ export async function DELETE(_request: Request, { params }: Params) {
   if (userId === sessionUser.id) {
     return NextResponse.json(
       { error: "You cannot delete your own account" },
+      { status: 400 },
+    );
+  }
+
+  const [existing] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!existing) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  if (existing.roleLevel === 0) {
+    return NextResponse.json(
+      { error: "Cannot delete platform operator accounts" },
       { status: 400 },
     );
   }

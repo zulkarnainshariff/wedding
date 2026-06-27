@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, isAuthError } from "@/lib/api-auth";
+import { isSuperuser } from "@/lib/permissions";
 import { getGuestListAccessForUser } from "@/lib/guest-queries";
 import { getTaskPermissionsForUser } from "@/lib/task-queries";
 
@@ -29,6 +30,7 @@ export async function GET() {
       isAdmin: user.isAdmin,
       permissions: user.permissions,
       preferences: user.preferences,
+      canAccessDiagnostics: isSuperuser(user),
       guestListAccess,
       taskPermissions,
     },

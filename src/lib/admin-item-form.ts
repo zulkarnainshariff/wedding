@@ -199,7 +199,10 @@ export function itemToForm(item: ItineraryItem): ItemFormState {
   };
 }
 
-export function buildItemApiPayload(form: ItemFormState) {
+export function buildItemApiPayload(
+  form: ItemFormState,
+  existingDetails?: Record<string, unknown> | null,
+) {
   const synced = syncStructuredTimes(
     form.category,
     form.structured,
@@ -207,6 +210,12 @@ export function buildItemApiPayload(form: ItemFormState) {
     form.startDatetime,
     form.endDatetime,
   );
+
+  let details = buildStructuredDetailsPayload(form.category, synced.structured);
+
+  if (form.category === "flight" && existingDetails) {
+    details = preserveLiveDepartureDetails(details, existingDetails);
+  }
 
   return {
     dayId: form.dayId ? Number(form.dayId) : null,
@@ -217,6 +226,81 @@ export function buildItemApiPayload(form: ItemFormState) {
     startDatetime: synced.startIso,
     endDatetime: synced.endIso,
     sortOrder: Number(form.sortOrder || 0),
-    details: buildStructuredDetailsPayload(form.category, synced.structured),
+    details,
   };
+}
+
+/** Keep departure terminal/gate and tracking snapshot when admin saves other fields. */
+function preserveLiveDepartureDetails(
+  payload: Record<string, unknown>,
+  existing: Record<string, unknown>,
+): Record<string, unknown> {
+  const next = { ...payload };
+
+  if (existing.departureTerminal != null && String(existing.departureTerminal).trim()) {
+    next.departureTerminal = existing.departureTerminal;
+  }
+  if (existing.departureGate != null && String(existing.departureGate).trim()) {
+    next.departureGate = existing.departureGate;
+  }
+  if (existing._flightTracking != null) {
+    next._flightTracking = existing._flightTracking;
+  }
+
+  return next;
+}
+
+function flightArrivalTimePart(
+  endDatetime: string,
+  startDatetime: string,
+  arrivalTime?: string,
+): string {
+  const fromEnd = endDatetime.split("T")[1];
+  if (fromEnd) return fromEnd.slice(0, 5);
+  if (arrivalTime?.trim()) return arrivalTime.slice(0, 5);
+  const fromStart = startDatetime.split("T")[1];
+  if (fromStart) return fromStart.slice(0, 5);
+  return "12:00";
+}
+
+/** When departure datetime changes, keep arrival time but align its date if it still matched the old departure date. */
+export function applyFlightStartDatetimeChange(
+  form: ItemFormState,
+  nextStart: string,
+): ItemFormState {
+  if (form.category !== "flight") {
+    return { ...form, startDatetime: nextStart };
+  }
+
+  const prevStartDate = form.startDatetime.split("T")[0] ?? "";
+  const nextStartDate = nextStart.split("T")[0] ?? "";
+  const prevEndDate = form.endDatetime.split("T")[0] ?? "";
+
+  const shouldAlignEndDate =
+    !form.endDatetime || (prevStartDate && prevEndDate === prevStartDate);
+
+  const nextEnd =
+    shouldAlignEndDate && nextStartDate
+      ? `${nextStartDate}T${flightArrivalTimePart(
+          form.endDatetime,
+          nextStart,
+          form.structured.simple.arrivalTime,
+        )}`
+      : form.endDatetime;
+
+  return { ...form, startDatetime: nextStart, endDatetime: nextEnd };
+}
+
+export function copyFlightDepartureDateToArrival(
+  form: ItemFormState,
+): ItemFormState {
+  if (form.category !== "flight" || !form.startDatetime) return form;
+  const startDate = form.startDatetime.split("T")[0];
+  if (!startDate) return form;
+  const time = flightArrivalTimePart(
+    form.endDatetime,
+    form.startDatetime,
+    form.structured.simple.arrivalTime,
+  );
+  return { ...form, endDatetime: `${startDate}T${time}` };
 }

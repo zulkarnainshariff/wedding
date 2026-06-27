@@ -62,6 +62,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
+  roleLevel: integer("role_level").default(3).notNull(),
   permissions: jsonb("permissions").notNull().default({}),
   preferences: jsonb("preferences").notNull().default({}),
   tokenVersion: integer("token_version").default(0).notNull(),
@@ -257,6 +258,58 @@ export const taskReminders = pgTable("task_reminders", {
     .notNull(),
 });
 
+export const loginLogs = pgTable("login_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  username: text("username"),
+  eventType: text("event_type").notNull(),
+  sessionId: text("session_id"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  username: text("username"),
+  action: text("action").notNull(),
+  resourceType: text("resource_type").notNull(),
+  resourceId: text("resource_id"),
+  summary: text("summary"),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const usageLogs = pgTable("usage_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  username: text("username"),
+  sessionId: text("session_id").notNull(),
+  eventType: text("event_type").notNull(),
+  path: text("path"),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const userActivitySessions = pgTable("user_activity_sessions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  sessionId: text("session_id").notNull().unique(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+});
+
 export type ItineraryDay = typeof itineraryDays.$inferSelect;
 export type NewItineraryDay = typeof itineraryDays.$inferInsert;
 export type ItineraryItem = typeof itineraryItems.$inferSelect;
@@ -281,3 +334,7 @@ export type TaskPermission = typeof taskPermissions.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type TaskNote = typeof taskNotes.$inferSelect;
 export type TaskReminder = typeof taskReminders.$inferSelect;
+export type LoginLog = typeof loginLogs.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type UsageLog = typeof usageLogs.$inferSelect;
+export type UserActivitySession = typeof userActivitySessions.$inferSelect;

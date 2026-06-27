@@ -37,6 +37,7 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
   const [cache, setCache] = useState<OfflineCache | null>(null);
   const updateIdRef = useRef<string | null>(null);
   const syncInFlightRef = useRef(false);
+  const flightRefreshKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     updateIdRef.current = updateId;
@@ -157,6 +158,19 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
 
     return () => source.close();
   }, [authLoading, user, syncNow, checkForUpdates]);
+
+  useEffect(() => {
+    if (!user || !cache?.items?.length) return;
+
+    const key = `${user.id}:${cache.cachedAt}`;
+    if (flightRefreshKeyRef.current === key) return;
+    flightRefreshKeyRef.current = key;
+
+    for (const item of cache.items) {
+      if (item.category !== "flight" || !item.id) continue;
+      void fetch(`/api/flights/${item.id}/status`, { cache: "no-store" });
+    }
+  }, [user, cache]);
 
   const getCachedItem = useCallback(
     (id: number) => cache?.items.find((item) => item.id === id) ?? null,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -12,6 +12,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   destructive = false,
   busy = false,
+  confirmPhrase,
   onClose,
   onConfirm,
 }: {
@@ -22,16 +23,23 @@ export function ConfirmDialog({
   cancelLabel?: string;
   destructive?: boolean;
   busy?: boolean;
+  /** When set, user must type this phrase to enable confirm. */
+  confirmPhrase?: string;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   const openedAtRef = useRef(0);
+  const [typedPhrase, setTypedPhrase] = useState("");
 
   useEffect(() => {
     if (open) {
       openedAtRef.current = Date.now();
+      setTypedPhrase("");
     }
   }, [open]);
+
+  const phraseMatches =
+    !confirmPhrase || typedPhrase.trim() === confirmPhrase.trim();
 
   if (!open) return null;
 
@@ -69,10 +77,24 @@ export function ConfirmDialog({
             </h2>
             <p
               id="confirm-dialog-message"
-              className="mt-2 text-sm text-stone-500"
+              className="mt-2 whitespace-pre-wrap text-sm text-stone-500"
             >
               {message}
             </p>
+            {confirmPhrase ? (
+              <label className="mt-4 block text-sm">
+                <span className="mb-1 block font-medium text-stone-700">
+                  Type <span className="font-mono">{confirmPhrase}</span> to confirm
+                </span>
+                <input
+                  value={typedPhrase}
+                  onChange={(e) => setTypedPhrase(e.target.value)}
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2 font-mono text-sm"
+                  autoComplete="off"
+                  disabled={busy}
+                />
+              </label>
+            ) : null}
           </div>
           <button
             type="button"
@@ -96,7 +118,7 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={busy}
+            disabled={busy || !phraseMatches}
             className={`rounded-xl px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 ${
               destructive ? "bg-red-600 hover:bg-red-700" : "bg-[#1e3a5f]"
             }`}

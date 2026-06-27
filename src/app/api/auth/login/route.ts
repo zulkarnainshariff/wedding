@@ -4,6 +4,7 @@ import {
   issueSessionForUser,
   setSessionCookie,
 } from "@/lib/auth";
+import { logLoginFailed, startUserSession } from "@/lib/activity-log";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
 
   const sessionUser = await authenticateUser(username, password);
   if (!sessionUser) {
+    await logLoginFailed(username, request);
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
@@ -36,6 +38,7 @@ export async function POST(request: Request) {
   }
 
   const token = await issueSessionForUser(user);
+  await startUserSession(sessionUser, "login", request);
   const response = NextResponse.json({
     user: {
       id: sessionUser.id,

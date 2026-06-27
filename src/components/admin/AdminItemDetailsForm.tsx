@@ -446,25 +446,17 @@ export function AdminItemDetailsForm({
             value={structured.simple.marketingFlightNumber}
             onChange={(v) => setSimple("marketingFlightNumber", v.toUpperCase())}
           />
-          <TextInput
-            label="Operating flight number (for tracking)"
-            value={structured.simple.operatingFlightNumber}
-            onChange={(v) => setSimple("operatingFlightNumber", v.toUpperCase())}
-          />
           <p className="sm:col-span-2 text-xs text-stone-500">
             Displayed as your flight (operating), e.g. QF1234 (AA456). Live
-            tracking uses the operating flight and departure IATA code.
-          </p>
-          <TimeInput label="Departure time" value={structured.simple.departureTime} onChange={(v) => setSimple("departureTime", v)} />
-          <TimeInput label="Arrival time" value={structured.simple.arrivalTime} onChange={(v) => setSimple("arrivalTime", v)} />
-          <p className="sm:col-span-2 text-xs text-stone-500">
-            Departure and arrival times use each airport&apos;s local timezone (from
-            the IATA codes above), not your device timezone.
+            tracking uses the operating flight number and departure IATA code.
           </p>
           <TextInput label="Aircraft" value={structured.simple.aircraft} onChange={(v) => setSimple("aircraft", v)} />
           <TextInput label="Total flight time" value={structured.simple.totalFlightTime} onChange={(v) => setSimple("totalFlightTime", v)} />
-          <TextInput label="Dep. terminal" value={structured.simple.departureTerminal} onChange={(v) => setSimple("departureTerminal", v)} />
-          <TextInput label="Dep. gate" value={structured.simple.departureGate} onChange={(v) => setSimple("departureGate", v)} />
+          <p className="sm:col-span-2 text-xs text-stone-500">
+            Departure terminal and gate are filled automatically from live flight
+            tracking on the day of travel (operating flight number + departure IATA
+            required).
+          </p>
           <TextInput label="Arr. terminal" value={structured.simple.arrivalTerminal} onChange={(v) => setSimple("arrivalTerminal", v)} />
           <TextInput label="Arr. gate" value={structured.simple.arrivalGate} onChange={(v) => setSimple("arrivalGate", v)} />
           <label className="block text-sm">
@@ -477,6 +469,10 @@ export function AdminItemDetailsForm({
               <option value="confirmed">Confirmed</option>
               <option value="tbc">To be confirmed</option>
             </select>
+            <p className="mt-1 text-xs text-stone-500">
+              Confirmed = booked flight details. To be confirmed = placeholder until
+              the booking is final (shows a TBC badge to guests).
+            </p>
           </label>
           <ParticipantMultiSelect
             value={structured.travellers}

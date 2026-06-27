@@ -9,6 +9,7 @@ import {
   type SessionUser,
   type UserPermissions,
 } from "./permissions";
+import { isAdminSession, roleLevelFromDb } from "./role-levels";
 import { users } from "./schema";
 import {
   normalizeUserPreferences,
@@ -80,6 +81,7 @@ export async function verifySessionToken(
       .select({
         tokenVersion: users.tokenVersion,
         isAdmin: users.isAdmin,
+        roleLevel: users.roleLevel,
         permissions: users.permissions,
         preferences: users.preferences,
         username: users.username,
@@ -93,10 +95,13 @@ export async function verifySessionToken(
     const tokenVersion = Number(payload.tokenVersion ?? 0);
     if (tokenVersion !== row.tokenVersion) return null;
 
+    const roleLevel = roleLevelFromDb(row.roleLevel, row.isAdmin);
+
     return {
       id,
       username: row.username,
-      isAdmin: row.isAdmin,
+      roleLevel,
+      isAdmin: isAdminSession(roleLevel),
       permissions: normalizePermissions(row.permissions, row.isAdmin, row.username),
       preferences: normalizeUserPreferences(row.preferences),
     };
@@ -155,10 +160,13 @@ export async function authenticateUser(
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) return null;
 
+  const roleLevel = roleLevelFromDb(user.roleLevel, user.isAdmin);
+
   return {
     id: user.id,
     username: user.username,
-    isAdmin: user.isAdmin,
+    roleLevel,
+    isAdmin: isAdminSession(roleLevel),
     permissions: normalizePermissions(user.permissions, user.isAdmin, user.username),
     preferences: normalizeUserPreferences(user.preferences),
   };

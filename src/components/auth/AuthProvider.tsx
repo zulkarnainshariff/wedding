@@ -16,6 +16,7 @@ import {
   canEditItinerary,
   canManageUsers as userCanManageUsers,
   canViewCategory,
+  isSuperuser,
 } from "@/lib/permissions";
 import type { Category } from "@/lib/types";
 
@@ -30,6 +31,7 @@ type AuthContextValue = {
   canEdit: boolean;
   canManageUsers: boolean;
   isAdmin: boolean;
+  canAccessDiagnostics: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -97,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       canEdit: user ? canEditItinerary(user) : false,
       canManageUsers: user ? userCanManageUsers(user) : false,
       isAdmin: user?.isAdmin ?? false,
+      canAccessDiagnostics: user ? isSuperuser(user) : false,
     }),
     [user, guestListAccess, taskPermissions, loading, refreshUser, logout],
   );

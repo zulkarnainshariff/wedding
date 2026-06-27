@@ -38,8 +38,10 @@ function formatTravellerAccess(permissions: UserPermissions): string {
 
 export function UserManagement({
   initialUsers,
+  allowAdminPromotion = false,
 }: {
   initialUsers: ManagedUser[];
+  allowAdminPromotion?: boolean;
 }) {
   const router = useRouter();
   const [users, setUsers] = useState(initialUsers);
@@ -251,28 +253,30 @@ export function UserManagement({
         </label>
 
         <div className="space-y-3 sm:col-span-2">
-          <label className="flex items-center gap-2 text-sm text-stone-700">
-            <input
-              type="checkbox"
-              checked={form.isAdmin}
-              onChange={(e) =>
-                setForm((current) => ({
-                  ...current,
-                  isAdmin: e.target.checked,
-                  viewAllCategories: e.target.checked ? true : current.viewAllCategories,
-                  viewAllTravellers: e.target.checked ? true : current.viewAllTravellers,
-                  canEdit: e.target.checked ? true : current.canEdit,
-                  canViewAllGuestLists: e.target.checked
-                    ? true
-                    : current.canViewAllGuestLists,
-                  canEditAllGuestLists: e.target.checked
-                    ? true
-                    : current.canEditAllGuestLists,
-                }))
-              }
-            />
-            Administrator (full access)
-          </label>
+          {allowAdminPromotion && (
+            <label className="flex items-center gap-2 text-sm text-stone-700">
+              <input
+                type="checkbox"
+                checked={form.isAdmin}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    isAdmin: e.target.checked,
+                    viewAllCategories: e.target.checked ? true : current.viewAllCategories,
+                    viewAllTravellers: e.target.checked ? true : current.viewAllTravellers,
+                    canEdit: e.target.checked ? true : current.canEdit,
+                    canViewAllGuestLists: e.target.checked
+                      ? true
+                      : current.canViewAllGuestLists,
+                    canEditAllGuestLists: e.target.checked
+                      ? true
+                      : current.canEditAllGuestLists,
+                  }))
+                }
+              />
+              Administrator (full access)
+            </label>
+          )}
 
           {!form.isAdmin && (
             <>
