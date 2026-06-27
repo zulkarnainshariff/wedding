@@ -29,7 +29,7 @@ docker compose build
 echo "Pushing database schema..."
 docker compose --profile tools run --rm migrate
 
-echo "Starting app on 127.0.0.1:3002..."
+echo "Starting app on 127.0.0.1:3102..."
 docker compose up -d
 
 echo "Done. Container status:"

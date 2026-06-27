@@ -7,6 +7,10 @@ import postgres from "postgres";
 import { APPLICATION_TABLES } from "@/lib/database-tables";
 import { executeSqlFileWithNode } from "@/lib/database-sql-node";
 import {
+  executeSequenceResetSql,
+  resetApplicationSequences,
+} from "@/lib/database-sequences";
+import {
   isDockerCliAvailable,
   isRunningInContainer,
   resolveDatabaseUrlForCli,
@@ -140,6 +144,7 @@ async function runPsqlFile(databaseUrl: string, filePath: string) {
 export async function wipeAndRestoreSeedFile(filename: string): Promise<{
   filename: string;
   tablesTruncated: number;
+  sequencesReset: number;
 }> {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   if (!databaseUrl) {
@@ -160,11 +165,14 @@ export async function wipeAndRestoreSeedFile(filename: string): Promise<{
     await sql.end();
 
     await runPsqlFile(databaseUrl, seedPath);
+    await executeSequenceResetSql(databaseUrl);
+    const sequencesReset = await resetApplicationSequences(databaseUrl);
     await bumpSyncVersion();
 
     return {
       filename,
       tablesTruncated: APPLICATION_TABLES.length,
+      sequencesReset,
     };
   } catch (error) {
     await sql.end({ timeout: 1 }).catch(() => undefined);

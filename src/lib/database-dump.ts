@@ -113,17 +113,20 @@ async function runPgDump(
 
 async function wrapReplicationRole(outputPath: string): Promise<void> {
   const body = await readFile(outputPath, "utf8");
-  if (body.includes("session_replication_role")) return;
+  const { SEQUENCE_RESET_SQL } = await import("@/lib/database-sequences");
 
-  await writeFile(
-    outputPath,
-    [
-      "SET session_replication_role = replica;",
-      body,
-      "SET session_replication_role = DEFAULT;",
-    ].join("\n"),
-    "utf8",
-  );
+  const parts = [];
+  if (!body.includes("session_replication_role")) {
+    parts.push("SET session_replication_role = replica;", body);
+  } else {
+    parts.push(body);
+  }
+  parts.push("SET session_replication_role = DEFAULT;");
+  if (!body.includes("Realign serial/identity sequences")) {
+    parts.push("", SEQUENCE_RESET_SQL);
+  }
+
+  await writeFile(outputPath, parts.join("\n"), "utf8");
 }
 
 export type DatabaseDumpResult = {
@@ -152,9 +155,7 @@ export async function dumpDatabaseToFile(options?: {
   const tempPath = path.join(tmpdir(), `wedding-dump-${Date.now()}.sql`);
 
   const method = await runPgDump(databaseUrl, tempPath);
-  if (method === "pg_dump") {
-    await wrapReplicationRole(tempPath);
-  }
+  await wrapReplicationRole(tempPath);
   await rename(tempPath, localPath);
 
   const contents = await readFile(localPath, "utf8");

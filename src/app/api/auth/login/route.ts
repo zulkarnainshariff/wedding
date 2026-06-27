@@ -38,7 +38,11 @@ export async function POST(request: Request) {
   }
 
   const token = await issueSessionForUser(user);
-  await startUserSession(sessionUser, "login", request);
+  try {
+    await startUserSession(sessionUser, "login", request);
+  } catch (error) {
+    console.error("Login activity logging failed:", error);
+  }
   const response = NextResponse.json({
     user: {
       id: sessionUser.id,

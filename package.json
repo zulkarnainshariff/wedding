@@ -21,6 +21,7 @@
     "db:migrate-item-features": "tsx src/db/migrate-item-features.ts",
     "db:migrate-system-logs": "tsx src/db/migrate-system-logs.ts",
     "db:dump-seed": "bash scripts/dump-wedding-seed.sh",
+    "db:reset-sequences": "tsx src/db/reset-sequences.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
