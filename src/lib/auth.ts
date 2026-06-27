@@ -74,21 +74,33 @@ export async function verifySessionToken(
 ): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, getSessionSecret());
+    const username = String(payload.username).trim().toLowerCase();
     const id = Number(payload.sub);
-    if (!id || !payload.username) return null;
+    if (!id || !username) return null;
 
-    const [row] = await db
-      .select({
-        tokenVersion: users.tokenVersion,
-        isAdmin: users.isAdmin,
-        roleLevel: users.roleLevel,
-        permissions: users.permissions,
-        preferences: users.preferences,
-        username: users.username,
-      })
+    const userColumns = {
+      id: users.id,
+      tokenVersion: users.tokenVersion,
+      isAdmin: users.isAdmin,
+      roleLevel: users.roleLevel,
+      permissions: users.permissions,
+      preferences: users.preferences,
+      username: users.username,
+    };
+
+    let [row] = await db
+      .select(userColumns)
       .from(users)
       .where(eq(users.id, id))
       .limit(1);
+
+    if (!row) {
+      [row] = await db
+        .select(userColumns)
+        .from(users)
+        .where(eq(users.username, username))
+        .limit(1);
+    }
 
     if (!row) return null;
 
@@ -98,7 +110,7 @@ export async function verifySessionToken(
     const roleLevel = roleLevelFromDb(row.roleLevel, row.isAdmin);
 
     return {
-      id,
+      id: row.id,
       username: row.username,
       roleLevel,
       isAdmin: isAdminSession(roleLevel),

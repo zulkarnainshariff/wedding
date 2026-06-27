@@ -88,7 +88,7 @@ export function DatabaseOperationsPanel() {
         return;
       }
       setStatus(
-        `Database wiped and restored from ${payload.filename} (${payload.tablesTruncated} tables reset).`,
+        `Database wiped and restored from ${payload.filename} (${payload.tablesTruncated} tables reset, ${payload.sequencesReset ?? "?"} sequences realigned).${payload.auditWarning ? ` Warning: ${payload.auditWarning}` : ""}`,
       );
       setRestoreDialogOpen(false);
     } finally {

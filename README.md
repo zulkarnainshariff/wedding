@@ -65,7 +65,7 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ## Deployment (Docker + OpenResty)
 
-The app runs in Docker and listens on **port 3002** on the host. OpenResty/nginx should proxy to `http://127.0.0.1:3002`.
+The app runs in Docker and listens on **port 3102** on the host. OpenResty/nginx should proxy to `http://127.0.0.1:3102`.
 
 **Repository:** [github.com/zulkarnainshariff/wedding](https://github.com/zulkarnainshariff/wedding)  
 **Deploy branch:** `main` (GitHub Actions deploys on push to `main`)
@@ -106,7 +106,7 @@ git checkout main
 git reset --hard origin/main
 ```
 
-The deploy script builds the image, runs `db:push`, and starts the container bound to `127.0.0.1:3002`.
+The deploy script builds the image, runs `db:push`, and starts the container bound to `127.0.0.1:3102`.
 
 ### OpenResty reverse proxy
 
@@ -114,7 +114,7 @@ Point your site at the Docker host port:
 
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:3002;
+    proxy_pass http://127.0.0.1:3102;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection 'upgrade';
@@ -144,7 +144,7 @@ Create `.env` on the server (not committed):
 |----------|-------------|
 | `DATABASE_URL` | Postgres connection string |
 | `SESSION_SECRET` | Long random string for auth cookies |
-| `PORT` | Host port in `.env.example` (3002); container uses 3000 internally |
+| `PORT` | Host port in `.env.example` (3102); container uses 3000 internally |
 
 `DATABASE_URL` is also passed at **image build time** for Next.js static generation.
 

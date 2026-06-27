@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import {
+  isPostgresUniqueViolation,
+  resetApplicationSequences,
+} from "@/lib/database-sequences";
 import { db } from "@/lib/db";
 import {
   auditLogs,
@@ -29,6 +33,16 @@ function requestMetaFrom(request?: Request | null): RequestMeta {
   };
 }
 
+async function withSequenceRecovery<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!isPostgresUniqueViolation(error)) throw error;
+    await resetApplicationSequences();
+    return operation();
+  }
+}
+
 export async function startUserSession(
   user: SessionUser,
   eventType: "login" | "session_resume",
@@ -38,30 +52,36 @@ export async function startUserSession(
   const meta = requestMetaFrom(request);
   const now = new Date();
 
-  await db.insert(userActivitySessions).values({
-    userId: user.id,
-    sessionId,
-    startedAt: now,
-    lastSeenAt: now,
-  });
+  await withSequenceRecovery(() =>
+    db.insert(userActivitySessions).values({
+      userId: user.id,
+      sessionId,
+      startedAt: now,
+      lastSeenAt: now,
+    }),
+  );
 
-  await db.insert(loginLogs).values({
-    userId: user.id,
-    username: user.username,
-    eventType,
-    sessionId,
-    ipAddress: meta.ipAddress,
-    userAgent: meta.userAgent,
-  });
+  await withSequenceRecovery(() =>
+    db.insert(loginLogs).values({
+      userId: user.id,
+      username: user.username,
+      eventType,
+      sessionId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    }),
+  );
 
-  await db.insert(usageLogs).values({
-    userId: user.id,
-    username: user.username,
-    sessionId,
-    eventType: "session_start",
-    path: null,
-    metadata: { trigger: eventType },
-  });
+  await withSequenceRecovery(() =>
+    db.insert(usageLogs).values({
+      userId: user.id,
+      username: user.username,
+      sessionId,
+      eventType: "session_start",
+      path: null,
+      metadata: { trigger: eventType },
+    }),
+  );
 
   return sessionId;
 }
@@ -72,14 +92,16 @@ export async function logLogout(
   request?: Request | null,
 ): Promise<void> {
   const meta = requestMetaFrom(request);
-  await db.insert(loginLogs).values({
-    userId: user.id,
-    username: user.username,
-    eventType: "logout",
-    sessionId: sessionId ?? null,
-    ipAddress: meta.ipAddress,
-    userAgent: meta.userAgent,
-  });
+  await withSequenceRecovery(() =>
+    db.insert(loginLogs).values({
+      userId: user.id,
+      username: user.username,
+      eventType: "logout",
+      sessionId: sessionId ?? null,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    }),
+  );
 
   if (sessionId) {
     await db
@@ -94,12 +116,14 @@ export async function logLoginFailed(
   request?: Request | null,
 ): Promise<void> {
   const meta = requestMetaFrom(request);
-  await db.insert(loginLogs).values({
-    username: username.toLowerCase(),
-    eventType: "login_failed",
-    ipAddress: meta.ipAddress,
-    userAgent: meta.userAgent,
-  });
+  await withSequenceRecovery(() =>
+    db.insert(loginLogs).values({
+      username: username.toLowerCase(),
+      eventType: "login_failed",
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    }),
+  );
 }
 
 export async function recordUsageHeartbeat(input: {
@@ -140,13 +164,15 @@ export async function recordUsageHeartbeat(input: {
 
   const eventType = input.detailed ? "page_view" : "heartbeat";
   if (input.detailed || eventType === "heartbeat") {
-    await db.insert(usageLogs).values({
-      userId: input.user.id,
-      username: input.user.username,
-      sessionId,
-      eventType,
-      path: input.path ?? null,
-    });
+    await withSequenceRecovery(() =>
+      db.insert(usageLogs).values({
+        userId: input.user.id,
+        username: input.user.username,
+        sessionId,
+        eventType,
+        path: input.path ?? null,
+      }),
+    );
   }
 
   return { sessionId, resumed };
@@ -160,16 +186,18 @@ export async function logAuditEvent(input: {
   summary?: string;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
-  await db.insert(auditLogs).values({
-    userId: input.user.id,
-    username: input.user.username,
-    action: input.action,
-    resourceType: input.resourceType,
-    resourceId:
-      input.resourceId == null ? null : String(input.resourceId),
-    summary: input.summary ?? null,
-    metadata: input.metadata ?? {},
-  });
+  await withSequenceRecovery(() =>
+    db.insert(auditLogs).values({
+      userId: input.user.id,
+      username: input.user.username,
+      action: input.action,
+      resourceType: input.resourceType,
+      resourceId:
+        input.resourceId == null ? null : String(input.resourceId),
+      summary: input.summary ?? null,
+      metadata: input.metadata ?? {},
+    }),
+  );
 }
 
 export async function listLoginLogs(filters: {

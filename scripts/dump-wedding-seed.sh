@@ -114,6 +114,43 @@ tmp="$(mktemp)"
   echo "SET session_replication_role = replica;"
   cat "$OUTPUT"
   echo "SET session_replication_role = DEFAULT;"
+  echo ""
+  cat <<'EOSQL'
+-- Realign serial/identity sequences after explicit-id INSERT restores
+DO $$
+DECLARE
+  r RECORD;
+  seq_name text;
+BEGIN
+  FOR r IN
+    SELECT
+      n.nspname AS schema_name,
+      c.relname AS table_name,
+      a.attname AS column_name
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+    JOIN pg_depend d ON d.refobjid = c.oid AND d.refobjsubid = a.attnum AND d.deptype = 'a'
+    JOIN pg_class s ON s.oid = d.objid AND s.relkind = 'S'
+    WHERE n.nspname = 'public' AND c.relkind = 'r'
+  LOOP
+    seq_name := pg_get_serial_sequence(
+      format('%I.%I', r.schema_name, r.table_name),
+      r.column_name
+    );
+    IF seq_name IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    EXECUTE format(
+      'SELECT setval(%L, COALESCE((SELECT MAX(%I) FROM %I.%I), 1), EXISTS (SELECT 1 FROM %I.%I))',
+      seq_name,
+      r.column_name, r.schema_name, r.table_name,
+      r.schema_name, r.table_name
+    );
+  END LOOP;
+END $$;
+EOSQL
 } > "$tmp"
 mv "$tmp" "$OUTPUT"
 
