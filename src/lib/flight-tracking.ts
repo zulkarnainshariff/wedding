@@ -542,6 +542,30 @@ function isEtaRefreshDue(
   return now.getTime() >= arrivalInstant.getTime();
 }
 
+const LANDED_BUFFER_MS = 15 * 60 * 1000;
+
+/** True when we're past scheduled/estimated arrival but snapshot still says airborne. */
+function isPastArrivalWindow(
+  now: Date,
+  item: ItineraryItem,
+  snapshot?: FlightTrackingSnapshot,
+): boolean {
+  if (isFlightLanded(snapshot)) return false;
+
+  const arrivalInstant = pickArrivalInstant(
+    item,
+    snapshot as FlightTimingSnapshot | undefined,
+  );
+  const sta = getScheduledArrival(item);
+  const endMs = Math.max(
+    arrivalInstant?.getTime() ?? 0,
+    sta?.getTime() ?? 0,
+  );
+  if (!endMs) return false;
+
+  return now.getTime() > endMs + LANDED_BUFFER_MS;
+}
+
 function inferStatus(
   now: Date,
   item: ItineraryItem,
@@ -555,9 +579,10 @@ function inferStatus(
   const std = getScheduledDeparture(item);
   const sta = getScheduledArrival(item);
   const nowMs = now.getTime();
-  const landedBufferMs = 15 * 60 * 1000;
 
   if (std && nowMs < std.getTime()) return "scheduled";
+
+  if (isPastArrivalWindow(now, item, snapshot)) return "landed";
 
   if (isFlightActiveInAir(snapshot)) return "active";
 
@@ -565,7 +590,7 @@ function inferStatus(
     if (snapshot && !isFlightLanded(snapshot)) {
       return "active";
     }
-    if (sta && nowMs > sta.getTime() + landedBufferMs) {
+    if (sta && nowMs > sta.getTime() + LANDED_BUFFER_MS) {
       return "landed";
     }
     return "active";
@@ -825,24 +850,23 @@ export async function getFlightLiveStatus(
       endDatetime: item.endDatetime,
       details: item.details,
     });
-    const timingPreview = computeDisplayTiming(now, item, trackingState.snapshot);
     const operatingFlightNumber = resolveOperatingFlightNumber(details);
     const depIata = normalizeFlightIata(details.fromIata);
     const flightDate = getItemCalendarDate(item);
-    const recentLanding =
-      !trackingState.snapshot &&
-      timingPreview.flightStatus === "landed" &&
+    const withinPostLandingWindow =
       schedule.endDatetime &&
       now.getTime() > schedule.endDatetime.getTime() &&
       now.getTime() - schedule.endDatetime.getTime() < 72 * 60 * 60 * 1000;
-
-    if (
-      recentLanding &&
+    const shouldRefreshPastFlight =
+      withinPostLandingWindow &&
       hasFlightTrackingApiKey() &&
       operatingFlightNumber &&
       depIata &&
-      flightDate
-    ) {
+      flightDate &&
+      (!trackingState.snapshot ||
+        isPastArrivalWindow(now, item, trackingState.snapshot));
+
+    if (shouldRefreshPastFlight) {
       try {
         const flight = await fetchLiveFlight({
           operatingFlightNumber,

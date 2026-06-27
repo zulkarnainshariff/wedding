@@ -76,14 +76,11 @@ export function computeFlightProgress(
     "ARR";
 
   let phase: FlightProgress["phase"];
-  const isLiveActive =
-    snapshot?.flightStatus === "active" ||
-    snapshot?.flightStatus?.toLowerCase() === "en-route";
   if (nowMs < scheduledStart.getTime()) {
     phase = "upcoming";
   } else if (
     snapshot?.arrival?.actual ||
-    (!isLiveActive && nowMs > scheduledEnd.getTime() + 15 * 60_000)
+    nowMs > scheduledEnd.getTime() + 15 * 60_000
   ) {
     phase = "landed";
   } else {
