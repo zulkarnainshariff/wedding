@@ -24,16 +24,17 @@ function seedDirectories(): string[] {
   const dirs = [root, path.join(root, "seeds")];
 
   if (isRunningInContainer()) {
-    if (existsSync("/app/seeds")) dirs.push("/app/seeds");
     if (existsSync("/app/data/dumps")) dirs.push("/app/data/dumps");
   }
 
-  return dirs;
+  return [...new Set(dirs.map((dir) => path.resolve(dir)))];
 }
+
+export type SeedFileLocation = "project" | "seeds" | "dumps";
 
 export type SeedFileInfo = {
   filename: string;
-  location: "project" | "seeds";
+  location: SeedFileLocation;
   byteSize: number;
   modifiedAt: string;
 };
@@ -47,11 +48,28 @@ function isSafeSqlFilename(filename: string): boolean {
   );
 }
 
+function seedLocationLabel(directory: string): SeedFileLocation {
+  const normalized = path.resolve(directory);
+  if (normalized.endsWith(`${path.sep}data${path.sep}dumps`)) {
+    return "dumps";
+  }
+  if (normalized.endsWith(`${path.sep}seeds`) || normalized === "/app/seeds") {
+    return "seeds";
+  }
+  return "project";
+}
+
+function isNewerSeedCandidate(
+  candidate: SeedFileInfo,
+  existing: SeedFileInfo,
+): boolean {
+  return candidate.modifiedAt.localeCompare(existing.modifiedAt) > 0;
+}
+
 export async function listSeedSqlFiles(): Promise<SeedFileInfo[]> {
   const found = new Map<string, SeedFileInfo>();
-  const [rootDir, seedsDir] = seedDirectories();
 
-  for (const directory of [rootDir, seedsDir]) {
+  for (const directory of seedDirectories()) {
     let entries: string[] = [];
     try {
       entries = await readdir(directory);
@@ -63,17 +81,25 @@ export async function listSeedSqlFiles(): Promise<SeedFileInfo[]> {
       if (!isSafeSqlFilename(entry)) continue;
 
       const fullPath = path.join(directory, entry);
-      const fileStat = await stat(fullPath);
+      let fileStat;
+      try {
+        fileStat = await stat(fullPath);
+      } catch {
+        continue;
+      }
       if (!fileStat.isFile()) continue;
 
-      const location = directory === seedsDir ? ("seeds" as const) : ("project" as const);
-
-      found.set(entry, {
+      const candidate: SeedFileInfo = {
         filename: entry,
-        location,
+        location: seedLocationLabel(directory),
         byteSize: fileStat.size,
         modifiedAt: fileStat.mtime.toISOString(),
-      });
+      };
+
+      const existing = found.get(entry);
+      if (!existing || isNewerSeedCandidate(candidate, existing)) {
+        found.set(entry, candidate);
+      }
     }
   }
 
@@ -87,17 +113,30 @@ export async function resolveSeedSqlPath(filename: string): Promise<string> {
     throw new Error("Invalid seed filename.");
   }
 
+  let newestPath: string | null = null;
+  let newestModifiedAt = "";
+
   for (const directory of seedDirectories()) {
     const fullPath = path.join(directory, filename);
     try {
       const fileStat = await stat(fullPath);
-      if (fileStat.isFile()) return fullPath;
+      if (!fileStat.isFile()) continue;
+
+      const modifiedAt = fileStat.mtime.toISOString();
+      if (!newestPath || modifiedAt.localeCompare(newestModifiedAt) > 0) {
+        newestPath = fullPath;
+        newestModifiedAt = modifiedAt;
+      }
     } catch {
       /* try next directory */
     }
   }
 
-  throw new Error(`Seed file not found: ${filename}`);
+  if (!newestPath) {
+    throw new Error(`Seed file not found: ${filename}`);
+  }
+
+  return newestPath;
 }
 
 async function runPsqlFile(databaseUrl: string, filePath: string) {

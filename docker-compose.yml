@@ -23,7 +23,8 @@ services:
     volumes:
       - wedding-uploads:/app/data/uploads
       - wedding-dumps:/app/data/dumps
-      - wedding-seeds:/app/seeds
+      # Bind SCP upload target so Diagnostics restore sees the latest dump.
+      - ${DEPLOY_TARGET_DIR:-./seeds}:/app/seeds
 
   migrate:
     build:
@@ -40,4 +41,3 @@ services:
 volumes:
   wedding-uploads:
   wedding-dumps:
-  wedding-seeds:

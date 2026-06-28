@@ -24,11 +24,24 @@ async function main() {
     `;
   }
 
-  await sql`
+  // One-time rename; skip when chris already exists (e.g. restored seed + legacy row).
+  const renamed = await sql`
     UPDATE users
     SET username = 'chris'
     WHERE username = 'christopher'
+      AND NOT EXISTS (SELECT 1 FROM users u WHERE u.username = 'chris')
+    RETURNING id
   `;
+  if (renamed.length === 0) {
+    const [{ christopherExists }] = await sql<{ christopherExists: boolean }[]>`
+      SELECT EXISTS(SELECT 1 FROM users WHERE username = 'christopher') AS christopher_exists
+    `;
+    if (christopherExists) {
+      console.log(
+        "Skipping christopher -> chris rename: chris already exists.",
+      );
+    }
+  }
 
   await sql`
     CREATE TABLE IF NOT EXISTS login_logs (

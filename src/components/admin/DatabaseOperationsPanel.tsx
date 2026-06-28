@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type SeedFileInfo = {
   filename: string;
-  location: "project" | "seeds";
+  location: "project" | "seeds" | "dumps";
   byteSize: number;
   modifiedAt: string;
 };
@@ -41,7 +41,7 @@ export function DatabaseOperationsPanel() {
     }
     const payload = (await response.json()) as SeedFilesPayload;
     setMeta(payload);
-    setSelectedSeed((current) => current || payload.files[0]?.filename || "");
+    setSelectedSeed(payload.files[0]?.filename ?? "");
   }, []);
 
   useEffect(() => {
@@ -153,16 +153,19 @@ export function DatabaseOperationsPanel() {
             <option value="">Select a .sql file…</option>
             {meta?.files.map((file) => (
               <option key={file.filename} value={file.filename}>
-                {file.filename} ({file.location}, {formatBytes(file.byteSize)})
+                {file.filename} ({file.location},{" "}
+                {new Date(file.modifiedAt).toLocaleString()},{" "}
+                {formatBytes(file.byteSize)})
               </option>
             ))}
           </select>
         </label>
 
         <p className="mb-4 text-xs text-stone-500">
-          Place seed files in the project root, <code>seeds/</code> folder, or{" "}
-          <code>/app/seeds</code> when running in Docker. Dumps are written to{" "}
-          <code>/app/data/dumps</code> in Docker. Generate a seed with{" "}
+          Seed files are discovered from the project root, <code>seeds/</code>,{" "}
+          <code>/app/seeds</code> (bind-mounted from <code>DEPLOY_TARGET_DIR</code>
+          ), and <code>/app/data/dumps</code> in Docker. The newest file is
+          selected automatically. Generate a seed with{" "}
           <code>npm run db:dump-seed</code> (writes <code>wedding_seed.sql</code>
           ).
         </p>
