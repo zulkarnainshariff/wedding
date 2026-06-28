@@ -168,7 +168,7 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
       </div>
 
       {/* Transit duration + total remaining — above the bar, same row */}
-      <div className="mt-1 flex gap-0.5">
+      <div className="mt-1 mb-3 flex gap-0.5">
         {parts.map((part, index) => {
           const isLast = index === parts.length - 1;
 
@@ -194,8 +194,8 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
       </div>
 
       {/* Track, transit dots, plane, leg time below plane */}
-      <div className="relative pb-3 pt-2">
-        <div className="flex gap-0.5">
+      <div className="relative pb-4">
+        <div className="flex gap-0.5 pt-1">
           {parts.map((part, index) => (
             <div
               key={`track-${part.kind}-${index}`}
@@ -220,7 +220,7 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
         </div>
 
         <div
-          className="pointer-events-none absolute top-2 left-0 h-2 rounded-full bg-gradient-to-r from-sky-400 to-sky-600 transition-[width] duration-500"
+          className="pointer-events-none absolute top-1 left-0 h-2 rounded-full bg-gradient-to-r from-sky-400 to-sky-600 transition-[width] duration-500"
           style={{ width: `${planePercent}%` }}
           aria-hidden
         />
@@ -229,7 +229,7 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
           className="pointer-events-none absolute z-20 transition-[left,right] duration-500"
           style={{
             ...planeHorizontalStyle(planePercent),
-            top: "12px",
+            top: "13px",
             transform:
               planePercent <= 0
                 ? "translateY(-50%)"
@@ -266,7 +266,7 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
             className="pointer-events-none absolute z-20 transition-[left,right] duration-500"
             style={{
               ...planeHorizontalStyle(planePercent),
-              top: "26px",
+              top: "30px",
               transform:
                 planePercent <= 0
                   ? "translateX(0)"

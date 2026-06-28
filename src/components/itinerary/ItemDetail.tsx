@@ -8,7 +8,8 @@ import { ItemSubItemsSection } from "@/components/itinerary/ItemSubItemsSection"
 import { ItemCompleteToggle, type ItemDoneAccent } from "@/components/itinerary/ItemCompleteToggle";
 import {
   formatFlightProgressDuration,
-  formatFlightRouteChain,
+  flightRouteLine,
+  flightSummaryExtraParts,
   getFlightTimelineDisplay,
   isFlightInProgress,
 } from "@/lib/flight-progress";
@@ -426,6 +427,10 @@ function ItemDetailHeader({
     : null;
   const flightTimeline =
     category === "flight" ? getFlightTimelineDisplay(item) : null;
+  const flightRoute =
+    category === "flight" ? flightRouteLine(flightTimeline, item.summary) : null;
+  const flightSummaryExtras =
+    category === "flight" ? flightSummaryExtraParts(item.summary, flightRoute) : [];
   const [flightInProgress, setFlightInProgress] = useState(() =>
     category === "flight" ? isFlightInProgress(item) : false,
   );
@@ -470,20 +475,20 @@ function ItemDetailHeader({
                 {flightNumberLabel}
               </p>
             )}
-            {category === "flight" && flightTimeline && (
+            {category === "flight" && flightRoute && (
               <p className="mt-1 text-sm font-semibold tracking-wide text-stone-600">
-                {formatFlightRouteChain(flightTimeline.routeCodes)}
+                {flightRoute}
               </p>
             )}
-            {item.summary && category === "flight" ? (
+            {flightSummaryExtras.length > 0 ? (
               <div className="mt-2 space-y-0.5 text-sm text-stone-500">
-                {item.summary.split(" · ").map((part, index) => (
+                {flightSummaryExtras.map((part, index) => (
                   <p key={`${index}-${part}`} className="break-words">
                     {part}
                   </p>
                 ))}
               </div>
-            ) : item.summary ? (
+            ) : item.summary && category !== "flight" ? (
               <p className="mt-2 break-words text-stone-500">{item.summary}</p>
             ) : null}
             {showLocation && (

@@ -772,3 +772,38 @@ export function getFlightTimelineDisplay(
 export function formatFlightRouteChain(codes: string[]): string {
   return codes.join(" → ");
 }
+
+const FLIGHT_ROUTE_PART = /^[A-Z]{3}(?:\s*→\s*[A-Z]{3})+$/;
+
+export function flightRouteLine(
+  flightTimeline: FlightTimelineDisplay | null,
+  summary: string | null | undefined,
+): string | null {
+  if (flightTimeline?.routeCodes.length) {
+    return formatFlightRouteChain(flightTimeline.routeCodes);
+  }
+
+  const firstSummaryPart = summary?.split(" · ").map((part) => part.trim())[0];
+  if (firstSummaryPart && FLIGHT_ROUTE_PART.test(firstSummaryPart)) {
+    return firstSummaryPart;
+  }
+
+  return null;
+}
+
+export function flightSummaryExtraParts(
+  summary: string | null | undefined,
+  routeLine: string | null,
+): string[] {
+  if (!summary) return [];
+
+  return summary
+    .split(" · ")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => {
+      if (!routeLine) return !FLIGHT_ROUTE_PART.test(part);
+      if (part === routeLine) return false;
+      return !FLIGHT_ROUTE_PART.test(part);
+    });
+}

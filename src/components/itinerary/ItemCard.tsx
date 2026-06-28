@@ -31,7 +31,8 @@ import {
 } from "@/components/itinerary/ItemCompleteToggle";
 import {
   formatFlightProgressDuration,
-  formatFlightRouteChain,
+  flightRouteLine,
+  flightSummaryExtraParts,
   getFlightTimelineDisplay,
   isFlightInProgress,
   isFlightLanded,
@@ -211,6 +212,10 @@ export function ItemCard({
     category === "flight" ? formatFlightSchedule(item) : null;
   const flightTimeline =
     category === "flight" ? getFlightTimelineDisplay(item) : null;
+  const flightRoute =
+    category === "flight" ? flightRouteLine(flightTimeline, item.summary) : null;
+  const flightSummaryExtras =
+    category === "flight" ? flightSummaryExtraParts(item.summary, flightRoute) : [];
   const completed = isItemCompleted(item);
   const subItems = item.subItems ?? [];
   const router = useRouter();
@@ -334,21 +339,21 @@ export function ItemCard({
             <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-stone-300 group-hover:text-[#d4a853]" />
           </div>
 
-          {category === "flight" && flightTimeline ? (
+          {category === "flight" && flightRoute ? (
             <p className="mt-1 text-xs font-semibold tracking-wide text-stone-600">
-              {formatFlightRouteChain(flightTimeline.routeCodes)}
+              {flightRoute}
             </p>
           ) : null}
 
-          {item.summary && category === "flight" ? (
+          {flightSummaryExtras.length > 0 ? (
             <div className="mt-1 space-y-0.5 text-sm text-stone-500">
-              {item.summary.split(" · ").map((part, index) => (
+              {flightSummaryExtras.map((part, index) => (
                 <p key={`${index}-${part}`} className="break-words">
                   {part}
                 </p>
               ))}
             </div>
-          ) : item.summary ? (
+          ) : item.summary && category !== "flight" ? (
             <p className="mt-1 break-words text-sm text-stone-500">{item.summary}</p>
           ) : null}
 
