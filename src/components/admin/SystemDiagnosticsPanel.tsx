@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { SectionShell } from "@/components/layout/PageShell";
 import { DatabaseOperationsPanel } from "@/components/admin/DatabaseOperationsPanel";
+import { NotificationsAdminPanel } from "@/components/admin/NotificationsAdminPanel";
 
 type LogKind = "login" | "audit" | "usage";
 
@@ -289,6 +290,8 @@ export function SystemDiagnosticsPanel() {
           </table>
         </div>
       </SectionShell>
+
+      <NotificationsAdminPanel />
 
       <AdminAccountsPanel />
     </div>

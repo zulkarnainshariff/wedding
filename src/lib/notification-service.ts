@@ -134,7 +134,9 @@ export async function getNotificationsForUser(userId: number) {
   return db
     .select()
     .from(notifications)
-    .where(eq(notifications.userId, userId))
+    .where(
+      and(eq(notifications.userId, userId), isNull(notifications.archivedAt)),
+    )
     .orderBy(desc(notifications.createdAt))
     .limit(50);
 }
@@ -145,9 +147,58 @@ export async function getUnreadCount(userId: number) {
     .select({ id: notifications.id })
     .from(notifications)
     .where(
-      and(eq(notifications.userId, userId), isNull(notifications.readAt)),
+      and(
+        eq(notifications.userId, userId),
+        isNull(notifications.readAt),
+        isNull(notifications.archivedAt),
+      ),
     );
   return rows.length;
+}
+
+export async function listAllNotifications(filters?: {
+  includeArchived?: boolean;
+  username?: string;
+  limit?: number;
+}) {
+  const baseQuery = db
+    .select({
+      id: notifications.id,
+      userId: notifications.userId,
+      username: users.username,
+      type: notifications.type,
+      title: notifications.title,
+      body: notifications.body,
+      href: notifications.href,
+      metadata: notifications.metadata,
+      readAt: notifications.readAt,
+      archivedAt: notifications.archivedAt,
+      createdAt: notifications.createdAt,
+    })
+    .from(notifications)
+    .innerJoin(users, eq(users.id, notifications.userId));
+
+  const rows = await (filters?.includeArchived
+    ? baseQuery
+    : baseQuery.where(isNull(notifications.archivedAt))
+  )
+    .orderBy(desc(notifications.createdAt))
+    .limit(filters?.limit ?? 200);
+
+  if (!filters?.username) return rows;
+  const needle = filters.username.toLowerCase();
+  return rows.filter((row) => row.username?.toLowerCase().includes(needle));
+}
+
+export async function archiveNotificationAdmin(id: number) {
+  await db
+    .update(notifications)
+    .set({ archivedAt: new Date() })
+    .where(eq(notifications.id, id));
+}
+
+export async function deleteNotificationAdmin(id: number) {
+  await db.delete(notifications).where(eq(notifications.id, id));
 }
 
 export async function markNotificationRead(userId: number, id: number) {

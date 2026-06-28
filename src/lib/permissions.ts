@@ -176,7 +176,9 @@ export function canViewItemTravellers(
 
   if (travellers.length === 0) {
     return (
-      item.category === "travel_insurance" || item.category === "pet_relocation"
+      item.category === "travel_insurance" ||
+      item.category === "pet_relocation" ||
+      item.category === "flight"
     );
   }
 

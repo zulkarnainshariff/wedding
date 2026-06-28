@@ -13,6 +13,8 @@ import {
   mergeLiveGateUpdates,
   withTrackingState,
 } from "@/lib/flight-tracking";
+import { autoCompleteLandedFlightItem } from "@/lib/flight-auto-complete";
+import { isFlightLanded } from "@/lib/flight-progress";
 import { getItemCalendarDate } from "@/lib/item-scheduling";
 import { filterItemsByPermission } from "@/lib/permissions";
 import { itineraryItems } from "@/lib/schema";
@@ -121,10 +123,29 @@ export async function GET(_request: Request, { params }: Params) {
     await bumpSyncVersion();
   }
 
+  let currentItem = item;
+  if (
+    isFlightLanded({
+      ...item,
+      details: mergedDetails,
+    }) ||
+    live.flightStatus === "landed"
+  ) {
+    const autoCompleted = await autoCompleteLandedFlightItem({
+      ...item,
+      details: mergedDetails,
+    });
+    if (autoCompleted) {
+      currentItem = autoCompleted;
+      mergedDetails = (autoCompleted.details ?? {}) as typeof mergedDetails;
+    }
+  }
+
   return NextResponse.json({
     ...live,
     scheduleLookup,
     detailsUpdated: detailsUpdated || trackingChanged || scheduleChanged,
     details: mergedDetails,
+    item: currentItem,
   });
 }

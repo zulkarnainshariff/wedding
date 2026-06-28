@@ -1,4 +1,5 @@
 import type { AccommodationSuggestion, Category, FlightSegment } from "@/lib/types";
+import { airlineInfoFromFlightNumbers } from "@/lib/airlines";
 import { formatFlightNumberDisplay, parseLegacyFlightNumber } from "@/lib/flight-numbers";
 import { buildLocationPayload, getItemLocation } from "@/lib/item-location";
 import { TRAVELLER_NAMES } from "@/lib/travellers";
@@ -15,6 +16,7 @@ export type StructuredItemDetails = {
   bookingReferences: TravellerRecord[];
   seats: TravellerRecord[];
   baggage: TravellerRecord[];
+  checkInStatus: Record<string, boolean>;
   baggageUnit: UnitsPreference;
   segments: FlightSegment[];
   suggestions: AccommodationSuggestion[];
@@ -31,12 +33,18 @@ const EMPTY_SIMPLE: Record<Category, Record<string, string>> = {
     marketingFlightNumber: "",
     operatingFlightNumber: "",
     flightNumber: "",
+    airlineIata: "",
+    airlineName: "",
+    operatingAirlineIata: "",
+    operatingAirlineName: "",
     departureTime: "",
     arrivalTime: "",
     status: "confirmed",
     aircraft: "",
     arrivalTerminal: "",
     arrivalGate: "",
+    departureTerminal: "",
+    departureGate: "",
     totalFlightTime: "",
   },
   pet_relocation: {
@@ -103,6 +111,7 @@ export function emptyStructuredDetails(category: Category): StructuredItemDetail
     bookingReferences: [],
     seats: [],
     baggage: [],
+    checkInStatus: {},
     baggageUnit: "metric",
     segments: [],
     suggestions: [],
@@ -193,6 +202,22 @@ export function parseStructuredDetails(
     if (!structured.simple.toIata && details.toIata) {
       structured.simple.toIata = String(details.toIata);
     }
+    if (
+      !structured.simple.airlineIata &&
+      (structured.simple.marketingFlightNumber ||
+        structured.simple.operatingFlightNumber)
+    ) {
+      const airline = airlineInfoFromFlightNumbers({
+        marketingFlightNumber: structured.simple.marketingFlightNumber,
+        operatingFlightNumber: structured.simple.operatingFlightNumber,
+      });
+      structured.simple.airlineIata = airline.airlineIata ?? "";
+      structured.simple.airlineName =
+        structured.simple.airlineName || airline.airlineName || "";
+      structured.simple.operatingAirlineIata = airline.operatingAirlineIata ?? "";
+      structured.simple.operatingAirlineName =
+        structured.simple.operatingAirlineName || airline.operatingAirlineName || "";
+    }
     structured.bookingReferences = recordsFromObject(
       details.bookingReferences as Record<string, string> | undefined,
     );
@@ -213,6 +238,17 @@ export function parseStructuredDetails(
     structured.segments = Array.isArray(details.segments)
       ? (details.segments as FlightSegment[])
       : [];
+    if (
+      details.checkInStatus &&
+      typeof details.checkInStatus === "object" &&
+      !Array.isArray(details.checkInStatus)
+    ) {
+      structured.checkInStatus = Object.fromEntries(
+        Object.entries(details.checkInStatus as Record<string, unknown>).filter(
+          ([, value]) => typeof value === "boolean",
+        ),
+      ) as Record<string, boolean>;
+    }
   }
 
   if (category === "accommodation") {
@@ -283,8 +319,11 @@ export function buildStructuredDetailsPayload(
   const payload: Record<string, unknown> = {
     ...structured.simple,
     notes: notes.length ? notes : undefined,
-    location,
   };
+
+  if (category !== "flight") {
+    payload.location = location;
+  }
 
   if (category === "flight") {
     payload.label =
@@ -308,14 +347,21 @@ export function buildStructuredDetailsPayload(
     payload.arrivalTime = structured.simple.arrivalTime || null;
     payload.arrivalTerminal = structured.simple.arrivalTerminal || undefined;
     payload.arrivalGate = structured.simple.arrivalGate || undefined;
-    delete payload.departureTerminal;
-    delete payload.departureGate;
+    payload.departureTerminal = structured.simple.departureTerminal || undefined;
+    payload.departureGate = structured.simple.departureGate || undefined;
+    payload.airlineIata = structured.simple.airlineIata.trim().toUpperCase() || undefined;
+    payload.airlineName = structured.simple.airlineName.trim() || undefined;
+    payload.operatingAirlineIata =
+      structured.simple.operatingAirlineIata.trim().toUpperCase() || undefined;
+    payload.operatingAirlineName =
+      structured.simple.operatingAirlineName.trim() || undefined;
     payload.status = structured.simple.status === "tbc" ? "tbc" : "confirmed";
     payload.bookingReferences = objectFromRecords(
       structured.bookingReferences,
     );
     payload.seats = objectFromRecords(structured.seats);
     payload.baggage = objectFromRecords(structured.baggage, true);
+    payload.checkInStatus = structured.checkInStatus;
     payload.segments = structured.segments
       .filter(
         (segment) =>

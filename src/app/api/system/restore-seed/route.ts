@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { logAuditEvent } from "@/lib/activity-log";
 import { isAuthError, requireSuperuserAccess } from "@/lib/api-auth";
 import { resetApplicationSequences } from "@/lib/database-sequences";
 import { wipeAndRestoreSeedFile } from "@/lib/database-restore";
+import { db } from "@/lib/db";
+import { users } from "@/lib/schema";
 
 export async function POST(request: Request) {
   const actor = await requireSuperuserAccess();
@@ -54,10 +57,21 @@ export async function POST(request: Request) {
       }
     }
 
+    const [actorRow] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, actor.username.toLowerCase()))
+      .limit(1);
+
+    const postRestoreNotice = actorRow
+      ? null
+      : "Restore completed. Your account is not in the seed file — run db:seed-users, then sign in again.";
+
     return NextResponse.json({
       ok: true,
       ...result,
       auditWarning,
+      postRestoreNotice,
     });
   } catch (error) {
     const message =

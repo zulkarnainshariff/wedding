@@ -1,12 +1,22 @@
+import { resolveAirportCitySync } from "@/lib/airport-cities";
+import {
+  airlineInfoFromAirlabsLeg,
+  airlineInfoFromFlightNumbers,
+} from "@/lib/airlines";
 import { getAirportTimezone } from "@/lib/airport-timezones";
 import {
   utcToDatetimeLocalInTimezone,
   type ResolvedFlightSchedule,
   resolveFlightSchedule,
 } from "@/lib/flight-datetime";
+import {
+  type AirlabsLeg,
+  routeFieldsFromLegChain,
+  sliceLegsFromDeparture,
+} from "@/lib/flight-segment-route";
 import { normalizeFlightIata } from "@/lib/flight-numbers";
 import type { ItineraryItem } from "@/lib/schema";
-import type { FlightDetails } from "@/lib/types";
+import type { FlightDetails, FlightSegment } from "@/lib/types";
 import { getFlightDetails } from "@/lib/types";
 
 export type FlightScheduleLookupResult = {
@@ -20,12 +30,33 @@ export type FlightScheduleLookupResult = {
   message?: string;
   fromIata?: string | null;
   toIata?: string | null;
+  fromCity?: string | null;
+  toCity?: string | null;
   departureDatetimeLocal?: string;
   arrivalDatetimeLocal?: string;
   eventDate?: string | null;
   arrivalDate?: string | null;
   departureTime?: string | null;
   arrivalTime?: string | null;
+  aircraft?: string | null;
+  totalFlightTime?: string | null;
+  departureTerminal?: string | null;
+  departureGate?: string | null;
+  arrivalTerminal?: string | null;
+  arrivalGate?: string | null;
+  segments?: FlightSegment[];
+  airlineIata?: string | null;
+  airlineName?: string | null;
+  operatingAirlineIata?: string | null;
+  operatingAirlineName?: string | null;
+  marketingFlightNumber?: string | null;
+  operatingFlightNumber?: string | null;
+  fieldErrors?: {
+    from?: string;
+    to?: string;
+    fromIata?: string;
+    toIata?: string;
+  };
 };
 
 type AviationEndpoint = {
@@ -41,22 +72,72 @@ type AviationStackFlight = {
   arrival?: AviationEndpoint;
 };
 
-type AirlabsFlight = {
-  dep_iata?: string;
-  arr_iata?: string;
-  dep_time?: string | null;
-  dep_time_utc?: string | null;
-  dep_estimated?: string | null;
-  dep_estimated_utc?: string | null;
-  dep_actual?: string | null;
-  dep_actual_utc?: string | null;
-  arr_time?: string | null;
-  arr_time_utc?: string | null;
-  arr_estimated?: string | null;
-  arr_estimated_utc?: string | null;
-  arr_actual?: string | null;
-  arr_actual_utc?: string | null;
+type AirlabsFlight = AirlabsLeg;
+
+type AirlabsLookupMatch = {
+  flight: AviationStackFlight;
+  raw: AirlabsFlight;
+  legs: AirlabsFlight[];
 };
+
+function formatDurationMinutes(minutes?: number | null): string | null {
+  if (minutes == null || minutes <= 0) return null;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours <= 0) return `${mins}m`;
+  if (mins <= 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+}
+
+function enrichLookupFromRaw(
+  mapped: Omit<
+    FlightScheduleLookupResult,
+    "available" | "reason" | "message" | "fieldErrors"
+  >,
+  raw?: AirlabsFlight,
+  operatingFlightNumber?: string | null,
+): Omit<
+  FlightScheduleLookupResult,
+  "available" | "reason" | "message" | "fieldErrors"
+> {
+  const fromIata = mapped.fromIata ?? raw?.dep_iata?.trim().toUpperCase() ?? null;
+  const toIata = mapped.toIata ?? raw?.arr_iata?.trim().toUpperCase() ?? null;
+  const airline = raw
+    ? airlineInfoFromAirlabsLeg(raw)
+    : airlineInfoFromFlightNumbers({
+        marketingFlightNumber: operatingFlightNumber,
+        operatingFlightNumber,
+      });
+
+  return {
+    ...mapped,
+    fromIata,
+    toIata,
+    fromCity:
+      raw?.dep_city?.trim() ||
+      resolveAirportCitySync(fromIata) ||
+      mapped.fromCity ||
+      null,
+    toCity:
+      raw?.arr_city?.trim() ||
+      resolveAirportCitySync(toIata) ||
+      mapped.toCity ||
+      null,
+    aircraft: raw?.aircraft_iata?.trim() || raw?.aircraft_icao?.trim() || mapped.aircraft || null,
+    totalFlightTime:
+      formatDurationMinutes(raw?.duration) || mapped.totalFlightTime || null,
+    departureTerminal: raw?.dep_terminal?.trim() || mapped.departureTerminal || null,
+    departureGate: raw?.dep_gate?.trim() || mapped.departureGate || null,
+    arrivalTerminal: raw?.arr_terminal?.trim() || mapped.arrivalTerminal || null,
+    arrivalGate: raw?.arr_gate?.trim() || mapped.arrivalGate || null,
+    airlineIata: airline.airlineIata,
+    airlineName: airline.airlineName,
+    operatingAirlineIata: airline.operatingAirlineIata,
+    operatingAirlineName: airline.operatingAirlineName,
+    marketingFlightNumber: airline.marketingFlightNumber,
+    operatingFlightNumber: airline.operatingFlightNumber,
+  };
+}
 
 function hasFlightTrackingApiKey(): boolean {
   return Boolean(
@@ -190,7 +271,10 @@ function localDatetimeFromEndpoint(
 
 export function aviationFlightToLookupResult(
   flight: AviationStackFlight,
-): Omit<FlightScheduleLookupResult, "available" | "reason" | "message"> {
+): Omit<
+  FlightScheduleLookupResult,
+  "available" | "reason" | "message" | "fieldErrors"
+> {
   const fromIata = flight.departure?.iata?.trim().toUpperCase() ?? null;
   const toIata = flight.arrival?.iata?.trim().toUpperCase() ?? null;
   const departure = localDatetimeFromEndpoint(flight.departure, fromIata);
@@ -199,6 +283,8 @@ export function aviationFlightToLookupResult(
   return {
     fromIata,
     toIata,
+    fromCity: resolveAirportCitySync(fromIata),
+    toCity: resolveAirportCitySync(toIata),
     departureDatetimeLocal: departure?.datetimeLocal,
     arrivalDatetimeLocal: arrival?.datetimeLocal,
     eventDate: departure?.date ?? flight.flight_date ?? null,
@@ -206,6 +292,31 @@ export function aviationFlightToLookupResult(
     departureTime: departure?.clock ?? null,
     arrivalTime: arrival?.clock ?? null,
   };
+}
+
+function buildManualFieldErrors(
+  input: {
+    depIata?: string | null;
+    arrIata?: string | null;
+  },
+  mapped?: Pick<
+    FlightScheduleLookupResult,
+    "fromIata" | "toIata" | "fromCity" | "toCity"
+  >,
+): FlightScheduleLookupResult["fieldErrors"] {
+  const errors: NonNullable<FlightScheduleLookupResult["fieldErrors"]> = {};
+  const fromIata = mapped?.fromIata ?? input.depIata?.trim().toUpperCase();
+  const toIata = mapped?.toIata ?? input.arrIata?.trim().toUpperCase();
+
+  if (!mapped?.fromCity && !fromIata) {
+    errors.from = "Enter departure city or a valid 3-letter airport code.";
+    errors.fromIata = "Enter a valid 3-letter IATA code or use flight lookup.";
+  }
+  if (!mapped?.toCity && !toIata) {
+    errors.to = "Enter arrival city or a valid 3-letter airport code.";
+    errors.toIata = "Enter a valid 3-letter IATA code or use flight lookup.";
+  }
+  return Object.keys(errors).length ? errors : undefined;
 }
 
 async function fetchAirlabsSchedules(
@@ -255,47 +366,95 @@ async function fetchAirlabsFlightEndpoint(
   return parseAirlabsFlightPayload(payload);
 }
 
+async function fetchAllAirlabsLegs(input: {
+  operatingFlightNumber: string;
+  flightDate: string;
+}): Promise<AirlabsFlight[]> {
+  const flightIata = normalizeOperatingFlightIata(input.operatingFlightNumber);
+  const airlineIata = extractAirlineIata(flightIata);
+
+  const byFlight = await fetchAirlabsSchedules({ flight_iata: flightIata });
+  let matches = byFlight.filter((flight) =>
+    flightMatchesDate(flight, input.flightDate),
+  );
+
+  if (matches.length === 0 && airlineIata) {
+    const byAirline = await fetchAirlabsSchedules({
+      airline_iata: airlineIata,
+      flight_iata: flightIata,
+    });
+    matches = byAirline.filter((flight) =>
+      flightMatchesDate(flight, input.flightDate),
+    );
+  }
+
+  if (matches.length === 0) {
+    const liveFlight = await fetchAirlabsFlightEndpoint(flightIata);
+    if (liveFlight && flightMatchesDate(liveFlight, input.flightDate)) {
+      matches = [liveFlight];
+    }
+  }
+
+  return matches;
+}
+
+function buildAirlabsLookupMatch(
+  legs: AirlabsFlight[],
+  flightDate: string,
+  depIata?: string | null,
+  arrIata?: string | null,
+): AirlabsLookupMatch | null {
+  if (legs.length === 0) return null;
+
+  const sliced = depIata
+    ? sliceLegsFromDeparture(legs, depIata)
+    : legs;
+
+  const arr = arrIata?.trim().toUpperCase();
+  const filtered =
+    arr && sliced.length > 0
+      ? (() => {
+          const last = sliced[sliced.length - 1];
+          if (
+            last.arr_iata?.trim().toUpperCase() === arr ||
+            sliced.length === 1
+          ) {
+            return sliced;
+          }
+          const endIndex = sliced.findIndex(
+            (leg) => leg.arr_iata?.trim().toUpperCase() === arr,
+          );
+          return endIndex === -1 ? sliced : sliced.slice(0, endIndex + 1);
+        })()
+      : sliced;
+
+  const raw = filtered[0];
+  if (!raw) return null;
+
+  return {
+    flight: mapAirlabsFlight(raw, flightDate),
+    raw,
+    legs: filtered,
+  };
+}
+
 async function fetchFromAirlabs(input: {
   operatingFlightNumber: string;
   flightDate: string;
   depIata?: string | null;
   arrIata?: string | null;
-}): Promise<AviationStackFlight | null> {
-  const flightIata = normalizeOperatingFlightIata(input.operatingFlightNumber);
-  const depIata = input.depIata?.trim().toUpperCase();
-  const arrIata = input.arrIata?.trim().toUpperCase();
+}): Promise<AirlabsLookupMatch | null> {
+  const allLegs = await fetchAllAirlabsLegs({
+    operatingFlightNumber: input.operatingFlightNumber,
+    flightDate: input.flightDate,
+  });
 
-  if (depIata) {
-    const byDeparture = await fetchAirlabsSchedules({
-      dep_iata: depIata,
-      flight_iata: flightIata,
-    });
-    const matches = byDeparture.filter(
-      (flight) =>
-        flightMatchesDate(flight, input.flightDate) &&
-        (!arrIata || !flight.arr_iata || flight.arr_iata.toUpperCase() === arrIata),
-    );
-    if (matches[0]) return mapAirlabsFlight(matches[0], input.flightDate);
-  }
-
-  const airlineIata = extractAirlineIata(flightIata);
-  if (airlineIata) {
-    const byAirline = await fetchAirlabsSchedules({
-      airline_iata: airlineIata,
-      flight_iata: flightIata,
-    });
-    const matches = byAirline.filter((flight) =>
-      flightMatchesDate(flight, input.flightDate),
-    );
-    if (matches[0]) return mapAirlabsFlight(matches[0], input.flightDate);
-  }
-
-  const liveFlight = await fetchAirlabsFlightEndpoint(flightIata);
-  if (liveFlight && flightMatchesDate(liveFlight, input.flightDate)) {
-    return mapAirlabsFlight(liveFlight, input.flightDate);
-  }
-
-  return null;
+  return buildAirlabsLookupMatch(
+    allLegs,
+    input.flightDate,
+    input.depIata,
+    input.arrIata,
+  );
 }
 
 async function fetchFromAviationStack(input: {
@@ -386,14 +545,22 @@ export async function lookupFlightSchedule(input: {
 
   try {
     let flight: AviationStackFlight | null = null;
+    let rawAirlabs: AirlabsFlight | undefined;
+
+    let airlabsLegs: AirlabsFlight[] | undefined;
 
     if (process.env.AIRLABS_API_KEY?.trim()) {
-      flight = await fetchFromAirlabs({
+      const airlabsMatch = await fetchFromAirlabs({
         operatingFlightNumber,
         flightDate,
         depIata: input.depIata,
         arrIata: input.arrIata,
       });
+      if (airlabsMatch) {
+        flight = airlabsMatch.flight;
+        rawAirlabs = airlabsMatch.raw;
+        airlabsLegs = airlabsMatch.legs;
+      }
     }
 
     const depIata = normalizeFlightIata(input.depIata);
@@ -411,25 +578,90 @@ export async function lookupFlightSchedule(input: {
         available: false,
         reason: "not_found",
         message:
-          "Could not find this flight on that date. Enter departure and arrival times manually.",
+          "Could not find this flight on that date. Enter route and times manually.",
+        fieldErrors: buildManualFieldErrors(input),
       };
     }
 
-    const mapped = aviationFlightToLookupResult(flight);
-    if (!mapped.departureDatetimeLocal || !mapped.arrivalDatetimeLocal) {
+    const routeFromLegs =
+      airlabsLegs && airlabsLegs.length > 0
+        ? routeFieldsFromLegChain(airlabsLegs, operatingFlightNumber)
+        : null;
+
+    const mapped = routeFromLegs
+      ? {
+          fromIata: routeFromLegs.fromIata,
+          toIata: routeFromLegs.toIata,
+          fromCity: routeFromLegs.fromCity,
+          toCity: routeFromLegs.toCity,
+          departureDatetimeLocal: routeFromLegs.departureDatetimeLocal,
+          arrivalDatetimeLocal: routeFromLegs.arrivalDatetimeLocal,
+          eventDate: routeFromLegs.eventDate,
+          arrivalDate: routeFromLegs.arrivalDate,
+          departureTime: routeFromLegs.departureTime,
+          arrivalTime: routeFromLegs.arrivalTime,
+          aircraft: routeFromLegs.aircraft,
+          totalFlightTime: routeFromLegs.totalFlightTime,
+          departureTerminal: routeFromLegs.departureTerminal,
+          departureGate: routeFromLegs.departureGate,
+          arrivalTerminal: routeFromLegs.arrivalTerminal,
+          arrivalGate: routeFromLegs.arrivalGate,
+          segments: routeFromLegs.segments,
+          airlineIata: routeFromLegs.airlineIata,
+          airlineName: routeFromLegs.airlineName,
+          operatingAirlineIata: routeFromLegs.operatingAirlineIata,
+          operatingAirlineName: routeFromLegs.operatingAirlineName,
+          marketingFlightNumber: routeFromLegs.marketingFlightNumber,
+          operatingFlightNumber: routeFromLegs.operatingFlightNumber,
+        }
+      : enrichLookupFromRaw(
+          aviationFlightToLookupResult(flight),
+          rawAirlabs,
+          operatingFlightNumber,
+        );
+
+    const airlineFallback = airlineInfoFromFlightNumbers({
+      marketingFlightNumber:
+        mapped.marketingFlightNumber ?? operatingFlightNumber,
+      operatingFlightNumber:
+        mapped.operatingFlightNumber ?? operatingFlightNumber,
+    });
+    const withAirline = {
+      ...mapped,
+      airlineIata: mapped.airlineIata ?? airlineFallback.airlineIata,
+      airlineName: mapped.airlineName ?? airlineFallback.airlineName,
+      operatingAirlineIata:
+        mapped.operatingAirlineIata ?? airlineFallback.operatingAirlineIata,
+      operatingAirlineName:
+        mapped.operatingAirlineName ?? airlineFallback.operatingAirlineName,
+      marketingFlightNumber:
+        mapped.marketingFlightNumber ?? airlineFallback.marketingFlightNumber,
+      operatingFlightNumber:
+        mapped.operatingFlightNumber ?? airlineFallback.operatingFlightNumber,
+    };
+
+    if (!withAirline.departureDatetimeLocal || !withAirline.arrivalDatetimeLocal) {
       return {
         available: false,
         reason: "not_found",
         message:
           "Flight found but times are unavailable. Enter departure and arrival times manually.",
-        ...mapped,
+        ...withAirline,
+        fieldErrors: buildManualFieldErrors(input, withAirline),
       };
     }
 
     return {
       available: true,
-      message: "Times loaded from flight schedule API.",
-      ...mapped,
+      message:
+        withAirline.segments && withAirline.segments.length > 0
+          ? `Flight details loaded (${withAirline.segments.length} segments).`
+          : withAirline.operatingFlightNumber &&
+              withAirline.marketingFlightNumber &&
+              withAirline.operatingFlightNumber !== withAirline.marketingFlightNumber
+            ? `Flight details loaded (codeshare operated as ${withAirline.operatingFlightNumber}).`
+            : "Flight details loaded from schedule API.",
+      ...withAirline,
     };
   } catch (error) {
     return {
@@ -449,10 +681,29 @@ export function applyLookupToFlightDetails(
 ): FlightDetails {
   return {
     ...details,
+    from: lookup.fromCity ?? details.from,
+    to: lookup.toCity ?? details.to,
     fromIata: lookup.fromIata ?? details.fromIata,
     toIata: lookup.toIata ?? details.toIata,
     departureTime: lookup.departureTime ?? details.departureTime,
     arrivalTime: lookup.arrivalTime ?? details.arrivalTime,
+    aircraft: lookup.aircraft ?? details.aircraft,
+    totalFlightTime: lookup.totalFlightTime ?? details.totalFlightTime,
+    departureTerminal: lookup.departureTerminal ?? details.departureTerminal,
+    departureGate: lookup.departureGate ?? details.departureGate,
+    arrivalTerminal: lookup.arrivalTerminal ?? details.arrivalTerminal,
+    arrivalGate: lookup.arrivalGate ?? details.arrivalGate,
+    segments: lookup.segments ?? details.segments,
+    airlineIata: lookup.airlineIata ?? details.airlineIata,
+    airlineName: lookup.airlineName ?? details.airlineName,
+    operatingAirlineIata:
+      lookup.operatingAirlineIata ?? details.operatingAirlineIata,
+    operatingAirlineName:
+      lookup.operatingAirlineName ?? details.operatingAirlineName,
+    marketingFlightNumber:
+      lookup.marketingFlightNumber ?? details.marketingFlightNumber,
+    operatingFlightNumber:
+      lookup.operatingFlightNumber ?? details.operatingFlightNumber,
   };
 }
 

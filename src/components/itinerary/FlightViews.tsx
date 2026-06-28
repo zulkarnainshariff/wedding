@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCircle2 } from "lucide-react";
 import type { FlightDetails, FlightSegment } from "@/lib/types";
 import { formatTravellerLabel } from "@/lib/types";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
@@ -8,6 +9,7 @@ import {
   formatFlightNumberDisplay,
   normalizeFlightDetails,
 } from "@/lib/flight-numbers";
+import { resolveAirlineLabel } from "@/lib/airlines";
 import { FlightLiveStatusPanel } from "@/components/itinerary/FlightLiveStatus";
 
 function DetailRow({
@@ -138,9 +140,11 @@ function BaggageTable({
 export function FlightDetailView({
   details,
   itemId,
+  canEdit = false,
 }: {
   details: FlightDetails;
   itemId?: number;
+  canEdit?: boolean;
 }) {
   const flight = normalizeFlightDetails(details);
   const passengers = flight.passengers ?? flight.travellers;
@@ -153,6 +157,17 @@ export function FlightDetailView({
   const flightNumberLabel = formatFlightNumberDisplay(
     flight.marketingFlightNumber,
     flight.operatingFlightNumber,
+  );
+  const airlineLabel = resolveAirlineLabel(flight.airlineIata, flight.airlineName);
+  const operatingAirlineLabel = resolveAirlineLabel(
+    flight.operatingAirlineIata,
+    flight.operatingAirlineName,
+  );
+  const isCodeshare = Boolean(
+    flight.marketingFlightNumber &&
+      flight.operatingFlightNumber &&
+      flight.marketingFlightNumber.trim().toUpperCase() !==
+        flight.operatingFlightNumber.trim().toUpperCase(),
   );
 
   return (
@@ -184,6 +199,19 @@ export function FlightDetailView({
         />
         <DetailRow label="Day" value={flight.dayOfWeek} />
         <DetailRow label="Flight" value={flightNumberLabel ?? undefined} />
+        <DetailRow label="Airline" value={airlineLabel ?? undefined} />
+        {isCodeshare ? (
+          <>
+            <DetailRow
+              label="Operated as"
+              value={flight.operatingFlightNumber ?? undefined}
+            />
+            <DetailRow
+              label="Operating airline"
+              value={operatingAirlineLabel ?? undefined}
+            />
+          </>
+        ) : null}
         <DetailRow label="Departure" value={flight.departureTime ?? undefined} />
         <DetailRow label="Arrival" value={flight.arrivalTime ?? undefined} />
         <DetailRow label="Duration" value={flight.totalFlightTime ?? flight.flightTime} />
@@ -220,7 +248,9 @@ export function FlightDetailView({
               .join(", ")}
           />
         )}
-        <DetailRow label="Booking ref." value={bookingRefs} />
+        {canEdit && (
+          <DetailRow label="Booking ref." value={bookingRefs} />
+        )}
       </dl>
 
       {flight.segments && flight.segments.length > 0 && (
@@ -240,6 +270,7 @@ export function FlightDetailView({
                 <tr>
                   <th className="px-4 py-2 font-medium">Traveller</th>
                   <th className="px-4 py-2 font-medium">Seat</th>
+                  <th className="px-4 py-2 font-medium">Check-in</th>
                 </tr>
               </thead>
               <tbody>
@@ -249,6 +280,16 @@ export function FlightDetailView({
                       {formatTravellerLabel(name)}
                     </td>
                     <td className="px-4 py-2 text-stone-600">{seat ?? "—"}</td>
+                    <td className="px-4 py-2 text-stone-600">
+                      {flight.checkInStatus?.[name] ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-700">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Checked in
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

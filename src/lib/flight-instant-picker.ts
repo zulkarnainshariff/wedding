@@ -1,6 +1,11 @@
 import { resolveFlightSchedule } from "@/lib/flight-datetime";
 import type { ItineraryItem } from "@/lib/schema";
 
+type FlightScheduleFields = Pick<
+  ItineraryItem,
+  "eventDate" | "startDatetime" | "endDatetime" | "details"
+>;
+
 export type FlightTimingSnapshot = {
   departure?: {
     scheduled?: string | null;
@@ -35,7 +40,7 @@ export function pickApiScheduleInstant(
   return api;
 }
 
-function getFlightSchedule(item: ItineraryItem) {
+function getFlightSchedule(item: FlightScheduleFields) {
   return resolveFlightSchedule({
     eventDate: item.eventDate,
     startDatetime: item.startDatetime,
@@ -51,7 +56,7 @@ function isFlightActiveInAir(snapshot?: FlightTimingSnapshot): boolean {
 }
 
 export function pickDepartureInstant(
-  item: ItineraryItem,
+  item: FlightScheduleFields,
   snapshot?: FlightTimingSnapshot,
 ): Date | null {
   const itemStd = getFlightSchedule(item).startDatetime;
@@ -67,7 +72,7 @@ export function pickDepartureInstant(
 
 /** Live ETA from tracking snapshot beats itinerary schedule while still airborne. */
 export function pickArrivalInstant(
-  item: ItineraryItem,
+  item: FlightScheduleFields,
   snapshot?: FlightTimingSnapshot,
 ): Date | null {
   const itemSta = getFlightSchedule(item).endDatetime;

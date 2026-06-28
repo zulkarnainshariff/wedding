@@ -105,6 +105,7 @@ export function ItemDetailModal() {
               onClose={handleClose}
               onEdit={canEdit ? () => setEditing(true) : undefined}
               onDelete={canEdit ? requestDelete : undefined}
+              canEdit={canEdit}
               modal
             />
           )}

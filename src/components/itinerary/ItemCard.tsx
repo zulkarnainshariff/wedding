@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
@@ -25,7 +27,16 @@ import { FlightProgressBar } from "@/components/itinerary/FlightProgressBar";
 import {
   ItemCompleteToggle,
   ItemDoneBadge,
+  type ItemDoneAccent,
 } from "@/components/itinerary/ItemCompleteToggle";
+import {
+  formatFlightProgressDuration,
+  flightRouteLine,
+  flightSummaryExtraParts,
+  getFlightTimelineDisplay,
+  isFlightInProgress,
+  isFlightLanded,
+} from "@/lib/flight-progress";
 import { isItemCompleted } from "@/lib/item-completion";
 import type { ItineraryItemWithSubItems } from "@/lib/item-subitem-utils";
 import { SubItemCascade } from "./SubItemDisplay";
@@ -199,8 +210,60 @@ export function ItemCard({
 
   const flightSchedule =
     category === "flight" ? formatFlightSchedule(item) : null;
+  const flightTimeline =
+    category === "flight" ? getFlightTimelineDisplay(item) : null;
+  const flightRoute =
+    category === "flight" ? flightRouteLine(flightTimeline, item.summary) : null;
+  const flightSummaryExtras =
+    category === "flight" ? flightSummaryExtraParts(item.summary, flightRoute) : [];
   const completed = isItemCompleted(item);
   const subItems = item.subItems ?? [];
+  const router = useRouter();
+  const autoCompleteRequestedRef = useRef(false);
+
+  const [flightInProgress, setFlightInProgress] = useState(() =>
+    category === "flight" ? isFlightInProgress(item) : false,
+  );
+
+  useEffect(() => {
+    autoCompleteRequestedRef.current = false;
+  }, [item.id]);
+
+  useEffect(() => {
+    if (category !== "flight") return;
+    const tick = () => setFlightInProgress(isFlightInProgress(item));
+    tick();
+    const interval = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(interval);
+  }, [item, category]);
+
+  useEffect(() => {
+    if (category !== "flight") return;
+
+    const tryAutoComplete = () => {
+      if (!isFlightLanded(item)) return;
+      if (isItemCompleted(item)) return;
+      if (autoCompleteRequestedRef.current) return;
+
+      autoCompleteRequestedRef.current = true;
+      void fetch(`/api/items/${item.id}/complete-if-landed`, { method: "POST" })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload: { autoCompleted?: boolean } | null) => {
+          if (payload?.autoCompleted) {
+            router.refresh();
+          }
+        })
+        .catch(() => {
+          autoCompleteRequestedRef.current = false;
+        });
+    };
+
+    tryAutoComplete();
+    const interval = window.setInterval(tryAutoComplete, 30_000);
+    return () => window.clearInterval(interval);
+  }, [category, item, router]);
+
+  const doneAccent: ItemDoneAccent = flightInProgress ? "amber" : "emerald";
 
   const displayTime =
     (activityDetails?.time
@@ -214,7 +277,13 @@ export function ItemCard({
         "group w-full rounded-2xl border bg-white shadow-sm transition-all",
         "hover:-translate-y-0.5 hover:border-[#1e3a5f]/20 hover:shadow-md",
         styles.border,
-        completed ? "border-emerald-200 bg-emerald-50/40" : "",
+        completed
+          ? doneAccent === "amber"
+            ? "border-amber-200 bg-amber-50/40"
+            : "border-emerald-200 bg-emerald-50/40"
+          : flightInProgress
+            ? "border-amber-200/80 bg-amber-50/20"
+            : "",
       ].join(" ")}
     >
       <div className="flex items-start gap-1.5 p-4">
@@ -251,14 +320,16 @@ export function ItemCard({
                     {subItems.length} sub-item{subItems.length === 1 ? "" : "s"}
                   </span>
                 )}
-                {completed && <ItemDoneBadge />}
+                {completed && <ItemDoneBadge accent={doneAccent} />}
                 <ItemTaskIndicator summary={taskSummary} />
               </div>
               <h3
                 className={[
                   "mt-0.5 break-words font-medium group-hover:text-[#1e3a5f]",
                   completed
-                    ? "text-stone-500 line-through decoration-emerald-600/40"
+                    ? doneAccent === "amber"
+                      ? "text-stone-500 line-through decoration-amber-600/40"
+                      : "text-stone-500 line-through decoration-emerald-600/40"
                     : "text-stone-900",
                 ].join(" ")}
               >
@@ -268,19 +339,25 @@ export function ItemCard({
             <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-stone-300 group-hover:text-[#d4a853]" />
           </div>
 
-          {item.summary && category === "flight" ? (
+          {category === "flight" && flightRoute ? (
+            <p className="mt-1 text-xs font-semibold tracking-wide text-stone-600">
+              {flightRoute}
+            </p>
+          ) : null}
+
+          {flightSummaryExtras.length > 0 ? (
             <div className="mt-1 space-y-0.5 text-sm text-stone-500">
-              {item.summary.split(" · ").map((part, index) => (
+              {flightSummaryExtras.map((part, index) => (
                 <p key={`${index}-${part}`} className="break-words">
                   {part}
                 </p>
               ))}
             </div>
-          ) : item.summary ? (
+          ) : item.summary && category !== "flight" ? (
             <p className="mt-1 break-words text-sm text-stone-500">{item.summary}</p>
           ) : null}
 
-          {itemLocation?.name && (
+          {category !== "flight" && itemLocation?.name && (
             <p className="mt-1 text-sm">
               {itemLocation.mapLink ? (
                 <a
@@ -318,6 +395,18 @@ export function ItemCard({
                   {flightSchedule.arrival}
                 </p>
               )}
+              {flightTimeline?.transitStops.map((stop) => {
+                const layover = formatFlightProgressDuration(stop.layoverMinutes);
+                if (!layover) return null;
+                return (
+                  <p key={stop.airport}>
+                    <span className="font-medium text-amber-700/80">Transit </span>
+                    <span className="text-amber-800">
+                      {stop.airport} · {layover}
+                    </span>
+                  </p>
+                );
+              })}
             </div>
           )}
 
@@ -408,7 +497,7 @@ export function ItemCard({
         </button>
 
         <div className="shrink-0 self-start pt-0.5">
-          <ItemCompleteToggle item={item} compact />
+          <ItemCompleteToggle item={item} compact accent={doneAccent} />
         </div>
       </div>
 
