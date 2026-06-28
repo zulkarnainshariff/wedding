@@ -78,6 +78,42 @@ function planeHorizontalStyle(percent: number): React.CSSProperties {
   return { left: `${percent}%`, transform: "translateX(-50%)" };
 }
 
+/** Map full-journey progress onto the flight-only bar (layovers collapse to a dot). */
+function visualBarPercent(
+  journeyPercent: number,
+  parts: FlightProgressPart[],
+): number {
+  const totalMinutes = parts.reduce((sum, part) => sum + part.minutes, 0);
+  const flightMinutes = parts
+    .filter((part) => part.kind === "flight")
+    .reduce((sum, part) => sum + part.minutes, 0);
+
+  if (totalMinutes <= 0 || flightMinutes <= 0) return journeyPercent;
+
+  const journeyMinutes = (journeyPercent / 100) * totalMinutes;
+  let timelineCursor = 0;
+  let visualCursor = 0;
+
+  for (const part of parts) {
+    const partEnd = timelineCursor + part.minutes;
+
+    if (journeyMinutes <= partEnd) {
+      if (part.kind === "flight" && part.minutes > 0) {
+        visualCursor +=
+          ((journeyMinutes - timelineCursor) / part.minutes) * part.minutes;
+      }
+      return Math.min(100, Math.max(0, (visualCursor / flightMinutes) * 100));
+    }
+
+    if (part.kind === "flight") {
+      visualCursor += part.minutes;
+    }
+    timelineCursor = partEnd;
+  }
+
+  return 100;
+}
+
 export function FlightProgressBar({ item }: { item: ItineraryItem }) {
   const router = useRouter();
   const autoCompleteRequestedRef = useRef(false);
@@ -116,12 +152,12 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
 
   const destinationLabel = destinationRemainingLabel(progress);
   const belowPlaneLabel = planeBelowLabel(progress);
-  const planePercent =
-    progress.phase === "landed"
-      ? 100
-      : clampPlanePercent(progress.percent);
-  const planeActive = progress.phase === "active";
   const parts = defaultParts(progress);
+  const journeyPercent =
+    progress.phase === "landed" ? 100 : progress.percent;
+  const planePercent = clampPlanePercent(
+    visualBarPercent(journeyPercent, parts),
+  );
 
   return (
     <div className="mt-3 border-t border-stone-100 pt-3">
@@ -168,7 +204,7 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
       </div>
 
       {/* Transit duration + total remaining — above the bar, same row */}
-      <div className="mt-1 mb-3 flex gap-0.5">
+      <div className="mt-0.5 mb-1.5 flex gap-0.5">
         {parts.map((part, index) => {
           const isLast = index === parts.length - 1;
 
@@ -194,9 +230,27 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
       </div>
 
       {/* Track, transit dots, plane, leg time below plane */}
-      <div className="relative pb-4">
-        <div className="flex gap-0.5 pt-1">
-          {parts.map((part, index) => (
+      <div className="relative py-3 pb-5">
+        <div className="relative flex items-center">
+          {parts.map((part, index) => {
+            if (part.kind === "transit") {
+              return (
+                <div
+                  key={`track-${part.kind}-${index}`}
+                  className="relative w-0 shrink-0"
+                  aria-hidden
+                >
+                  <span className="absolute top-1/2 left-0 z-10 block h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-2 ring-stone-300" />
+                </div>
+              );
+            }
+
+            const isFirstFlight =
+              parts.findIndex((entry) => entry.kind === "flight") === index;
+            const isLastFlight =
+              parts.findLastIndex((entry) => entry.kind === "flight") === index;
+
+            return (
             <div
               key={`track-${part.kind}-${index}`}
               className="relative min-w-0"
@@ -204,82 +258,73 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
             >
               <div
                 className={[
-                  "h-2 w-full rounded-full",
-                  part.kind === "flight" ? "bg-sky-200/90" : "bg-stone-200/90",
+                  "h-2 w-full bg-sky-200/90",
+                  isFirstFlight && isLastFlight
+                    ? "rounded-full"
+                    : [
+                        isFirstFlight ? "rounded-l-full" : "rounded-l-none",
+                        isLastFlight ? "rounded-r-full" : "rounded-r-none",
+                      ].join(" "),
                 ].join(" ")}
                 aria-hidden
               />
-              {part.kind === "transit" ? (
-                <span
-                  className="absolute top-1/2 left-1/2 z-10 block h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-2 ring-stone-300"
-                  aria-hidden
-                />
-              ) : null}
             </div>
-          ))}
-        </div>
+            );
+          })}
 
-        <div
-          className="pointer-events-none absolute top-1 left-0 h-2 rounded-full bg-gradient-to-r from-sky-400 to-sky-600 transition-[width] duration-500"
-          style={{ width: `${planePercent}%` }}
-          aria-hidden
-        />
-
-        <div
-          className="pointer-events-none absolute z-20 transition-[left,right] duration-500"
-          style={{
-            ...planeHorizontalStyle(planePercent),
-            top: "13px",
-            transform:
-              planePercent <= 0
-                ? "translateY(-50%)"
-                : planePercent >= 100
-                  ? "translate(-100%, -50%)"
-                  : "translate(-50%, -50%)",
-          }}
-        >
-          <span
-            className={[
-              "flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm ring-2",
-              progress.phase === "landed"
-                ? "ring-emerald-500"
-                : planeActive
-                  ? "ring-amber-500"
-                  : "ring-sky-500",
-            ].join(" ")}
-          >
-            <Plane
-              className={[
-                "h-3.5 w-3.5 rotate-45",
-                progress.phase === "landed"
-                  ? "text-emerald-700"
-                  : planeActive
-                    ? "text-amber-700"
-                    : "text-sky-700",
-              ].join(" ")}
-            />
-          </span>
-        </div>
-
-        {belowPlaneLabel ? (
           <div
-            className="pointer-events-none absolute z-20 transition-[left,right] duration-500"
+            className="pointer-events-none absolute top-1/2 left-0 h-2 -translate-y-1/2 rounded-full bg-gradient-to-r from-sky-400 to-sky-600 transition-[width] duration-500"
+            style={{ width: `${planePercent}%` }}
+            aria-hidden
+          />
+
+          <div
+            className="pointer-events-none absolute top-1/2 z-20 transition-[left,right] duration-500"
             style={{
               ...planeHorizontalStyle(planePercent),
-              top: "30px",
               transform:
                 planePercent <= 0
-                  ? "translateX(0)"
+                  ? "translateY(-50%)"
                   : planePercent >= 100
-                    ? "translateX(-100%)"
-                    : "translateX(-50%)",
+                    ? "translate(-100%, -50%)"
+                    : "translate(-50%, -50%)",
             }}
           >
-            <span className="block max-w-[96px] truncate text-center text-[9px] font-medium whitespace-nowrap text-stone-600">
-              {belowPlaneLabel}
+            <span
+              className={[
+                "flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm ring-2",
+                progress.phase === "landed" ? "ring-emerald-500" : "ring-sky-500",
+              ].join(" ")}
+            >
+              <Plane
+                className={[
+                  "h-3.5 w-3.5 rotate-45",
+                  progress.phase === "landed" ? "text-emerald-700" : "text-sky-700",
+                ].join(" ")}
+              />
             </span>
           </div>
-        ) : null}
+
+          {belowPlaneLabel ? (
+            <div
+              className="pointer-events-none absolute z-20 transition-[left,right] duration-500"
+              style={{
+                ...planeHorizontalStyle(planePercent),
+                top: "calc(50% + 18px)",
+                transform:
+                  planePercent <= 0
+                    ? "translateX(0)"
+                    : planePercent >= 100
+                      ? "translateX(-100%)"
+                      : "translateX(-50%)",
+              }}
+            >
+              <span className="block max-w-[96px] truncate text-center text-[9px] font-medium whitespace-nowrap text-stone-600">
+                {belowPlaneLabel}
+              </span>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
