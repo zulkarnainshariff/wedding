@@ -88,11 +88,16 @@ export async function verifySessionToken(
       username: users.username,
     };
 
-    let [row] = await db
+    let [matchedById] = await db
       .select(userColumns)
       .from(users)
       .where(eq(users.id, id))
       .limit(1);
+
+    let row =
+      matchedById && matchedById.username.toLowerCase() === username
+        ? matchedById
+        : undefined;
 
     if (!row) {
       [row] = await db

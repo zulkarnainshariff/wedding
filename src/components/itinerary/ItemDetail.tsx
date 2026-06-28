@@ -1,10 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink, MapPin, Pencil, Trash2, X } from "lucide-react";
 import { ItemDocumentsSection } from "@/components/itinerary/ItemDocumentsSection";
 import { ItemSubItemsSection } from "@/components/itinerary/ItemSubItemsSection";
-import { ItemCompleteToggle } from "@/components/itinerary/ItemCompleteToggle";
+import { ItemCompleteToggle, type ItemDoneAccent } from "@/components/itinerary/ItemCompleteToggle";
+import {
+  formatFlightProgressDuration,
+  formatFlightRouteChain,
+  getFlightTimelineDisplay,
+  isFlightInProgress,
+} from "@/lib/flight-progress";
 import { ItemTaskSection } from "@/components/tasks/ItemTaskSection";
 import {
   FlightDetailView,
@@ -26,6 +33,7 @@ import {
   type Category,
   type TravelInsuranceDetails,
 } from "@/lib/types";
+import { formatFlightNumberDisplay } from "@/lib/flight-numbers";
 import type { ItineraryItem } from "@/lib/schema";
 
 function NotesBlock({
@@ -408,6 +416,29 @@ function ItemDetailHeader({
 }) {
   const flightSchedule =
     category === "flight" ? formatFlightSchedule(item) : null;
+  const showLocation = category !== "flight" && sharedLocation?.name;
+  const flightDetails = category === "flight" ? getFlightDetails(item.details) : null;
+  const flightNumberLabel = flightDetails
+    ? formatFlightNumberDisplay(
+        flightDetails.marketingFlightNumber,
+        flightDetails.operatingFlightNumber,
+      ) ?? flightDetails.flightNumber
+    : null;
+  const flightTimeline =
+    category === "flight" ? getFlightTimelineDisplay(item) : null;
+  const [flightInProgress, setFlightInProgress] = useState(() =>
+    category === "flight" ? isFlightInProgress(item) : false,
+  );
+
+  useEffect(() => {
+    if (category !== "flight") return;
+    const tick = () => setFlightInProgress(isFlightInProgress(item));
+    tick();
+    const interval = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(interval);
+  }, [item, category]);
+
+  const doneAccent: ItemDoneAccent = flightInProgress ? "amber" : "emerald";
 
   const categoryLabel =
     category === "activity" && activityType === "sub_item"
@@ -434,6 +465,16 @@ function ItemDetailHeader({
             <h1 className="mt-1 break-words font-serif text-xl text-[#1e3a5f] sm:text-3xl">
               {item.title}
             </h1>
+            {category === "flight" && flightNumberLabel && (
+              <p className="mt-1 text-sm font-medium text-sky-800">
+                {flightNumberLabel}
+              </p>
+            )}
+            {category === "flight" && flightTimeline && (
+              <p className="mt-1 text-sm font-semibold tracking-wide text-stone-600">
+                {formatFlightRouteChain(flightTimeline.routeCodes)}
+              </p>
+            )}
             {item.summary && category === "flight" ? (
               <div className="mt-2 space-y-0.5 text-sm text-stone-500">
                 {item.summary.split(" · ").map((part, index) => (
@@ -445,10 +486,10 @@ function ItemDetailHeader({
             ) : item.summary ? (
               <p className="mt-2 break-words text-stone-500">{item.summary}</p>
             ) : null}
-            {sharedLocation?.name && (
+            {showLocation && (
               <p className="mt-2 break-words text-sm">
                 {sharedLocation.mapLink ? (
-                  <MapLink label={sharedLocation.name} href={sharedLocation.mapLink} />
+                  <MapLink label={sharedLocation.name!} href={sharedLocation.mapLink} />
                 ) : (
                   <span className="text-stone-600">{sharedLocation.name}</span>
                 )}
@@ -457,7 +498,7 @@ function ItemDetailHeader({
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-stretch sm:self-start">
-          <ItemCompleteToggle item={item} />
+          <ItemCompleteToggle item={item} accent={doneAccent} />
           {onEdit && (
             <button
               type="button"
@@ -491,15 +532,26 @@ function ItemDetailHeader({
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-4 text-sm text-stone-500">
+      <div className="mt-5 flex flex-col gap-1 text-sm text-stone-500">
         {category === "flight" ? (
           <>
-            {flightSchedule?.departure && (
-              <span>Departs: {flightSchedule.departure}</span>
-            )}
-            {flightSchedule?.arrival && (
-              <span>Arrives: {flightSchedule.arrival}</span>
-            )}
+            <div className="flex flex-wrap gap-4">
+              {flightSchedule?.departure && (
+                <span>Departs: {flightSchedule.departure}</span>
+              )}
+              {flightSchedule?.arrival && (
+                <span>Arrives: {flightSchedule.arrival}</span>
+              )}
+            </div>
+            {flightTimeline?.transitStops.map((stop) => {
+              const layover = formatFlightProgressDuration(stop.layoverMinutes);
+              if (!layover) return null;
+              return (
+                <p key={stop.airport} className="text-amber-800">
+                  Transit {stop.airport} · {layover}
+                </p>
+              );
+            })}
           </>
         ) : (
           <>
@@ -524,6 +576,7 @@ function ItemDetailBody({
   stayDetails,
   carDetails,
   activityDetails,
+  canEdit,
 }: {
   item: ItineraryItem;
   category: string;
@@ -532,11 +585,16 @@ function ItemDetailBody({
   stayDetails: ReturnType<typeof getAccommodationDetails>;
   carDetails: ReturnType<typeof getCarRentalDetails>;
   activityDetails: ReturnType<typeof getActivityDetails>;
+  canEdit: boolean;
 }) {
   return (
     <>
       {category === "flight" && flightDetails && (
-        <FlightDetailView details={flightDetails} itemId={item.id} />
+        <FlightDetailView
+          details={flightDetails}
+          itemId={item.id}
+          canEdit={canEdit}
+        />
       )}
       {category === "pet_relocation" && petDetails && (
         <PetRelocationDetailView details={petDetails} />
@@ -566,12 +624,14 @@ export function ItemDetailView({
   onClose,
   onEdit,
   onDelete,
+  canEdit = false,
 }: {
   item: ItineraryItem;
   modal?: boolean;
   onClose?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  canEdit?: boolean;
 }) {
   const category = isCategory(item.category) ? item.category : "flight";
   const styles = CATEGORY_STYLES[category];
@@ -609,6 +669,7 @@ export function ItemDetailView({
       stayDetails={stayDetails}
       carDetails={carDetails}
       activityDetails={activityDetails}
+      canEdit={canEdit}
     />
   );
 

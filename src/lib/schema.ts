@@ -168,6 +168,7 @@ export const notifications = pgTable("notifications", {
   href: text("href"),
   metadata: jsonb("metadata").default({}),
   readAt: timestamp("read_at", { withTimezone: true }),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

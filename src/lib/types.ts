@@ -42,6 +42,10 @@ export type FlightDetails = {
   operatingFlightNumber?: string;
   /** @deprecated Use marketingFlightNumber + operatingFlightNumber */
   flightNumber?: string | null;
+  airlineIata?: string;
+  airlineName?: string;
+  operatingAirlineIata?: string;
+  operatingAirlineName?: string;
   from: string;
   to: string;
   fromIata?: string;
@@ -64,6 +68,7 @@ export type FlightDetails = {
   segments?: FlightSegment[];
   notes?: string[];
   status: "confirmed" | "tbc";
+  checkInStatus?: Record<string, boolean>;
 };
 
 export type PetRelocationDetails = {
@@ -225,8 +230,22 @@ export function isPetRelocationItem(item: {
 export function getFlightDetails(details: unknown): FlightDetails | null {
   if (!details || typeof details !== "object") return null;
   const d = details as FlightDetails;
-  if (!d.from || !d.to) return null;
-  return d;
+  const fromIata =
+    typeof d.fromIata === "string" ? d.fromIata.trim().toUpperCase() : "";
+  const toIata =
+    typeof d.toIata === "string" ? d.toIata.trim().toUpperCase() : "";
+  const fromCity = d.from?.trim() || "";
+  const toCity = d.to?.trim() || "";
+  const from = fromCity || fromIata;
+  const to = toCity || toIata;
+  if (!from || !to) return null;
+  return {
+    ...d,
+    from,
+    to,
+    fromIata: fromIata || undefined,
+    toIata: toIata || undefined,
+  };
 }
 
 export function getPetRelocationDetails(

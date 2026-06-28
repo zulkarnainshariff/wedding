@@ -33,6 +33,15 @@ function requestMetaFrom(request?: Request | null): RequestMeta {
   };
 }
 
+async function resolveLogUserId(user: SessionUser): Promise<number | null> {
+  const [row] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, user.username.toLowerCase()))
+    .limit(1);
+  return row?.id ?? null;
+}
+
 async function withSequenceRecovery<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
@@ -51,10 +60,12 @@ export async function startUserSession(
   const sessionId = randomUUID();
   const meta = requestMetaFrom(request);
   const now = new Date();
+  const userId = await resolveLogUserId(user);
+  if (!userId) return sessionId;
 
   await withSequenceRecovery(() =>
     db.insert(userActivitySessions).values({
-      userId: user.id,
+      userId,
       sessionId,
       startedAt: now,
       lastSeenAt: now,
@@ -63,7 +74,7 @@ export async function startUserSession(
 
   await withSequenceRecovery(() =>
     db.insert(loginLogs).values({
-      userId: user.id,
+      userId,
       username: user.username,
       eventType,
       sessionId,
@@ -74,7 +85,7 @@ export async function startUserSession(
 
   await withSequenceRecovery(() =>
     db.insert(usageLogs).values({
-      userId: user.id,
+      userId,
       username: user.username,
       sessionId,
       eventType: "session_start",
@@ -92,9 +103,10 @@ export async function logLogout(
   request?: Request | null,
 ): Promise<void> {
   const meta = requestMetaFrom(request);
+  const userId = await resolveLogUserId(user);
   await withSequenceRecovery(() =>
     db.insert(loginLogs).values({
-      userId: user.id,
+      userId,
       username: user.username,
       eventType: "logout",
       sessionId: sessionId ?? null,
@@ -164,9 +176,10 @@ export async function recordUsageHeartbeat(input: {
 
   const eventType = input.detailed ? "page_view" : "heartbeat";
   if (input.detailed || eventType === "heartbeat") {
+    const userId = await resolveLogUserId(input.user);
     await withSequenceRecovery(() =>
       db.insert(usageLogs).values({
-        userId: input.user.id,
+        userId,
         username: input.user.username,
         sessionId,
         eventType,
@@ -186,9 +199,10 @@ export async function logAuditEvent(input: {
   summary?: string;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
-  await withSequenceRecovery(() =>
-    db.insert(auditLogs).values({
-      userId: input.user.id,
+  await withSequenceRecovery(async () => {
+    const userId = await resolveLogUserId(input.user);
+    await db.insert(auditLogs).values({
+      userId,
       username: input.user.username,
       action: input.action,
       resourceType: input.resourceType,
@@ -196,8 +210,8 @@ export async function logAuditEvent(input: {
         input.resourceId == null ? null : String(input.resourceId),
       summary: input.summary ?? null,
       metadata: input.metadata ?? {},
-    }),
-  );
+    });
+  });
 }
 
 export async function listLoginLogs(filters: {

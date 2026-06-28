@@ -360,6 +360,88 @@ function FlightSegmentsEditor({
   );
 }
 
+function SeatCheckInEditor({
+  rows,
+  checkInStatus,
+  onChange,
+  onCheckInChange,
+}: {
+  rows: TravellerRecord[];
+  checkInStatus: Record<string, boolean>;
+  onChange: (rows: TravellerRecord[]) => void;
+  onCheckInChange: (status: Record<string, boolean>) => void;
+}) {
+  return (
+    <div className="sm:col-span-2">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-sm text-stone-500">Seat numbers &amp; check-in</p>
+        <button
+          type="button"
+          onClick={() => onChange([...rows, { name: "", value: "" }])}
+          className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2 py-1 text-xs"
+        >
+          <Plus className="h-3 w-3" />
+          Add row
+        </button>
+      </div>
+      <div className="space-y-2">
+        {rows.map((row, index) => (
+          <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+            <select
+              value={row.name}
+              onChange={(e) => {
+                const next = [...rows];
+                next[index] = { ...row, name: e.target.value };
+                onChange(next);
+              }}
+              className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+            >
+              <option value="">Select traveller</option>
+              {travellerOptions(rows.map((r) => r.name)).map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={row.value}
+              placeholder="Seat"
+              onChange={(e) => {
+                const next = [...rows];
+                next[index] = { ...row, value: e.target.value };
+                onChange(next);
+              }}
+              className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+            />
+            <label className="flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                checked={Boolean(row.name && checkInStatus[row.name])}
+                onChange={(e) => {
+                  if (!row.name) return;
+                  onCheckInChange({
+                    ...checkInStatus,
+                    [row.name]: e.target.checked,
+                  });
+                }}
+              />
+              Checked in
+            </label>
+            <button
+              type="button"
+              onClick={() => onChange(rows.filter((_, i) => i !== index))}
+              className="rounded-lg border border-red-200 px-3 py-2 text-red-600"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function AdminItemDetailsForm({
   category,
   structured,
@@ -383,13 +465,15 @@ export function AdminItemDetailsForm({
 
   return (
     <div className="mt-3 grid gap-4 sm:grid-cols-2">
-      <LocationFields
-        locationName={structured.locationName}
-        locationMapUrl={structured.locationMapUrl}
-        onChange={(locationName, locationMapUrl) =>
-          onChange({ ...structured, locationName, locationMapUrl })
-        }
-      />
+      {category !== "flight" && (
+        <LocationFields
+          locationName={structured.locationName}
+          locationMapUrl={structured.locationMapUrl}
+          onChange={(locationName, locationMapUrl) =>
+            onChange({ ...structured, locationName, locationMapUrl })
+          }
+        />
+      )}
 
       {category === "activity" && (
         <>
@@ -437,29 +521,7 @@ export function AdminItemDetailsForm({
 
       {category === "flight" && (
         <>
-          <TextInput label="From" value={structured.simple.from} onChange={(v) => setSimple("from", v)} />
-          <TextInput label="From airport (IATA)" value={structured.simple.fromIata} onChange={(v) => setSimple("fromIata", v.toUpperCase())} />
-          <TextInput label="To" value={structured.simple.to} onChange={(v) => setSimple("to", v)} />
-          <TextInput label="To airport (IATA)" value={structured.simple.toIata} onChange={(v) => setSimple("toIata", v.toUpperCase())} />
-          <TextInput
-            label="Your flight number (codeshare / ticket)"
-            value={structured.simple.marketingFlightNumber}
-            onChange={(v) => setSimple("marketingFlightNumber", v.toUpperCase())}
-          />
-          <p className="sm:col-span-2 text-xs text-stone-500">
-            Displayed as your flight (operating), e.g. QF1234 (AA456). Live
-            tracking uses the operating flight number and departure IATA code.
-          </p>
-          <TextInput label="Aircraft" value={structured.simple.aircraft} onChange={(v) => setSimple("aircraft", v)} />
-          <TextInput label="Total flight time" value={structured.simple.totalFlightTime} onChange={(v) => setSimple("totalFlightTime", v)} />
-          <p className="sm:col-span-2 text-xs text-stone-500">
-            Departure terminal and gate are filled automatically from live flight
-            tracking on the day of travel (operating flight number + departure IATA
-            required).
-          </p>
-          <TextInput label="Arr. terminal" value={structured.simple.arrivalTerminal} onChange={(v) => setSimple("arrivalTerminal", v)} />
-          <TextInput label="Arr. gate" value={structured.simple.arrivalGate} onChange={(v) => setSimple("arrivalGate", v)} />
-          <label className="block text-sm">
+          <label className="block text-sm sm:col-span-2">
             <span className="mb-1 block text-stone-500">Status</span>
             <select
               value={structured.simple.status}
@@ -469,10 +531,6 @@ export function AdminItemDetailsForm({
               <option value="confirmed">Confirmed</option>
               <option value="tbc">To be confirmed</option>
             </select>
-            <p className="mt-1 text-xs text-stone-500">
-              Confirmed = booked flight details. To be confirmed = placeholder until
-              the booking is final (shows a TBC badge to guests).
-            </p>
           </label>
           <ParticipantMultiSelect
             value={structured.travellers}
@@ -499,11 +557,13 @@ export function AdminItemDetailsForm({
             }
             valueLabel="Reference"
           />
-          <TravellerRecordsEditor
-            label="Seat numbers"
+          <SeatCheckInEditor
             rows={structured.seats}
+            checkInStatus={structured.checkInStatus}
             onChange={(seats) => onChange({ ...structured, seats })}
-            valueLabel="Seat"
+            onCheckInChange={(checkInStatus) =>
+              onChange({ ...structured, checkInStatus })
+            }
           />
           <div className="sm:col-span-2">
             <div className="mb-2 flex items-center justify-between">

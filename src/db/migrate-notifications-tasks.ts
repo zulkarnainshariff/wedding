@@ -74,6 +74,11 @@ async function main() {
     )
   `;
 
+  await sql`
+    ALTER TABLE notifications
+    ADD COLUMN IF NOT EXISTS archived_at timestamptz
+  `;
+
   console.log("Notifications and tasks tables ready.");
 }
 

@@ -42,6 +42,8 @@ export function LoginForm({
       }
 
       onSuccess?.();
+      setUsername("");
+      setPassword("");
       const destination =
         variant === "page"
           ? searchParams.get("next") || redirectTo
