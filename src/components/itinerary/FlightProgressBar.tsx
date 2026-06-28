@@ -114,6 +114,43 @@ function visualBarPercent(
   return 100;
 }
 
+function TransitMarker({
+  children,
+  className = "",
+  valign = "top",
+}: {
+  children: React.ReactNode;
+  className?: string;
+  valign?: "top" | "center";
+}) {
+  return (
+    <div
+      className={[
+        "relative w-0 shrink-0",
+        valign === "center" ? "self-center" : "",
+      ].join(" ")}
+    >
+      <div
+        className={[
+          "absolute left-0 -translate-x-1/2 whitespace-nowrap",
+          valign === "center" ? "top-1/2 -translate-y-1/2" : "top-0",
+          className,
+        ].join(" ")}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function firstFlightIndex(parts: FlightProgressPart[]): number {
+  return parts.findIndex((part) => part.kind === "flight");
+}
+
+function lastFlightIndex(parts: FlightProgressPart[]): number {
+  return parts.findLastIndex((part) => part.kind === "flight");
+}
+
 export function FlightProgressBar({ item }: { item: ItineraryItem }) {
   const router = useRouter();
   const autoCompleteRequestedRef = useRef(false);
@@ -158,43 +195,49 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
   const planePercent = clampPlanePercent(
     visualBarPercent(journeyPercent, parts),
   );
+  const firstFlight = firstFlightIndex(parts);
+  const lastFlight = lastFlightIndex(parts);
+  const singleFlight = firstFlight === lastFlight && firstFlight >= 0;
 
   return (
     <div className="mt-3 border-t border-stone-100 pt-3">
       {/* Airport codes */}
-      <div className="flex gap-0.5">
+      <div className="flex leading-none">
         {parts.map((part, index) => {
-          const isFirst = index === 0;
-          const isLast = index === parts.length - 1;
+          if (part.kind === "transit") {
+            return (
+              <TransitMarker key={`code-${part.kind}-${index}`}>
+                <span className="text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
+                  {part.fromLabel}
+                </span>
+              </TransitMarker>
+            );
+          }
+
+          const isFirstFlight = index === firstFlight;
+          const isLastFlight = index === lastFlight;
 
           return (
             <div
               key={`code-${part.kind}-${index}`}
-              className="min-w-0"
+              className={[
+                "relative min-w-0",
+                singleFlight && isFirstFlight ? "flex justify-between" : "",
+              ].join(" ")}
               style={{ flex: part.minutes }}
             >
-              {isFirst && isLast ? (
-                <div className="flex justify-between">
-                  <span className="text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
-                    {progress.fromLabel}
-                  </span>
-                  <span className="text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
-                    {progress.toLabel}
-                  </span>
-                </div>
-              ) : null}
-              {isFirst && !isLast ? (
+              {isFirstFlight ? (
                 <span className="text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
                   {progress.fromLabel}
                 </span>
               ) : null}
-              {part.kind === "transit" ? (
-                <span className="block text-center text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
-                  {part.fromLabel}
+              {isLastFlight && !singleFlight ? (
+                <span className="absolute right-0 text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
+                  {progress.toLabel}
                 </span>
               ) : null}
-              {isLast && !isFirst ? (
-                <span className="block text-right text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
+              {singleFlight && isLastFlight ? (
+                <span className="text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
                   {progress.toLabel}
                 </span>
               ) : null}
@@ -204,22 +247,29 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
       </div>
 
       {/* Transit duration + total remaining — above the bar, same row */}
-      <div className="mt-0.5 mb-1.5 flex gap-0.5">
+      <div className="mb-1.5 flex leading-none">
         {parts.map((part, index) => {
-          const isLast = index === parts.length - 1;
+          if (part.kind === "transit") {
+            return (
+              <TransitMarker key={`meta-${part.kind}-${index}`}>
+                {part.layoverMinutes ? (
+                  <p className="text-center text-[9px] leading-none font-medium text-stone-500">
+                    {formatFlightProgressDuration(part.layoverMinutes)} transit
+                  </p>
+                ) : null}
+              </TransitMarker>
+            );
+          }
+
+          const isLastFlight = index === lastFlight;
 
           return (
             <div
               key={`meta-${part.kind}-${index}`}
-              className={part.kind === "transit" ? "relative min-w-0 overflow-visible" : "min-w-0"}
+              className="relative min-w-0"
               style={{ flex: part.minutes }}
             >
-              {part.kind === "transit" && part.layoverMinutes ? (
-                <p className="mx-auto w-max text-center text-[9px] leading-none font-medium whitespace-nowrap text-stone-500">
-                  {formatFlightProgressDuration(part.layoverMinutes)} transit
-                </p>
-              ) : null}
-              {isLast && destinationLabel ? (
+              {isLastFlight && destinationLabel ? (
                 <p className="text-right text-[9px] leading-none font-medium whitespace-nowrap text-stone-600">
                   {destinationLabel}
                 </p>
@@ -235,20 +285,17 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
           {parts.map((part, index) => {
             if (part.kind === "transit") {
               return (
-                <div
-                  key={`track-${part.kind}-${index}`}
-                  className="relative w-0 shrink-0"
-                  aria-hidden
-                >
-                  <span className="absolute top-1/2 left-0 z-10 block h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-2 ring-stone-300" />
-                </div>
+                <TransitMarker key={`track-${part.kind}-${index}`} valign="center">
+                  <span
+                    className="block h-2.5 w-2.5 rounded-full bg-white ring-2 ring-stone-300"
+                    aria-hidden
+                  />
+                </TransitMarker>
               );
             }
 
-            const isFirstFlight =
-              parts.findIndex((entry) => entry.kind === "flight") === index;
-            const isLastFlight =
-              parts.findLastIndex((entry) => entry.kind === "flight") === index;
+            const isFirstFlight = index === firstFlight;
+            const isLastFlight = index === lastFlight;
 
             return (
             <div
