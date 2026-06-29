@@ -1,14 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plane } from "lucide-react";
+import { useTripTime } from "@/components/itinerary/TripTimeContext";
+import { useDisplayFormat } from "@/hooks/useDisplayFormat";
+import { getAirportTimezone } from "@/lib/airport-timezones";
+import {
+  shouldFetchFlightLiveStatus,
+  shouldShowSavedFlightGateInfo,
+} from "@/lib/flight-live-eligibility";
 import {
   formatFlightDuration,
   formatFlightStatusLabel,
+  type FlightLiveEndpoint,
   type FlightLiveStatus,
 } from "@/lib/flight-tracking";
-import { formatFlightNumberDisplay } from "@/lib/flight-numbers";
-import { formatDateTime } from "@/lib/types";
+import { formatFlightNumberDisplay, formatJourneyFlightLabel } from "@/lib/flight-numbers";
+import {
+  flightSegmentsFromDetails,
+  resolveTrackingLegEndpoints,
+} from "@/lib/flight-segment-timing";
+import { getFlightDetails } from "@/lib/types";
+import { subscribeSyncUpdated } from "@/lib/sync-client";
+import type { ItineraryItem } from "@/lib/schema";
 
 function Row({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;
@@ -49,26 +63,110 @@ function GateRow({
   return <Row label={label} value={value} />;
 }
 
+function pickEndpointInstant(
+  endpoint?: FlightLiveEndpoint,
+  preferActual = false,
+): string | null {
+  if (!endpoint) return null;
+  if (preferActual && endpoint.actual) return endpoint.actual;
+  return endpoint.actual ?? endpoint.estimated ?? endpoint.scheduled ?? null;
+}
+
+function SavedFlightGatePanel({
+  marketingFlightNumber,
+  operatingFlightNumber,
+  savedDeparture,
+  savedArrival,
+}: {
+  marketingFlightNumber?: string | null;
+  operatingFlightNumber?: string | null;
+  savedDeparture?: { terminal?: string | null; gate?: string | null };
+  savedArrival?: { terminal?: string | null; gate?: string | null };
+}) {
+  const displayNumber = formatFlightNumberDisplay(
+    marketingFlightNumber,
+    operatingFlightNumber,
+  );
+
+  return (
+    <div className="mb-4 overflow-hidden rounded-xl border border-stone-200 bg-stone-50">
+      <div className="flex items-center gap-2 border-b border-stone-200 px-4 py-3">
+        <Plane className="h-4 w-4 text-stone-600" />
+        <div>
+          <p className="text-xs font-semibold tracking-wide text-stone-600 uppercase">
+            Saved gate info
+          </p>
+          {displayNumber ? (
+            <p className="text-sm text-stone-600">{displayNumber}</p>
+          ) : null}
+        </div>
+      </div>
+      <div className="space-y-2 px-4 py-3">
+        <GateRow label="Departure" saved={savedDeparture} />
+        <GateRow label="Arrival" saved={savedArrival} />
+        <p className="text-xs text-stone-500">
+          Early morning flight — showing saved gate details from the itinerary.
+          Live updates appear on the day of travel.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function FlightLiveStatusPanel({
+  item,
   itemId,
   marketingFlightNumber,
   operatingFlightNumber,
   savedDeparture,
   savedArrival,
 }: {
+  item: ItineraryItem;
   itemId: number;
   marketingFlightNumber?: string | null;
   operatingFlightNumber?: string | null;
   savedDeparture?: { terminal?: string | null; gate?: string | null };
   savedArrival?: { terminal?: string | null; gate?: string | null };
 }) {
+  const { effectiveDate, effectiveDateString } = useTripTime();
+  const { formatDateTime, formatInstant } = useDisplayFormat();
   const [live, setLive] = useState<FlightLiveStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchLive = useMemo(
+    () => shouldFetchFlightLiveStatus(item, effectiveDate),
+    [item, effectiveDate],
+  );
+  const showSavedOnly = useMemo(
+    () => !fetchLive && shouldShowSavedFlightGateInfo(item, effectiveDate),
+    [fetchLive, item, effectiveDate],
+  );
+  const liveFlightLabel = useMemo(() => {
+    const details = getFlightDetails(item.details);
+    if (!details) return null;
+    const segments = flightSegmentsFromDetails(details);
+    if (segments.length >= 2) {
+      const activeLeg = resolveTrackingLegEndpoints(item, effectiveDate);
+      if (activeLeg) {
+        const segment = segments[activeLeg.segmentIndex];
+        return (
+          formatFlightNumberDisplay(
+            segment.marketingFlightNumber,
+            segment.operatingFlightNumber,
+          ) || segment.flightNumber
+        );
+      }
+    }
+    return formatJourneyFlightLabel(details);
+  }, [item, effectiveDate]);
+
   const refresh = useCallback(async () => {
+    if (!fetchLive) return;
     setLoading(true);
     try {
-      const response = await fetch(`/api/flights/${itemId}/status`);
+      const response = await fetch(
+        `/api/flights/${itemId}/status?asOf=${encodeURIComponent(effectiveDateString)}`,
+      );
       if (response.ok) {
         setLive(await response.json());
       } else {
@@ -87,15 +185,19 @@ export function FlightLiveStatusPanel({
     } finally {
       setLoading(false);
     }
-  }, [itemId]);
+  }, [fetchLive, itemId, effectiveDateString]);
 
   useEffect(() => {
+    if (!fetchLive) {
+      setLoading(false);
+      setLive(null);
+      return;
+    }
     void refresh();
-  }, [refresh]);
+  }, [fetchLive, refresh]);
 
-  // Refresh computed timing; poll faster when ETA hits zero but still in the air.
   useEffect(() => {
-    if (!live?.available) return;
+    if (!fetchLive || !live?.available) return;
     const atEta =
       live.flightStatus === "active" && (live.remainingMinutes ?? 1) <= 0;
     const intervalMs = atEta ? 30_000 : 60_000;
@@ -103,7 +205,27 @@ export function FlightLiveStatusPanel({
       void refresh();
     }, intervalMs);
     return () => window.clearInterval(interval);
-  }, [live?.available, live?.flightStatus, live?.remainingMinutes, refresh]);
+  }, [fetchLive, live?.available, live?.flightStatus, live?.remainingMinutes, refresh]);
+
+  useEffect(() => {
+    if (!fetchLive) return;
+    return subscribeSyncUpdated(() => {
+      void refresh();
+    });
+  }, [fetchLive, refresh]);
+
+  if (showSavedOnly) {
+    return (
+      <SavedFlightGatePanel
+        marketingFlightNumber={marketingFlightNumber}
+        operatingFlightNumber={operatingFlightNumber}
+        savedDeparture={savedDeparture}
+        savedArrival={savedArrival}
+      />
+    );
+  }
+
+  if (!fetchLive) return null;
 
   if (loading && !live) {
     return (
@@ -123,9 +245,30 @@ export function FlightLiveStatusPanel({
     );
   }
 
-  const displayNumber = formatFlightNumberDisplay(
-    marketingFlightNumber ?? live.marketingFlightNumber,
-    operatingFlightNumber ?? live.operatingFlightNumber,
+  const displayNumber =
+    liveFlightLabel ||
+    formatFlightNumberDisplay(
+      marketingFlightNumber ?? live.marketingFlightNumber,
+      operatingFlightNumber ?? live.operatingFlightNumber,
+    );
+
+  const formatLiveTime = (
+    iso: string | null | undefined,
+    airportIata?: string | null,
+  ) =>
+    formatInstant(iso, getAirportTimezone(airportIata), {
+      airportCode: airportIata,
+    });
+
+  const departureTimeLabel =
+    live.flightStatus === "scheduled" ? "Scheduled departure" : "Departed";
+
+  const departureTimeValue = formatLiveTime(
+    pickEndpointInstant(
+      live.departure,
+      live.flightStatus === "landed" || live.flightStatus === "active",
+    ),
+    live.depIata,
   );
 
   const arrivalTimeLabel =
@@ -135,20 +278,10 @@ export function FlightLiveStatusPanel({
         ? "Scheduled arrival"
         : "Est. arrival";
 
-  const arrivalTimeValue =
-    live.flightStatus === "landed"
-      ? live.arrival?.actual
-        ? formatDateTime(live.arrival.actual)
-        : live.arrival?.estimated
-          ? formatDateTime(live.arrival.estimated)
-          : live.arrival?.scheduled
-            ? formatDateTime(live.arrival.scheduled)
-            : null
-      : live.arrival?.estimated
-        ? formatDateTime(live.arrival.estimated)
-        : live.arrival?.scheduled
-          ? formatDateTime(live.arrival.scheduled)
-          : null;
+  const arrivalTimeValue = formatLiveTime(
+    pickEndpointInstant(live.arrival, live.flightStatus === "landed"),
+    live.arrIata,
+  );
 
   return (
     <div className="mb-4 overflow-hidden rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 to-white">
@@ -171,63 +304,56 @@ export function FlightLiveStatusPanel({
           label="Status"
           value={formatFlightStatusLabel(live.flightStatus)}
         />
+
         {live.flightStatus === "landed" && (
-          <>
-            <Row
-              label="Flight time"
-              value={formatFlightDuration(live.elapsedMinutes)}
-            />
-            <Row label={arrivalTimeLabel} value={arrivalTimeValue} />
-            <GateRow
-              label="Arrival"
-              endpoint={live.arrival}
-              saved={savedArrival}
-            />
-          </>
+          <Row
+            label="Flight time"
+            value={formatFlightDuration(live.elapsedMinutes)}
+          />
         )}
-        {live.flightStatus === "scheduled" && (
-          <>
-            <Row label={arrivalTimeLabel} value={arrivalTimeValue} />
-            <GateRow
-              label="Arrival"
-              endpoint={live.arrival}
-              saved={savedArrival}
-            />
-          </>
-        )}
+
         {live.flightStatus === "active" && (
           <>
             <Row
               label="Time in air"
               value={formatFlightDuration(live.elapsedMinutes)}
             />
-            <Row label={arrivalTimeLabel} value={arrivalTimeValue} />
             <Row
               label="Time remaining"
               value={formatFlightDuration(live.remainingMinutes, {
                 zeroLabel: "Arriving soon",
               })}
             />
-            <GateRow
-              label="Arrival"
-              endpoint={live.arrival}
-              saved={savedArrival}
-            />
           </>
         )}
-        <GateRow label="Departure" endpoint={live.departure} saved={savedDeparture} />
-        {live.arrival?.delayMinutes ? (
-          <Row
-            label="Arrival delay"
-            value={`${live.arrival.delayMinutes} min`}
-          />
-        ) : null}
+
+        <Row label={departureTimeLabel} value={departureTimeValue} />
+        <GateRow
+          label="Departure"
+          endpoint={live.departure}
+          saved={savedDeparture}
+        />
+
+        <Row label={arrivalTimeLabel} value={arrivalTimeValue} />
+        <GateRow
+          label="Arrival"
+          endpoint={live.arrival}
+          saved={savedArrival}
+        />
+
         {live.departure?.delayMinutes ? (
           <Row
             label="Departure delay"
             value={`${live.departure.delayMinutes} min`}
           />
         ) : null}
+        {live.arrival?.delayMinutes ? (
+          <Row
+            label="Arrival delay"
+            value={`${live.arrival.delayMinutes} min`}
+          />
+        ) : null}
+
         {live.message && live.computedOnly && (
           <p className="text-xs text-stone-500">{live.message}</p>
         )}

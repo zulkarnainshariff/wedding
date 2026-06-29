@@ -1,12 +1,16 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useTripTime } from "@/components/itinerary/TripTimeContext";
+import { shouldFetchFlightLiveStatus } from "@/lib/flight-live-eligibility";
 import {
   readOfflineCache,
   writeOfflineCache,
   type OfflineCache,
 } from "@/lib/offline-store";
+import { dispatchSyncUpdated } from "@/lib/sync-client";
 
 type SyncCheckResult = "upToDate" | "updateAvailable" | "offline" | "error";
 
@@ -29,7 +33,9 @@ async function fetchSync(query: string, signal?: AbortSignal) {
 }
 
 export function OfflineSyncProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { effectiveDate, effectiveDateString } = useTripTime();
   const [updateId, setUpdateId] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -48,6 +54,17 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
     setUpdateId(payload.updateId);
     setLastSyncedAt(payload.cachedAt);
   }, []);
+
+  const publishSyncUpdate = useCallback(
+    (payload: OfflineCache) => {
+      const previousId = updateIdRef.current;
+      if (previousId && previousId !== payload.updateId) {
+        dispatchSyncUpdated({ updateId: payload.updateId });
+        router.refresh();
+      }
+    },
+    [router],
+  );
 
   const syncNow = useCallback(async () => {
     if (typeof window === "undefined" || syncInFlightRef.current) return;
@@ -82,6 +99,7 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
       };
       await writeOfflineCache(payload);
       applyCache(payload);
+      publishSyncUpdate(payload);
       setIsOffline(false);
     } catch {
       const existing = await readOfflineCache();
@@ -91,7 +109,7 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
       syncInFlightRef.current = false;
       setSyncing(false);
     }
-  }, [applyCache]);
+  }, [applyCache, publishSyncUpdate]);
 
   const checkForUpdates = useCallback(async (): Promise<SyncCheckResult> => {
     if (!navigator.onLine) return "offline";
@@ -117,14 +135,14 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
   }, [applyCache]);
 
   useEffect(() => {
-    if (authLoading || !user || IS_DEV) return;
+    if (authLoading || !user) return;
     void syncNow();
   }, [authLoading, user, syncNow]);
 
   useEffect(() => {
     const handleOnline = () => {
       setIsOffline(false);
-      if (!IS_DEV) void syncNow();
+      void syncNow();
     };
     const handleOffline = () => setIsOffline(true);
 
@@ -139,25 +157,54 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
   }, [syncNow]);
 
   useEffect(() => {
-    if (authLoading || !user || typeof window === "undefined" || IS_DEV) return;
+    if (authLoading || !user || typeof window === "undefined") return;
 
-    const source = new EventSource("/api/sync/stream");
-    source.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as { updateId?: string };
-        if (
-          payload.updateId &&
-          payload.updateId !== updateIdRef.current
-        ) {
-          void syncNow();
+    let source: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const connect = () => {
+      source?.close();
+      source = new EventSource("/api/sync/stream");
+      source.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data) as { updateId?: string };
+          if (
+            payload.updateId &&
+            payload.updateId !== updateIdRef.current
+          ) {
+            void syncNow();
+          }
+        } catch {
+          /* ignore malformed events */
         }
-      } catch {
-        /* ignore malformed events */
-      }
+      };
+      source.onerror = () => {
+        source?.close();
+        reconnectTimer = setTimeout(connect, 5000);
+      };
     };
 
-    return () => source.close();
-  }, [authLoading, user, syncNow, checkForUpdates]);
+    connect();
+
+    return () => {
+      source?.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+    };
+  }, [authLoading, user, syncNow]);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    const interval = window.setInterval(() => {
+      void checkForUpdates().then((result) => {
+        if (result === "updateAvailable") {
+          void syncNow();
+        }
+      });
+    }, 60_000);
+
+    return () => window.clearInterval(interval);
+  }, [authLoading, user, checkForUpdates, syncNow]);
 
   useEffect(() => {
     if (!user || !cache?.items?.length) return;
@@ -168,9 +215,13 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
 
     for (const item of cache.items) {
       if (item.category !== "flight" || !item.id) continue;
-      void fetch(`/api/flights/${item.id}/status`, { cache: "no-store" });
+      if (!shouldFetchFlightLiveStatus(item, effectiveDate)) continue;
+      void fetch(
+        `/api/flights/${item.id}/status?asOf=${encodeURIComponent(effectiveDateString)}`,
+        { cache: "no-store" },
+      );
     }
-  }, [user, cache]);
+  }, [user, cache, effectiveDate, effectiveDateString]);
 
   const getCachedItem = useCallback(
     (id: number) => cache?.items.find((item) => item.id === id) ?? null,

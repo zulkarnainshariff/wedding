@@ -1,8 +1,10 @@
+import { formatBookingGroupsDisplay } from "@/lib/booking-groups";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
 import { formatClockTimeWithPrefs } from "@/lib/display-format";
 import { resolveFlightSchedule } from "@/lib/flight-datetime";
 import {
   formatFlightNumberDisplay,
+  formatJourneyFlightLabel,
   normalizeFlightDetails,
 } from "@/lib/flight-numbers";
 import { formatSeatsSummary } from "@/lib/seats";
@@ -448,7 +450,11 @@ function formatTravellerList(names: string[], cargoParty: string[] = []): string
 export function formatGroupedBookingRefs(
   bookingReferences?: Record<string, string>,
   fallback?: string | null,
+  bookingGroups?: import("./booking-groups").BookingGroup[],
 ): string | null {
+  if (bookingGroups && bookingGroups.length > 0) {
+    return formatBookingGroupsDisplay(bookingGroups, bookingReferences, fallback);
+  }
   if (bookingReferences && Object.keys(bookingReferences).length > 0) {
     const byRef = new Map<string, string[]>();
     for (const [name, ref] of Object.entries(bookingReferences)) {
@@ -558,11 +564,7 @@ function formatBaggageSummary(
 }
 
 function flightNumberLabel(details: FlightDetails): string {
-  const normalized = normalizeFlightDetails(details);
-  const display = formatFlightNumberDisplay(
-    normalized.marketingFlightNumber,
-    normalized.operatingFlightNumber,
-  );
+  const display = formatJourneyFlightLabel(normalizeFlightDetails(details));
   if (display) return display;
   return details.status === "tbc" ? "TBC" : "—";
 }
@@ -731,6 +733,7 @@ function buildFlightDetailsBlock(
   const refs = formatGroupedBookingRefs(
     details.bookingReferences,
     details.bookingReference,
+    details.bookingGroups,
   );
   if (refs) {
     lines.push({ text: "Booking Reference" });

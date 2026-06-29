@@ -1,4 +1,5 @@
 import type { FlightDetails, FlightSegment } from "./types";
+import { flightSegmentsFromDetails } from "./flight-segment-timing";
 
 /** Parse legacy strings like "QF1234 (AA456)" or "QF4716 (AA3164)". */
 export function parseLegacyFlightNumber(value: string | null | undefined): {
@@ -66,6 +67,93 @@ export function formatFlightNumberDisplay(
     return `${booked} (${actual})`;
   }
   return booked || actual || null;
+}
+
+function segmentFlightLabel(segment: FlightSegment): string | null {
+  return (
+    formatFlightNumberDisplay(
+      segment.marketingFlightNumber,
+      segment.operatingFlightNumber,
+    ) ||
+    segment.flightNumber?.trim() ||
+    null
+  );
+}
+
+/** Item-level flight label: one number, repeated number, or each leg listed. */
+export function formatJourneyFlightLabel(
+  details: FlightDetails | null | undefined,
+): string | null {
+  if (!details) return null;
+
+  const segments = flightSegmentsFromDetails(details);
+
+  if (segments.length >= 2) {
+    const labels = segments
+      .map((segment) => segmentFlightLabel(segment))
+      .filter((label): label is string => Boolean(label));
+
+    if (labels.length === 0) {
+      return (
+        formatFlightNumberDisplay(
+          details.marketingFlightNumber,
+          details.operatingFlightNumber,
+        ) || details.flightNumber?.trim() || null
+      );
+    }
+
+    const normalized = labels.map((label) => label.toUpperCase());
+    if (new Set(normalized).size === 1) {
+      return labels[0];
+    }
+
+    return labels.join(" · ");
+  }
+
+  if (segments.length === 1) {
+    return segmentFlightLabel(segments[0]);
+  }
+
+  return (
+    formatFlightNumberDisplay(
+      details.marketingFlightNumber,
+      details.operatingFlightNumber,
+    ) ||
+    details.flightNumber?.trim() ||
+    null
+  );
+}
+
+export function resolveSegmentOperatingFlightNumber(
+  segment: FlightSegment,
+): string | null {
+  return resolveOperatingFlightNumber(segment);
+}
+
+export function resolveSegmentMarketingFlightNumber(
+  segment: FlightSegment,
+): string | null {
+  return resolveMarketingFlightNumber(segment);
+}
+
+/** True when every leg uses the same marketed flight number (e.g. SQ12 via NRT). */
+export function isSingleFlightNumberJourney(
+  details: FlightDetails | null | undefined,
+): boolean {
+  if (!details) return false;
+  const segments = flightSegmentsFromDetails(details);
+  if (segments.length < 2) return true;
+
+  const numbers = segments
+    .map(
+      (segment) =>
+        segment.marketingFlightNumber?.trim().toUpperCase() ||
+        segment.operatingFlightNumber?.trim().toUpperCase() ||
+        segment.flightNumber?.trim().toUpperCase(),
+    )
+    .filter(Boolean);
+
+  return numbers.length > 0 && new Set(numbers).size === 1;
 }
 
 export function resolveMarketingFlightNumber(

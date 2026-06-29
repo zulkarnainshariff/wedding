@@ -2,13 +2,29 @@
 
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { ViewModeToggle } from "@/components/itinerary/ViewModeToggle";
+import { ParticipantFilterDropdown } from "@/components/itinerary/ParticipantFilterDropdown";
 
-export function ScheduleToolbar() {
+export function ScheduleToolbar({
+  participantOptions,
+  selectedParticipants = [],
+  onParticipantsChange,
+}: {
+  participantOptions?: string[];
+  selectedParticipants?: string[];
+  onParticipantsChange?: (value: string[]) => void;
+}) {
   const { hidePast, setHidePast } = useTripTime();
 
   return (
     <div className="mb-6 flex flex-wrap items-center gap-3">
       <ViewModeToggle />
+      {participantOptions && onParticipantsChange ? (
+        <ParticipantFilterDropdown
+          options={participantOptions}
+          value={selectedParticipants}
+          onChange={onParticipantsChange}
+        />
+      ) : null}
       <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm shadow-sm">
         <input
           type="checkbox"

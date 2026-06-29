@@ -1,16 +1,25 @@
 "use client";
 
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Timer } from "lucide-react";
 import type { FlightDetails, FlightSegment } from "@/lib/types";
 import { formatTravellerLabel } from "@/lib/types";
+import { formatBookingGroupsDisplay } from "@/lib/booking-groups";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { formatSeatsSummary, hasAssignedSeats } from "@/lib/seats";
 import {
   formatFlightNumberDisplay,
+  formatJourneyFlightLabel,
   normalizeFlightDetails,
 } from "@/lib/flight-numbers";
 import { resolveAirlineLabel } from "@/lib/airlines";
 import { FlightLiveStatusPanel } from "@/components/itinerary/FlightLiveStatus";
+import {
+  buildFlightLegDisplayList,
+  flightSegmentsFromDetails,
+  segmentLabel,
+} from "@/lib/flight-segment-timing";
+import { formatFlightProgressDuration } from "@/lib/flight-progress";
+import type { ItineraryItem } from "@/lib/schema";
 
 function DetailRow({
   label,
@@ -37,54 +46,107 @@ function StatusBadge({ status }: { status: "confirmed" | "tbc" }) {
   );
 }
 
-function SegmentTimeline({ segments }: { segments: FlightSegment[] }) {
+function formatSegmentEndpoint(
+  segment: FlightSegment,
+  endpoint: "from" | "to",
+): string {
+  const code = segmentLabel(segment, endpoint);
+  const place = endpoint === "from" ? segment.from : segment.to;
+  if (place?.trim() && place.trim().toUpperCase() !== code) {
+    return `${place} (${code})`;
+  }
+  return code;
+}
+
+function LayoverCard({
+  airport,
+  layoverMinutes,
+}: {
+  airport: string;
+  layoverMinutes: number;
+}) {
+  const duration = formatFlightProgressDuration(layoverMinutes);
+  if (!duration) return null;
+
+  return (
+    <div className="flex items-start gap-3 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 px-4 py-3">
+      <Timer className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden />
+      <div>
+        <p className="text-[11px] font-semibold tracking-wide text-amber-800 uppercase">
+          Transit
+        </p>
+        <p className="mt-0.5 text-sm font-medium text-amber-950">
+          {airport} · {duration}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function SegmentTimeline({ item }: { item: ItineraryItem }) {
+  const { formatClockTime } = useDisplayFormat();
+  const legs = buildFlightLegDisplayList(item);
+  if (legs.length === 0) return null;
+
   return (
     <div className="space-y-3 py-4">
       <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
         Itinerary segments
       </h3>
       <div className="space-y-3">
-        {segments.map((segment, index) => {
-          if (segment.transit) {
-            return (
-              <div
-                key={`transit-${index}`}
-                className="rounded-xl border border-dashed border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600"
-              >
-                Layover at {segment.airport} · {segment.transit}
-              </div>
-            );
-          }
+        {legs.map(({ segment, segmentIndex, layoverAfter }) => {
+          const flightNumber = formatFlightNumberDisplay(
+            segment.marketingFlightNumber,
+            segment.operatingFlightNumber,
+          ) || segment.flightNumber;
+          const depTime = segment.departureTime
+            ? formatClockTime(segment.departureTime)
+            : null;
+          const arrTime = segment.arrivalTime
+            ? formatClockTime(segment.arrivalTime)
+            : null;
 
           return (
-            <div
-              key={`segment-${index}`}
-              className="rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3"
-            >
-              <p className="font-medium text-sky-900">
-                {formatFlightNumberDisplay(
-                  segment.marketingFlightNumber,
-                  segment.operatingFlightNumber,
-                ) || segment.flightNumber}{" "}
-                · {segment.from}
-                {segment.fromIata ? ` (${segment.fromIata})` : ""} → {segment.to}
-                {segment.toIata ? ` (${segment.toIata})` : ""}
-              </p>
-              <p className="mt-1 text-sm text-stone-600">
-                {segment.departureTime && `Departs ${segment.departureTime}`}
-                {segment.arrivalTime && ` · Arrives ${segment.arrivalTime}`}
-                {segment.flightTime && ` · ${segment.flightTime}`}
-              </p>
-              {(segment.departureTerminal || segment.departureGate) && (
-                <p className="mt-1 text-xs text-stone-500">
-                  {segment.departureTerminal &&
-                    `Dep. terminal ${segment.departureTerminal}`}
-                  {segment.departureGate && ` · Dep. gate ${segment.departureGate}`}
+            <div key={`leg-${segmentIndex}`} className="space-y-3">
+              <div className="rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3">
+                <p className="font-medium text-sky-900">
+                  {flightNumber ? `${flightNumber} · ` : ""}
+                  {formatSegmentEndpoint(segment, "from")} →{" "}
+                  {formatSegmentEndpoint(segment, "to")}
                 </p>
-              )}
-              {segment.aircraft && (
-                <p className="mt-1 text-xs text-stone-500">Aircraft: {segment.aircraft}</p>
-              )}
+                <p className="mt-1 text-sm text-stone-600">
+                  {depTime && `Departs ${depTime}`}
+                  {depTime && arrTime && " · "}
+                  {arrTime && `Arrives ${arrTime}`}
+                  {segment.flightTime && ` · ${segment.flightTime}`}
+                </p>
+                {(segment.departureTerminal || segment.departureGate) && (
+                  <p className="mt-1 text-xs text-stone-500">
+                    {segment.departureTerminal &&
+                      `Dep. terminal ${segment.departureTerminal}`}
+                    {segment.departureGate &&
+                      ` · Dep. gate ${segment.departureGate}`}
+                  </p>
+                )}
+                {(segment.arrivalTerminal || segment.arrivalGate) && (
+                  <p className="mt-1 text-xs text-stone-500">
+                    {segment.arrivalTerminal &&
+                      `Arr. terminal ${segment.arrivalTerminal}`}
+                    {segment.arrivalGate && ` · Arr. gate ${segment.arrivalGate}`}
+                  </p>
+                )}
+                {segment.aircraft && (
+                  <p className="mt-1 text-xs text-stone-500">
+                    Aircraft: {segment.aircraft}
+                  </p>
+                )}
+              </div>
+              {layoverAfter ? (
+                <LayoverCard
+                  airport={layoverAfter.airport}
+                  layoverMinutes={layoverAfter.layoverMinutes}
+                />
+              ) : null}
             </div>
           );
         })}
@@ -139,25 +201,24 @@ function BaggageTable({
 
 export function FlightDetailView({
   details,
+  item,
   itemId,
   canEdit = false,
 }: {
   details: FlightDetails;
+  item: ItineraryItem;
   itemId?: number;
   canEdit?: boolean;
 }) {
   const flight = normalizeFlightDetails(details);
   const passengers = flight.passengers ?? flight.travellers;
-  const bookingRefs = flight.bookingReferences
-    ? Object.entries(flight.bookingReferences)
-        .map(([name, ref]) => `${name}: ${ref}`)
-        .join(" · ")
-    : flight.bookingReference;
-
-  const flightNumberLabel = formatFlightNumberDisplay(
-    flight.marketingFlightNumber,
-    flight.operatingFlightNumber,
+  const bookingRefs = formatBookingGroupsDisplay(
+    flight.bookingGroups,
+    flight.bookingReferences,
+    flight.bookingReference,
   );
+
+  const flightNumberLabel = formatJourneyFlightLabel(flight);
   const airlineLabel = resolveAirlineLabel(flight.airlineIata, flight.airlineName);
   const operatingAirlineLabel = resolveAirlineLabel(
     flight.operatingAirlineIata,
@@ -174,6 +235,7 @@ export function FlightDetailView({
     <div>
       {itemId ? (
         <FlightLiveStatusPanel
+          item={item}
           itemId={itemId}
           marketingFlightNumber={flight.marketingFlightNumber}
           operatingFlightNumber={flight.operatingFlightNumber}
@@ -253,8 +315,8 @@ export function FlightDetailView({
         )}
       </dl>
 
-      {flight.segments && flight.segments.length > 0 && (
-        <SegmentTimeline segments={flight.segments} />
+      {flightSegmentsFromDetails(flight).length > 0 && (
+        <SegmentTimeline item={item} />
       )}
 
       <BaggageTable baggage={flight.baggage} cargoParty={flight.cargoParty} />

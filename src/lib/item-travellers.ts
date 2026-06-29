@@ -66,6 +66,11 @@ export function extractItemTravellers(
   addNames(names, d.seats);
   addNames(names, d.baggage);
   addNames(names, d.bookingReferences);
+  if (Array.isArray(d.bookingGroups)) {
+    for (const group of d.bookingGroups as { travellers?: string[] }[]) {
+      addNames(names, group.travellers);
+    }
+  }
 
   if (category === "car_rental" && typeof d.driver === "string") {
     addName(names, d.driver);

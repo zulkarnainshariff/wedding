@@ -4,9 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
+import { formatBookingGroupsDisplay } from "@/lib/booking-groups";
 import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
 import { formatSeatsSummary } from "@/lib/seats";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/activity-utils";
+import { getAccommodationTileLines, enrichStayDetailsFromItem, buildAccommodationCompactSummary } from "@/lib/accommodation-utils";
+import { useStackedAccommodationLayout } from "@/hooks/useStackedAccommodationLayout";
 import { getItemLocation } from "@/lib/item-location";
 import {
   CATEGORY_META,
@@ -29,6 +32,11 @@ import {
   ItemDoneBadge,
   type ItemDoneAccent,
 } from "@/components/itinerary/ItemCompleteToggle";
+import { FlightCheckInBadge, FlightCheckInReminderPill, FlightCheckInToggle } from "@/components/itinerary/FlightCheckInToggle";
+import {
+  isFlightFullyCheckedIn,
+  isFlightPartiallyCheckedIn,
+} from "@/lib/flight-check-in";
 import {
   formatFlightProgressDuration,
   flightRouteLine,
@@ -96,11 +104,11 @@ function FlightDetailedPreview({
   formatClockTime: (time: string | null | undefined) => string;
   formatBaggage: (value: number | null | undefined) => string;
 }) {
-  const bookingRefs = details.bookingReferences
-    ? Object.entries(details.bookingReferences)
-        .map(([name, ref]) => `${formatTravellerLabel(name)} ${ref}`)
-        .join(" · ")
-    : details.bookingReference;
+  const bookingRefs = formatBookingGroupsDisplay(
+    details.bookingGroups,
+    details.bookingReferences,
+    details.bookingReference,
+  );
 
   const baggageSummary = details.baggage
     ? Object.entries(details.baggage)
@@ -181,8 +189,14 @@ export function ItemCard({
   taskSummary?: ItemTaskSummary;
 }) {
   const { openItem, viewMode } = useItineraryUI();
-  const { formatDateTime, formatClockTime, formatBaggage, formatFlightSchedule } =
-    useDisplayFormat();
+  const {
+    formatDateTime,
+    formatClockTime,
+    formatBaggage,
+    formatFlightSchedule,
+    formatStayDateTime,
+    preferences,
+  } = useDisplayFormat();
   const category = isCategory(item.category) ? item.category : "flight";
   const styles = CATEGORY_STYLES[category];
   const Icon = getCategoryIcon(category);
@@ -217,6 +231,10 @@ export function ItemCard({
   const flightSummaryExtras =
     category === "flight" ? flightSummaryExtraParts(item.summary, flightRoute) : [];
   const completed = isItemCompleted(item);
+  const flightCheckedIn =
+    category === "flight" &&
+    (isFlightFullyCheckedIn(flightDetails) ||
+      isFlightPartiallyCheckedIn(flightDetails));
   const subItems = item.subItems ?? [];
   const router = useRouter();
   const autoCompleteRequestedRef = useRef(false);
@@ -264,6 +282,21 @@ export function ItemCard({
   }, [category, item, router]);
 
   const doneAccent: ItemDoneAccent = flightInProgress ? "amber" : "emerald";
+
+  const stackedAccommodation = useStackedAccommodationLayout();
+  const enrichedStayDetails =
+    category === "accommodation" && stayDetails
+      ? enrichStayDetailsFromItem(item, stayDetails)
+      : null;
+  const accommodationLines =
+    enrichedStayDetails && stackedAccommodation
+      ? getAccommodationTileLines(enrichedStayDetails, preferences)
+      : [];
+  const accommodationSummary =
+    enrichedStayDetails && !stackedAccommodation
+      ? buildAccommodationCompactSummary(enrichedStayDetails, preferences) ||
+        item.summary
+      : null;
 
   const displayTime =
     (activityDetails?.time
@@ -321,6 +354,8 @@ export function ItemCard({
                   </span>
                 )}
                 {completed && <ItemDoneBadge accent={doneAccent} />}
+                {category === "flight" && <FlightCheckInReminderPill item={item} />}
+                {flightCheckedIn && <FlightCheckInBadge />}
                 <ItemTaskIndicator summary={taskSummary} />
               </div>
               <h3
@@ -353,11 +388,25 @@ export function ItemCard({
                 </p>
               ))}
             </div>
+          ) : accommodationLines.length > 0 ? (
+            <div className="mt-1 space-y-0.5 text-sm text-stone-500">
+              {accommodationLines.map((line, index) => (
+                <p key={`${index}-${line}`} className="break-words">
+                  {line}
+                </p>
+              ))}
+            </div>
+          ) : accommodationSummary ? (
+            <p className="mt-1 break-words text-sm text-stone-500">
+              {accommodationSummary}
+            </p>
           ) : item.summary && category !== "flight" ? (
             <p className="mt-1 break-words text-sm text-stone-500">{item.summary}</p>
           ) : null}
 
-          {category !== "flight" && itemLocation?.name && (
+          {category !== "flight" &&
+            category !== "accommodation" &&
+            itemLocation?.name && (
             <p className="mt-1 text-sm">
               {itemLocation.mapLink ? (
                 <a
@@ -377,6 +426,7 @@ export function ItemCard({
 
           {displayTime &&
             category !== "flight" &&
+            category !== "accommodation" &&
             (viewMode === "condensed" || category === "activity") && (
             <p className="mt-2 text-xs text-stone-400">{displayTime}</p>
           )}
@@ -415,6 +465,7 @@ export function ItemCard({
           {viewMode === "condensed" &&
             category !== "activity" &&
             category !== "flight" &&
+            category !== "accommodation" &&
             item.startDatetime && (
               <p className="mt-2 text-xs text-stone-400">
                 {formatDateTime(item.startDatetime)}
@@ -434,27 +485,19 @@ export function ItemCard({
               {(stayDetails.checkInDate || stayDetails.checkInTime) && (
                 <InlineDetail
                   label="Check-in"
-                  value={[
-                    stayDetails.checkInDate ?? null,
-                    stayDetails.checkInTime
-                      ? formatClockTime(stayDetails.checkInTime)
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
+                  value={formatStayDateTime(
+                    stayDetails.checkInDate,
+                    stayDetails.checkInTime,
+                  )}
                 />
               )}
               {stayDetails.checkOutDate && (
                 <InlineDetail
                   label="Check-out"
-                  value={[
+                  value={formatStayDateTime(
                     stayDetails.checkOutDate,
-                    stayDetails.checkOutTime
-                      ? formatClockTime(stayDetails.checkOutTime)
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
+                    stayDetails.checkOutTime,
+                  )}
                 />
               )}
               <InlineDetail
@@ -496,7 +539,10 @@ export function ItemCard({
         </div>
         </button>
 
-        <div className="shrink-0 self-start pt-0.5">
+        <div className="flex shrink-0 items-center gap-1.5 self-start pt-0.5">
+          {category === "flight" && (
+            <FlightCheckInToggle item={item} compact />
+          )}
           <ItemCompleteToggle item={item} compact accent={doneAccent} />
         </div>
       </div>

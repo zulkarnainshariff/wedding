@@ -291,14 +291,18 @@ export async function PUT(request: Request, { params }: Params) {
       })
       .returning();
 
-    await createNotification({
-      userId: created.assigneeUserId,
-      type: sub.isUrgent ? "task_urgent" : "task_assigned",
-      title: "Subtask assigned",
-      body: created.title,
-      href: taskHref(created),
-      metadata: { taskId: created.id, urgent: Boolean(sub.isUrgent) },
-    });
+    try {
+      await createNotification({
+        userId: created.assigneeUserId,
+        type: sub.isUrgent ? "task_urgent" : "task_assigned",
+        title: "Subtask assigned",
+        body: created.title,
+        href: taskHref(created),
+        metadata: { taskId: created.id, urgent: Boolean(sub.isUrgent) },
+      });
+    } catch (error) {
+      console.error("Subtask created but notification failed:", error);
+    }
   }
 
   return NextResponse.json(updated);

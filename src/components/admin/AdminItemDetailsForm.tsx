@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 import type { ItineraryItem } from "@/lib/schema";
 import {
   defaultTravellerRows,
@@ -8,6 +9,14 @@ import {
   type StructuredItemDetails,
   type TravellerRecord,
 } from "@/lib/admin-item-details";
+import type { BookingGroup } from "@/lib/booking-groups";
+import {
+  normalizeBookingGroupLinks,
+  otherBookingReferences,
+  remapBookingReference,
+  removeBookingGroup,
+  updateBookingGroupLinks,
+} from "@/lib/booking-groups";
 import type { AccommodationSuggestion, Category, FlightSegment } from "@/lib/types";
 
 function TimeInput({
@@ -206,6 +215,247 @@ function TravellerRecordsEditor({
   );
 }
 
+function TravellerCheckboxDropdown({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const allSelected =
+    options.length > 0 && options.every((name) => value.includes(name));
+  const summary =
+    value.length === 0
+      ? "Select travellers"
+      : allSelected
+        ? "Everyone"
+        : value.join(", ");
+
+  function toggle(name: string) {
+    onChange(
+      value.includes(name)
+        ? value.filter((entry) => entry !== name)
+        : [...value, name],
+    );
+  }
+
+  return (
+    <div className="relative">
+      <p className="mb-1 text-xs text-stone-500">{label}</p>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center justify-between rounded-lg border border-stone-200 bg-white px-3 py-2 text-left text-sm"
+      >
+        <span className="truncate text-stone-700">{summary}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-stone-400" />
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close traveller selector"
+            className="fixed inset-0 z-10"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-stone-200 bg-white p-2 shadow-lg">
+          {options.length > 1 && (
+            <label className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-50">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() =>
+                  onChange(allSelected ? [] : [...options])
+                }
+              />
+              <span className="font-medium">Everyone</span>
+            </label>
+          )}
+          {options.map((name) => (
+            <label
+              key={name}
+              className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-50"
+            >
+              <input
+                type="checkbox"
+                checked={value.includes(name)}
+                onChange={() => toggle(name)}
+              />
+              <span>{name}</span>
+            </label>
+          ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function LinkedReferencesDropdown({
+  currentReference,
+  options,
+  value,
+  onChange,
+}: {
+  currentReference: string;
+  options: string[];
+  value: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const summary =
+    value.length === 0
+      ? "None"
+      : value.length === 1
+        ? value[0]
+        : `${value.length} linked`;
+
+  if (!options.length || !currentReference.trim()) return null;
+
+  function toggle(ref: string) {
+    onChange(
+      value.includes(ref) ? value.filter((entry) => entry !== ref) : [...value, ref],
+    );
+  }
+
+  return (
+    <div className="relative sm:col-span-2">
+      <p className="mb-1 text-xs text-stone-500">
+        Linked with other booking(s)
+      </p>
+      <p className="mb-2 text-xs text-stone-400">
+        Cross-linked at the airline — separate PNRs, travelling together.
+      </p>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center justify-between rounded-lg border border-stone-200 bg-white px-3 py-2 text-left text-sm"
+      >
+        <span className="truncate text-stone-700">{summary}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-stone-400" />
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close linked booking selector"
+            className="fixed inset-0 z-10"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-stone-200 bg-white p-2 shadow-lg">
+            {options.map((ref) => (
+              <label
+                key={ref}
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={value.includes(ref)}
+                  onChange={() => toggle(ref)}
+                />
+                <span>{ref}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function BookingGroupsEditor({
+  groups,
+  onChange,
+  flightTravellers,
+}: {
+  groups: BookingGroup[];
+  onChange: (groups: BookingGroup[]) => void;
+  flightTravellers: string[];
+}) {
+  const participantOptions = flightTravellers.filter((name) => name !== "Everyone");
+
+  return (
+    <div className="sm:col-span-2">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-sm text-stone-500">Booking references</p>
+        <button
+          type="button"
+          onClick={() =>
+            onChange([
+              ...groups,
+              { reference: "", travellers: [], linkedWith: [] },
+            ])
+          }
+          className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2 py-1 text-xs"
+        >
+          <Plus className="h-3 w-3" />
+          Add reference
+        </button>
+      </div>
+      {participantOptions.length === 0 && (
+        <p className="mb-2 text-xs text-amber-700">
+          Add flight participants above before assigning booking references.
+        </p>
+      )}
+      <div className="space-y-3">
+        {groups.map((group, index) => (
+          <div
+            key={index}
+            className="space-y-2 rounded-lg border border-stone-200 p-3"
+          >
+            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <label className="block text-sm">
+                <span className="mb-1 block text-xs text-stone-500">PNR / reference</span>
+                <input
+                  type="text"
+                  value={group.reference}
+                  placeholder="e.g. RTVP8U"
+                  onChange={(e) => {
+                    onChange(remapBookingReference(groups, index, e.target.value));
+                  }}
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <TravellerCheckboxDropdown
+                label="Applies to"
+                options={participantOptions}
+                value={group.travellers}
+                onChange={(travellers) => {
+                  const next = [...groups];
+                  next[index] = { ...group, travellers };
+                  onChange(next);
+                }}
+              />
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => onChange(removeBookingGroup(groups, index))}
+                  className="rounded-lg border border-red-200 px-3 py-2 text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <LinkedReferencesDropdown
+              currentReference={group.reference}
+              options={otherBookingReferences(groups, index)}
+              value={group.linkedWith ?? []}
+              onChange={(linkedWith) =>
+                onChange(updateBookingGroupLinks(groups, index, linkedWith))
+              }
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LocationFields({
   locationName,
   locationMapUrl,
@@ -242,7 +492,13 @@ function FlightSegmentsEditor({
   return (
     <div className="sm:col-span-2">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-sm font-semibold text-stone-600">Flight segments</p>
+        <div>
+          <p className="text-sm font-semibold text-stone-600">Flight segments</p>
+          <p className="text-xs text-stone-500">
+            One item = one booking. Add a segment per flight leg; use your ticket
+            number and operating number on each leg when they differ.
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => onChange([...segments, {}])}
@@ -308,7 +564,7 @@ function FlightSegmentsEditor({
                 }}
               />
               <TextInput
-                label="Your flight number"
+                label="Ticket / marketed flight no."
                 value={segment.marketingFlightNumber ?? segment.flightNumber ?? ""}
                 onChange={(value) => {
                   const next = [...segments];
@@ -317,7 +573,7 @@ function FlightSegmentsEditor({
                 }}
               />
               <TextInput
-                label="Operating flight number"
+                label="Operating flight no."
                 value={segment.operatingFlightNumber ?? ""}
                 onChange={(value) => {
                   const next = [...segments];
@@ -325,6 +581,11 @@ function FlightSegmentsEditor({
                   onChange(next);
                 }}
               />
+              <p className="sm:col-span-2 text-xs text-stone-500">
+                Example: ticket shows QF4716 but AA3164 operates the aircraft —
+                put QF4716 as marketed and AA3164 as operating. Same number on
+                both for a non-codeshare leg like QF93.
+              </p>
               <TimeInput
                 label="Departure"
                 value={segment.departureTime ?? ""}
@@ -535,9 +796,16 @@ export function AdminItemDetailsForm({
           <ParticipantMultiSelect
             value={structured.travellers}
             onChange={(travellers) => {
+              const nextGroups = structured.bookingGroups.map((group) => ({
+                ...group,
+                travellers: group.travellers.filter((name) =>
+                  travellers.includes(name),
+                ),
+              }));
               onChange({
                 ...structured,
                 travellers,
+                bookingGroups: nextGroups,
                 seats:
                   structured.seats.length > 0
                     ? structured.seats
@@ -549,13 +817,10 @@ export function AdminItemDetailsForm({
               });
             }}
           />
-          <TravellerRecordsEditor
-            label="Booking references"
-            rows={structured.bookingReferences}
-            onChange={(bookingReferences) =>
-              onChange({ ...structured, bookingReferences })
-            }
-            valueLabel="Reference"
+          <BookingGroupsEditor
+            groups={structured.bookingGroups}
+            onChange={(bookingGroups) => onChange({ ...structured, bookingGroups })}
+            flightTravellers={structured.travellers}
           />
           <SeatCheckInEditor
             rows={structured.seats}
@@ -590,10 +855,47 @@ export function AdminItemDetailsForm({
               inputType="number"
             />
           </div>
-          <FlightSegmentsEditor
-            segments={structured.segments}
-            onChange={(segments) => onChange({ ...structured, segments })}
-          />
+          {structured.segments.length > 0 ? (
+            <FlightSegmentsEditor
+              segments={structured.segments}
+              onChange={(segments) => onChange({ ...structured, segments })}
+            />
+          ) : (
+            <div className="sm:col-span-2 rounded-lg border border-dashed border-stone-200 px-3 py-3">
+              <p className="text-sm text-stone-600">
+                Single-segment flight — edit the flight number, airports, and
+                times in the schedule fields above.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const simple = structured.simple;
+                  onChange({
+                    ...structured,
+                    segments: [
+                      {
+                        from: simple.from,
+                        to: simple.to,
+                        fromIata: simple.fromIata,
+                        toIata: simple.toIata,
+                        marketingFlightNumber: simple.marketingFlightNumber,
+                        operatingFlightNumber:
+                          simple.operatingFlightNumber ||
+                          simple.marketingFlightNumber,
+                        departureTime: simple.departureTime,
+                        arrivalTime: simple.arrivalTime,
+                        aircraft: simple.aircraft,
+                      },
+                    ],
+                  });
+                }}
+                className="mt-2 inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2 py-1 text-xs"
+              >
+                <Plus className="h-3 w-3" />
+                Add connecting segment
+              </button>
+            </div>
+          )}
         </>
       )}
 

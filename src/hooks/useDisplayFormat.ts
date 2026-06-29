@@ -5,7 +5,11 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import {
   formatBaggageWithPrefs,
   formatClockTimeWithPrefs,
+  formatDateOnlyWithPrefs,
+  formatDateRangeCompactWithPrefs,
   formatDateTimeWithPrefs,
+  formatInstantWithPrefs,
+  formatStayDateTimeWithPrefs,
 } from "@/lib/display-format";
 import { formatFlightEndpointLabel, formatFlightScheduleLines } from "@/lib/flight-datetime";
 import { DEFAULT_USER_PREFERENCES } from "@/lib/user-preferences";
@@ -20,6 +24,21 @@ export function useDisplayFormat() {
       preferences,
       formatDateTime: (iso: string | Date | null | undefined) =>
         formatDateTimeWithPrefs(iso, preferences),
+      formatInstant: (
+        iso: string | Date | null | undefined,
+        timeZone: string | null | undefined,
+        options?: { airportCode?: string | null },
+      ) => formatInstantWithPrefs(iso, timeZone, preferences, options),
+      formatDateOnly: (value: string | Date | null | undefined) =>
+        formatDateOnlyWithPrefs(value, preferences),
+      formatDateRange: (
+        start: string | null | undefined,
+        end: string | null | undefined,
+      ) => formatDateRangeCompactWithPrefs(start, end, preferences),
+      formatStayDateTime: (
+        date: string | null | undefined,
+        time: string | null | undefined,
+      ) => formatStayDateTimeWithPrefs(date, time, preferences),
       formatClockTime: (time: string | null | undefined) =>
         formatClockTimeWithPrefs(time, preferences),
       formatBaggage: (value: number | null | undefined) =>
@@ -36,6 +55,6 @@ export function useDisplayFormat() {
           hour12: preferences.timeFormat === "12h",
         }),
     }),
-    [preferences.timeFormat, preferences.units],
+    [preferences],
   );
 }

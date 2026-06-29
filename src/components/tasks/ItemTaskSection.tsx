@@ -61,6 +61,19 @@ const EMPTY_FORM: TaskFormState = {
   remindAt: "",
 };
 
+type UrgencyFilter = "all" | "urgent" | "non-urgent";
+type TaskSortKey = "dueAt" | "assignee" | "assigner";
+
+function compareNullableDates(
+  a: string | Date | null,
+  b: string | Date | null,
+): number {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return new Date(a).getTime() - new Date(b).getTime();
+}
+
 function notifyTasksChanged() {
   window.dispatchEvent(new Event("tasks-changed"));
 }
@@ -102,6 +115,8 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
   const [pendingCantCompleteId, setPendingCantCompleteId] = useState<number | null>(null);
   const [editingNotes, setEditingNotes] = useState<TaskNoteRow[] | null>(null);
   const [focusTaskId, setFocusTaskId] = useState<number | null>(null);
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
+  const [sortKey, setSortKey] = useState<TaskSortKey>("dueAt");
   const openedTaskRef = useRef<number | null>(null);
 
   const canAssign = taskPermissions.some(
@@ -277,7 +292,10 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
     });
     setBusy(false);
     if (!response.ok) {
-      setError("Failed to create task.");
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setError(payload?.error ?? "Failed to create task.");
       return;
     }
     setStatus("Task created.");
@@ -403,7 +421,29 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
     notifyTasksChanged();
   }
 
-  const rootTasks = tasks.filter((task) => !task.parentTaskId);
+  const rootTasks = useMemo(() => {
+    let list = tasks.filter((task) => !task.parentTaskId);
+
+    if (urgencyFilter === "urgent") {
+      list = list.filter((task) => task.isUrgent);
+    } else if (urgencyFilter === "non-urgent") {
+      list = list.filter((task) => !task.isUrgent);
+    }
+
+    if (user?.isAdmin) {
+      list = [...list].sort((a, b) => {
+        if (sortKey === "dueAt") {
+          return compareNullableDates(a.dueAt, b.dueAt);
+        }
+        if (sortKey === "assignee") {
+          return a.assignee.localeCompare(b.assignee);
+        }
+        return a.assigner.localeCompare(b.assigner);
+      });
+    }
+
+    return list;
+  }, [tasks, urgencyFilter, sortKey, user?.isAdmin]);
   const subtasksByParent = useMemo(() => {
     const map = new Map<number, ItemTaskRow[]>();
     for (const task of tasks) {
@@ -660,6 +700,37 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
         <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           {status}
         </p>
+      )}
+
+      {tasks.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label className="inline-flex items-center gap-2 text-sm text-stone-600">
+            <span>Show</span>
+            <select
+              value={urgencyFilter}
+              onChange={(e) => setUrgencyFilter(e.target.value as UrgencyFilter)}
+              className="rounded-lg border border-stone-200 px-2 py-1.5"
+            >
+              <option value="all">All tasks</option>
+              <option value="urgent">Urgent only</option>
+              <option value="non-urgent">Non-urgent only</option>
+            </select>
+          </label>
+          {user?.isAdmin && (
+            <label className="inline-flex items-center gap-2 text-sm text-stone-600">
+              <span>Sort by</span>
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as TaskSortKey)}
+                className="rounded-lg border border-stone-200 px-2 py-1.5"
+              >
+                <option value="dueAt">Due date</option>
+                <option value="assignee">Assignee</option>
+                <option value="assigner">Assigner</option>
+              </select>
+            </label>
+          )}
+        </div>
       )}
 
       {rootTasks.length === 0 ? (

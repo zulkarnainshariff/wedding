@@ -1,5 +1,6 @@
 import { resolveAirportCitySync } from "@/lib/airport-cities";
 import { airlineInfoFromAirlabsLeg } from "@/lib/airlines";
+import { formatFlightNumberDisplay } from "@/lib/flight-numbers";
 import { getAirportTimezone } from "@/lib/airport-timezones";
 import { utcToDatetimeLocalInTimezone } from "@/lib/flight-datetime";
 import type { FlightSegment } from "@/lib/types";
@@ -128,11 +129,23 @@ export function airlabsLegToSegment(
   const toIata = normalizeIata(leg.arr_iata);
   const dep = localFromUtc(bestUtc(leg, "dep"), fromIata);
   const arr = localFromUtc(bestUtc(leg, "arr"), toIata);
+  const airline = airlineInfoFromAirlabsLeg(leg);
+  const marketingFlightNumber =
+    airline.marketingFlightNumber ?? flightNumber?.trim().toUpperCase() ?? undefined;
+  const operatingFlightNumber =
+    airline.operatingFlightNumber ??
+    marketingFlightNumber ??
+    flightNumber?.trim().toUpperCase() ??
+    undefined;
 
   return {
-    marketingFlightNumber: flightNumber ?? leg.flight_iata ?? undefined,
-    operatingFlightNumber: flightNumber ?? leg.flight_iata ?? undefined,
-    flightNumber: flightNumber ?? leg.flight_iata ?? undefined,
+    marketingFlightNumber,
+    operatingFlightNumber,
+    flightNumber:
+      formatFlightNumberDisplay(marketingFlightNumber, operatingFlightNumber) ??
+      flightNumber ??
+      leg.flight_iata ??
+      undefined,
     from:
       leg.dep_city?.trim() ||
       resolveAirportCitySync(fromIata) ||
@@ -225,9 +238,14 @@ export function routeFieldsFromLegChain(
   const departure = localFromUtc(bestUtc(first, "dep"), fromIata);
   const arrival = localFromUtc(bestUtc(last, "arr"), toIata);
 
-  const segments = ordered.map((leg) => airlabsLegToSegment(leg, flightNumber));
+  const segments = ordered.map((leg) => airlabsLegToSegment(leg));
   const totalMinutes = ordered.reduce((sum, leg) => sum + (leg.duration ?? 0), 0);
-  const airline = airlineInfoFromAirlabsLeg(first);
+  const firstAirline = airlineInfoFromAirlabsLeg(first);
+  const allSameMarketing = segments.every(
+    (segment) =>
+      segment.marketingFlightNumber?.toUpperCase() ===
+      segments[0].marketingFlightNumber?.toUpperCase(),
+  );
 
   return {
     segments: segments.length === 1 ? [] : segments,
@@ -266,15 +284,30 @@ export function routeFieldsFromLegChain(
     departureGate: first.dep_gate?.trim() || null,
     arrivalTerminal: last.arr_terminal?.trim() || null,
     arrivalGate: last.arr_gate?.trim() || null,
-    airlineIata: airline.airlineIata,
-    airlineName: airline.airlineName,
-    operatingAirlineIata: airline.operatingAirlineIata,
-    operatingAirlineName: airline.operatingAirlineName,
-    marketingFlightNumber:
-      airline.marketingFlightNumber ?? flightNumber ?? null,
-    operatingFlightNumber:
-      airline.operatingFlightNumber ?? flightNumber ?? null,
+    airlineIata: firstAirline.airlineIata,
+    airlineName: firstAirline.airlineName,
+    operatingAirlineIata: firstAirline.operatingAirlineIata,
+    operatingAirlineName: firstAirline.operatingAirlineName,
+    marketingFlightNumber: allSameMarketing
+      ? segments[0].marketingFlightNumber ?? flightNumber ?? null
+      : formatJourneyNumbersFromSegments(segments) ?? flightNumber ?? null,
+    operatingFlightNumber: allSameMarketing
+      ? segments[0].operatingFlightNumber ?? flightNumber ?? null
+      : null,
   };
+}
+
+function formatJourneyNumbersFromSegments(segments: FlightSegment[]): string | null {
+  const labels = segments
+    .map(
+      (segment) =>
+        formatFlightNumberDisplay(
+          segment.marketingFlightNumber,
+          segment.operatingFlightNumber,
+        ) || segment.flightNumber?.trim(),
+    )
+    .filter(Boolean);
+  return labels.length ? labels.join(" · ") : null;
 }
 
 export function sliceSegmentsFromDeparture(

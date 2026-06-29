@@ -1,10 +1,13 @@
-import {
-  parseStoredClockTime,
-  resolveFlightSchedule,
-  zonedLocalToUtc,
-} from "@/lib/flight-datetime";
-import { getAirportTimezone } from "@/lib/airport-timezones";
 import { pickArrivalInstant, pickDepartureInstant } from "@/lib/flight-instant-picker";
+import {
+  buildFlightLegDisplayList,
+  flightSegmentsFromDetails,
+  resolveActiveSegmentIndex,
+  resolveFlightScheduleForItem,
+  resolveSegmentWindows,
+  segmentLabel,
+  type ResolvedSegmentWindow,
+} from "@/lib/flight-segment-timing";
 import type { ItineraryItem } from "@/lib/schema";
 import { getFlightDetails, type FlightSegment } from "@/lib/types";
 
@@ -14,7 +17,11 @@ export type FlightScheduleItem = Pick<
 >;
 
 type TrackingSnapshot = {
-  departure?: { actual?: string | null };
+  departure?: {
+    actual?: string | null;
+    estimated?: string | null;
+    scheduled?: string | null;
+  };
   arrival?: { actual?: string | null; estimated?: string | null };
   flightStatus?: string;
 };
@@ -82,160 +89,6 @@ function readTrackingSnapshot(details: unknown): TrackingSnapshot | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const snapshot = (raw as { snapshot?: TrackingSnapshot }).snapshot;
   return snapshot;
-}
-
-function addDaysToDateString(date: string, days: number): string {
-  const [year, month, day] = date.split("-").map(Number);
-  const next = new Date(Date.UTC(year, month - 1, day + days, 12, 0, 0));
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}`;
-}
-
-function parseFlightDurationMinutes(value?: string | null): number | null {
-  if (!value?.trim()) return null;
-  const trimmed = value.trim();
-  const hoursMins = /^(\d+)\s*h(?:\s*(\d+)\s*m)?$/i.exec(trimmed);
-  if (hoursMins) {
-    return Number(hoursMins[1]) * 60 + Number(hoursMins[2] ?? 0);
-  }
-  const minsOnly = /^(\d+)\s*m$/i.exec(trimmed);
-  if (minsOnly) return Number(minsOnly[1]);
-  return null;
-}
-
-function segmentLabel(segment: FlightSegment, endpoint: "from" | "to"): string {
-  if (endpoint === "from") {
-    return (
-      segment.fromIata?.trim().toUpperCase() ||
-      segment.from?.trim().slice(0, 3).toUpperCase() ||
-      "DEP"
-    );
-  }
-  return (
-    segment.toIata?.trim().toUpperCase() ||
-    segment.to?.trim().slice(0, 3).toUpperCase() ||
-    "ARR"
-  );
-}
-
-function calendarDateForInstant(instant: Date, timeZone: string | null): string {
-  if (!timeZone) {
-    const pad = (value: number) => String(value).padStart(2, "0");
-    return `${instant.getFullYear()}-${pad(instant.getMonth() + 1)}-${pad(instant.getDate())}`;
-  }
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return formatter.format(instant);
-}
-
-function resolveClockInstant(
-  clockValue: string | null | undefined,
-  timeZone: string | null,
-  afterInstant: Date,
-  fallbackDate: string | null,
-): Date | null {
-  const parsed = parseStoredClockTime(clockValue);
-  if (!parsed?.clock) return null;
-
-  let date =
-    parsed.embeddedDate ??
-    (timeZone
-      ? calendarDateForInstant(afterInstant, timeZone)
-      : fallbackDate) ??
-    calendarDateForInstant(afterInstant, null);
-
-  for (let guard = 0; guard < 6; guard += 1) {
-    const instant = timeZone
-      ? zonedLocalToUtc(date, parsed.clock, timeZone)
-      : (() => {
-          const [year, month, day] = date.split("-").map(Number);
-          const [hour, minute] = parsed.clock.split(":").map(Number);
-          return new Date(year, month - 1, day, hour, minute, 0);
-        })();
-
-    if (!instant) return null;
-    if (instant.getTime() > afterInstant.getTime()) return instant;
-    date = addDaysToDateString(date, 1);
-  }
-
-  return null;
-}
-
-type ResolvedSegmentWindow = {
-  segment: FlightSegment;
-  dep: Date;
-  arr: Date;
-  fromLabel: string;
-  toLabel: string;
-};
-
-function resolveSegmentWindows(
-  segments: FlightSegment[],
-  journeyStart: Date,
-  journeyEnd: Date,
-  eventDate: string | null,
-): ResolvedSegmentWindow[] {
-  const windows: ResolvedSegmentWindow[] = [];
-
-  for (let index = 0; index < segments.length; index += 1) {
-    const segment = segments[index];
-    const fromLabel = segmentLabel(segment, "from");
-    const toLabel = segmentLabel(segment, "to");
-    const depTz = getAirportTimezone(segment.fromIata);
-    const arrTz = getAirportTimezone(segment.toIata);
-
-    let dep: Date;
-    if (index === 0) {
-      dep = journeyStart;
-    } else {
-      const previous = windows[index - 1];
-      const depFromClock = resolveClockInstant(
-        segment.departureTime,
-        depTz,
-        previous.arr,
-        eventDate,
-      );
-      dep =
-        depFromClock && depFromClock.getTime() > previous.arr.getTime()
-          ? depFromClock
-          : previous.arr;
-    }
-
-    let arr: Date | null = null;
-    if (index === segments.length - 1) {
-      arr = journeyEnd;
-    } else {
-      arr = resolveClockInstant(segment.arrivalTime, arrTz, dep, eventDate);
-    }
-
-    if (!arr) {
-      const durationMinutes = parseFlightDurationMinutes(segment.flightTime);
-      if (durationMinutes != null) {
-        arr = new Date(dep.getTime() + durationMinutes * 60_000);
-      }
-    }
-
-    if (!arr) {
-      arr = resolveClockInstant(segment.arrivalTime, arrTz, dep, eventDate);
-    }
-
-    if (!arr || arr.getTime() <= dep.getTime()) {
-      const durationMinutes = parseFlightDurationMinutes(segment.flightTime) ?? 60;
-      arr = new Date(dep.getTime() + durationMinutes * 60_000);
-    }
-
-    if (index === segments.length - 1 && journeyEnd.getTime() > dep.getTime()) {
-      arr = journeyEnd;
-    }
-
-    windows.push({ segment, dep, arr, fromLabel, toLabel });
-  }
-
-  return windows;
 }
 
 function buildMultiSegmentMeta(
@@ -358,11 +211,42 @@ function scheduledBarPercent(
   );
 }
 
+function buildSegmentProgress(
+  leg: FlightProgressLeg,
+  window: ResolvedSegmentWindow,
+  nowMs: number,
+  operativeEndMs: number,
+  isLastSegment: boolean,
+): FlightSegmentProgress {
+  const startMs = leg.startMs;
+  const scheduledEndMs = leg.endMs;
+  const operativeLegEndMs = isLastSegment ? operativeEndMs : scheduledEndMs;
+  const legMs = Math.max(1, scheduledEndMs - startMs);
+  const percent = Math.min(
+    100,
+    Math.max(0, ((nowMs - startMs) / legMs) * 100),
+  );
+
+  return {
+    index: leg.segmentIndex!,
+    fromLabel: window.fromLabel,
+    toLabel: window.toLabel,
+    percent,
+    phase: "active",
+    remainingMinutes: Math.max(
+      0,
+      Math.round((operativeLegEndMs - nowMs) / 60_000),
+    ),
+    totalMinutes: Math.max(1, Math.round(legMs / 60_000)),
+  };
+}
+
 function resolveActiveSegmentAndTransit(
   legs: FlightProgressLeg[],
   windows: ResolvedSegmentWindow[],
   nowMs: number,
   phase: FlightProgress["phase"],
+  operativeEndMs: number,
 ): {
   segment: FlightSegmentProgress | null;
   transit: FlightProgress["transit"];
@@ -372,53 +256,65 @@ function resolveActiveSegmentAndTransit(
   }
 
   for (const leg of legs) {
-    if (leg.kind === "transit") {
-      if (nowMs >= leg.startMs && nowMs < leg.endMs) {
-        return {
-          segment: null,
-          transit: {
-            airportLabel: leg.fromLabel,
-            remainingMinutes: Math.max(
-              0,
-              Math.round((leg.endMs - nowMs) / 60_000),
-            ),
-          },
-        };
-      }
-      continue;
+    if (leg.kind === "transit" && nowMs >= leg.startMs && nowMs < leg.endMs) {
+      return {
+        segment: null,
+        transit: {
+          airportLabel: leg.fromLabel,
+          remainingMinutes: Math.max(
+            0,
+            Math.round((leg.endMs - nowMs) / 60_000),
+          ),
+        },
+      };
     }
+  }
 
-    if (leg.segmentIndex == null) continue;
+  let activeSegment: FlightSegmentProgress | null = null;
+
+  for (const leg of legs) {
+    if (leg.kind !== "flight" || leg.segmentIndex == null) continue;
+
     const window = windows[leg.segmentIndex];
+    const isLastSegment = leg.segmentIndex === windows.length - 1;
     const startMs = leg.startMs;
-    const endMs = leg.endMs;
-    const legMs = endMs - startMs;
-    if (legMs <= 0) continue;
+    const scheduledEndMs = leg.endMs;
+    const operativeLegEndMs = isLastSegment ? operativeEndMs : scheduledEndMs;
 
-    let segmentPhase: FlightSegmentProgress["phase"] = "upcoming";
-    if (nowMs >= endMs) {
-      segmentPhase = "complete";
-    } else if (nowMs >= startMs) {
-      segmentPhase = "active";
-    }
+    if (nowMs < startMs) continue;
+    if (nowMs >= operativeLegEndMs) continue;
 
-    if (segmentPhase !== "active") continue;
-
-    const percent = Math.min(
-      100,
-      Math.max(0, ((nowMs - startMs) / legMs) * 100),
+    const candidate = buildSegmentProgress(
+      leg,
+      window,
+      nowMs,
+      operativeEndMs,
+      isLastSegment,
     );
 
+    if (!activeSegment || leg.segmentIndex > activeSegment.index) {
+      activeSegment = candidate;
+    }
+  }
+
+  if (activeSegment) {
+    return { segment: activeSegment, transit: null };
+  }
+
+  const fallbackIndex = resolveActiveSegmentIndex(windows, nowMs);
+  const fallbackLeg = legs.find(
+    (leg) => leg.kind === "flight" && leg.segmentIndex === fallbackIndex,
+  );
+  const fallbackWindow = windows[fallbackIndex];
+  if (fallbackLeg && fallbackWindow && nowMs >= fallbackLeg.startMs) {
     return {
-      segment: {
-        index: leg.segmentIndex,
-        fromLabel: window.fromLabel,
-        toLabel: window.toLabel,
-        percent,
-        phase: segmentPhase,
-        remainingMinutes: Math.max(0, Math.round((endMs - nowMs) / 60_000)),
-        totalMinutes: Math.max(1, Math.round(legMs / 60_000)),
-      },
+      segment: buildSegmentProgress(
+        fallbackLeg,
+        fallbackWindow,
+        nowMs,
+        operativeEndMs,
+        fallbackIndex === windows.length - 1,
+      ),
       transit: null,
     };
   }
@@ -426,13 +322,33 @@ function resolveActiveSegmentAndTransit(
   return { segment: null, transit: null };
 }
 
-function flightSegmentsFromDetails(
-  details: ReturnType<typeof getFlightDetails>,
-): FlightSegment[] {
-  if (!details?.segments?.length) return [];
-  return details.segments.filter(
-    (segment) => !segment.transit && (segment.fromIata || segment.from),
+function multiSegmentJourneyPercent(
+  legs: FlightProgressLeg[],
+  windows: ResolvedSegmentWindow[],
+  segment: FlightSegmentProgress | null,
+  nowMs: number,
+  operativeEndMs: number,
+  scheduledStartMs: number,
+  scheduledEndMs: number,
+): number {
+  if (!segment) {
+    return scheduledBarPercent("active", nowMs, scheduledStartMs, scheduledEndMs);
+  }
+
+  const leg = legs.find(
+    (entry) =>
+      entry.kind === "flight" && entry.segmentIndex === segment.index,
   );
+  if (!leg) {
+    return scheduledBarPercent("active", nowMs, scheduledStartMs, scheduledEndMs);
+  }
+
+  const isLastSegment = segment.index === windows.length - 1;
+  const operativeLegEndMs = isLastSegment ? operativeEndMs : leg.endMs;
+  const span = Math.max(1, operativeLegEndMs - leg.startMs);
+  const t = Math.min(1, Math.max(0, (nowMs - leg.startMs) / span));
+
+  return leg.startPercent + t * (leg.endPercent - leg.startPercent);
 }
 
 export function computeFlightProgress(
@@ -443,12 +359,7 @@ export function computeFlightProgress(
     return null;
   }
 
-  const schedule = resolveFlightSchedule({
-    eventDate: item.eventDate,
-    startDatetime: item.startDatetime,
-    endDatetime: item.endDatetime,
-    details: item.details,
-  });
+  const schedule = resolveFlightScheduleForItem(item);
 
   if (!schedule.startDatetime || !schedule.endDatetime) {
     return null;
@@ -461,8 +372,9 @@ export function computeFlightProgress(
 
   const snapshot = readTrackingSnapshot(item.details);
   const departureInstant =
-    pickDepartureInstant(item, snapshot) ?? scheduledStart;
-  const arrivalInstant = pickArrivalInstant(item, snapshot) ?? scheduledEnd;
+    pickDepartureInstant(item, snapshot, now) ?? scheduledStart;
+  const arrivalInstant =
+    pickArrivalInstant(item, snapshot, now) ?? scheduledEnd;
 
   const nowMs = now.getTime();
   const operativeStart = departureInstant;
@@ -475,17 +387,34 @@ export function computeFlightProgress(
 
   const showFrom = scheduledStart.getTime() - 60 * 60_000;
   const showUntil = scheduledEnd.getTime() + 2 * 60 * 60_000;
-  if (nowMs < showFrom || nowMs > showUntil) return null;
+  const trackingDeparture = [
+    snapshot?.departure?.actual,
+    snapshot?.departure?.estimated,
+    snapshot?.departure?.scheduled,
+  ]
+    .map((value) => (value ? new Date(value) : null))
+    .find((value) => value && !Number.isNaN(value.getTime()));
+  const journeyStarted =
+    nowMs >= operativeStartMs ||
+    (trackingDeparture != null && trackingDeparture.getTime() <= nowMs);
+  if ((nowMs < showFrom || nowMs > showUntil) && !journeyStarted) return null;
 
   const flightDetails = getFlightDetails(item.details);
-  const fromLabel =
-    flightDetails?.fromIata?.trim() ||
-    flightDetails?.from?.trim().slice(0, 3).toUpperCase() ||
-    "DEP";
-  const toLabel =
-    flightDetails?.toIata?.trim() ||
-    flightDetails?.to?.trim().slice(0, 3).toUpperCase() ||
-    "ARR";
+  const segments = flightSegmentsFromDetails(flightDetails);
+  const isMultiSegment = segments.length >= 2;
+  const routeCodes =
+    segments.length >= 2
+      ? routeCodesFromSegments(segments)
+      : [
+          flightDetails?.fromIata?.trim().toUpperCase() ||
+            flightDetails?.from?.trim().slice(0, 3).toUpperCase() ||
+            "DEP",
+          flightDetails?.toIata?.trim().toUpperCase() ||
+            flightDetails?.to?.trim().slice(0, 3).toUpperCase() ||
+            "ARR",
+        ];
+  const fromLabel = routeCodes[0] ?? "DEP";
+  const toLabel = routeCodes[routeCodes.length - 1] ?? "ARR";
 
   let phase: FlightProgress["phase"];
   if (nowMs < scheduledStartMs && nowMs < operativeStartMs) {
@@ -512,9 +441,6 @@ export function computeFlightProgress(
     remainingMinutes = 0;
   }
 
-  const segments = flightSegmentsFromDetails(flightDetails);
-  const isMultiSegment = segments.length >= 2;
-
   let stops: FlightProgressStop[] = [
     { label: fromLabel, percent: 0, kind: "origin" },
     { label: toLabel, percent: 100, kind: "destination" },
@@ -535,15 +461,17 @@ export function computeFlightProgress(
   let transit: FlightProgress["transit"] = null;
   let parts: FlightProgressPart[] = [];
 
+  let segmentWindows: ResolvedSegmentWindow[] = [];
+
   if (isMultiSegment) {
-    const windows = resolveSegmentWindows(
+    segmentWindows = resolveSegmentWindows(
       segments,
       scheduledStart,
       scheduledEnd,
       schedule.eventDate,
     );
     const meta = buildMultiSegmentMeta(
-      windows,
+      segmentWindows,
       scheduledStartMs,
       scheduledEndMs,
     );
@@ -551,9 +479,10 @@ export function computeFlightProgress(
     legs = meta.legs;
     const active = resolveActiveSegmentAndTransit(
       legs,
-      windows,
+      segmentWindows,
       nowMs,
       phase,
+      operativeEndMs,
     );
     segment = active.segment;
     transit = active.transit;
@@ -578,12 +507,23 @@ export function computeFlightProgress(
     parts = buildProgressParts(legs);
   }
 
-  const percent = scheduledBarPercent(
-    phase,
-    nowMs,
-    scheduledStartMs,
-    scheduledEndMs,
-  );
+  const percent =
+    isMultiSegment && phase === "active"
+      ? multiSegmentJourneyPercent(
+          legs,
+          segmentWindows,
+          segment,
+          nowMs,
+          operativeEndMs,
+          scheduledStartMs,
+          scheduledEndMs,
+        )
+      : scheduledBarPercent(
+          phase,
+          nowMs,
+          scheduledStartMs,
+          scheduledEndMs,
+        );
 
   return {
     phase,
@@ -676,19 +616,23 @@ export function isFlightLanded(
 ): boolean {
   if (item.category !== "flight") return false;
 
-  const schedule = resolveFlightSchedule({
-    eventDate: item.eventDate,
-    startDatetime: item.startDatetime,
-    endDatetime: item.endDatetime,
-    details: item.details,
-  });
+  const schedule = resolveFlightScheduleForItem(item);
 
   if (!schedule.endDatetime) return false;
 
   const snapshot = readTrackingSnapshot(item.details);
   const nowMs = now.getTime();
   const status = snapshot?.flightStatus?.toLowerCase();
-  if (status === "landed") return true;
+  const flightDetails = getFlightDetails(item.details);
+  const segments = flightSegmentsFromDetails(flightDetails);
+  const isMultiSegment = segments.length >= 2;
+
+  if (status === "landed") {
+    if (isMultiSegment) {
+      return nowMs >= schedule.endDatetime.getTime();
+    }
+    return true;
+  }
   return nowMs > schedule.endDatetime.getTime() + 15 * 60_000;
 }
 
@@ -699,12 +643,7 @@ export function isFlightInProgress(
 ): boolean {
   if (item.category !== "flight") return false;
 
-  const schedule = resolveFlightSchedule({
-    eventDate: item.eventDate,
-    startDatetime: item.startDatetime,
-    endDatetime: item.endDatetime,
-    details: item.details,
-  });
+  const schedule = resolveFlightScheduleForItem(item);
 
   if (!schedule.startDatetime || !schedule.endDatetime) return false;
 
@@ -716,6 +655,7 @@ export function isFlightInProgress(
 
 export function getFlightTimelineDisplay(
   item: FlightScheduleItem,
+  now = new Date(),
 ): FlightTimelineDisplay | null {
   if (item.category !== "flight") return null;
 
@@ -723,12 +663,7 @@ export function getFlightTimelineDisplay(
   if (!flightDetails) return null;
 
   const segments = flightSegmentsFromDetails(flightDetails);
-  const schedule = resolveFlightSchedule({
-    eventDate: item.eventDate,
-    startDatetime: item.startDatetime,
-    endDatetime: item.endDatetime,
-    details: item.details,
-  });
+  const schedule = resolveFlightScheduleForItem(item);
 
   if (!schedule.startDatetime || !schedule.endDatetime) return null;
 
@@ -746,24 +681,16 @@ export function getFlightTimelineDisplay(
 
   let transitStops: FlightTimelineDisplay["transitStops"] = [];
   if (segments.length >= 2) {
-    const windows = resolveSegmentWindows(
-      segments,
-      schedule.startDatetime,
-      schedule.endDatetime,
-      schedule.eventDate,
-    );
-    const meta = buildMultiSegmentMeta(
-      windows,
-      schedule.startDatetime.getTime(),
-      schedule.endDatetime.getTime(),
-    );
-    transitStops = meta.stops
-      .filter((stop) => stop.kind === "transit")
-      .map((stop) => ({
-        airport: stop.label,
-        layoverMinutes: stop.layoverMinutes ?? 0,
-      }))
-      .filter((stop) => stop.layoverMinutes > 0);
+    const nowMs = now.getTime();
+    transitStops = buildFlightLegDisplayList(item)
+      .map((leg) => leg.layoverAfter)
+      .filter(
+        (
+          layover,
+        ): layover is NonNullable<typeof layover> =>
+          layover != null && nowMs < layover.departureAtMs,
+      )
+      .map(({ airport, layoverMinutes }) => ({ airport, layoverMinutes }));
   }
 
   return { routeCodes, transitStops };

@@ -12,6 +12,14 @@ import {
 import { isItemCompleted } from "@/lib/item-completion";
 import type { ItineraryItem } from "@/lib/schema";
 
+type FlightBarAnchor = {
+  key: string;
+  percent: number;
+  code: string;
+  meta: string | null;
+  isTransit: boolean;
+};
+
 function clampPlanePercent(value: number): number {
   if (value <= 0) return 0;
   if (value >= 100) return 100;
@@ -20,16 +28,14 @@ function clampPlanePercent(value: number): number {
 
 function destinationRemainingLabel(progress: FlightProgress): string | null {
   if (progress.phase === "landed") return "Landed";
+  if (progress.phase === "upcoming" || !progress.isMultiSegment) return null;
 
   const duration = formatFlightProgressDuration(progress.remainingMinutes);
   if (!duration) return null;
-
-  if (progress.phase === "upcoming") return `Departs in ${duration}`;
   if (progress.remainingMinutes === 0) return "Arriving soon";
   return `${duration} remaining`;
 }
 
-/** Time label shown directly below the aircraft icon. */
 function planeBelowLabel(progress: FlightProgress): string | null {
   if (progress.phase === "landed") return null;
 
@@ -68,25 +74,129 @@ function defaultParts(progress: FlightProgress): FlightProgressPart[] {
   ];
 }
 
-function planeHorizontalStyle(percent: number): React.CSSProperties {
+function totalFlightMinutes(parts: FlightProgressPart[]): number {
+  return parts
+    .filter((part) => part.kind === "flight")
+    .reduce((sum, part) => sum + part.minutes, 0);
+}
+
+function isTransitStopPassed(
+  progress: FlightProgress,
+  transitIndex: number,
+): boolean {
+  if (progress.phase === "landed") return true;
+  if (progress.transit) return false;
+  return (
+    progress.segment != null && progress.segment.index > transitIndex
+  );
+}
+
+function buildFlightBarAnchors(
+  parts: FlightProgressPart[],
+  progress: FlightProgress,
+  destinationLabel: string | null,
+): FlightBarAnchor[] {
+  const flightMinutes = totalFlightMinutes(parts);
+  if (flightMinutes <= 0) return [];
+
+  const originCode =
+    progress.stops.find((stop) => stop.kind === "origin")?.label ??
+    progress.fromLabel;
+  const destinationCode =
+    progress.stops.find((stop) => stop.kind === "destination")?.label ??
+    progress.toLabel;
+  const transitStops = progress.stops.filter((stop) => stop.kind === "transit");
+
+  const anchors: FlightBarAnchor[] = [
+    {
+      key: "origin",
+      percent: 0,
+      code: originCode,
+      meta: null,
+      isTransit: false,
+    },
+  ];
+
+  let flightCursor = 0;
+  let transitIndex = 0;
+
+  for (const part of parts) {
+    if (part.kind === "flight") {
+      flightCursor += part.minutes;
+      continue;
+    }
+
+    const percent = (flightCursor / flightMinutes) * 100;
+    const currentTransitIndex = transitIndex;
+    const transitStop = transitStops[currentTransitIndex];
+    transitIndex += 1;
+    anchors.push({
+      key: `transit-${transitStop?.label ?? part.fromLabel}-${transitIndex}`,
+      percent,
+      code: transitStop?.label ?? part.fromLabel,
+      meta:
+        part.layoverMinutes &&
+        !isTransitStopPassed(progress, currentTransitIndex)
+          ? `${formatFlightProgressDuration(part.layoverMinutes)} transit`
+          : null,
+      isTransit: true,
+    });
+  }
+
+  anchors.push({
+    key: "destination",
+    percent: 100,
+    code: destinationCode,
+    meta: destinationLabel,
+    isTransit: false,
+  });
+
+  return anchors;
+}
+
+function anchorStyle(percent: number): React.CSSProperties {
   if (percent <= 0) {
-    return { left: 0, transform: "translateX(0)" };
+    return { left: 0 };
   }
   if (percent >= 100) {
-    return { right: 0, left: "auto", transform: "translateX(0)" };
+    return { right: 0, left: "auto" };
   }
   return { left: `${percent}%`, transform: "translateX(-50%)" };
 }
 
-/** Map full-journey progress onto the flight-only bar (layovers collapse to a dot). */
+function anchorAlignClass(percent: number): string {
+  if (percent <= 0) return "text-left";
+  if (percent >= 100) return "text-right";
+  return "text-center";
+}
+
+function planeHorizontalStyle(percent: number): React.CSSProperties {
+  if (percent <= 0) {
+    return { left: 0, transform: "translateY(-50%)" };
+  }
+  if (percent >= 100) {
+    return { right: 0, left: "auto", transform: "translate(0, -50%)" };
+  }
+  return { left: `${percent}%`, transform: "translate(-50%, -50%)" };
+}
+
+function planeLabelStyle(percent: number): React.CSSProperties {
+  const iconHalf = 12;
+  if (percent <= 0) {
+    return { left: `${iconHalf}px`, transform: "translateX(-50%)" };
+  }
+  if (percent >= 100) {
+    return { right: `${iconHalf}px`, left: "auto", transform: "translateX(50%)" };
+  }
+  return { left: `${percent}%`, transform: "translateX(-50%)" };
+}
+
 function visualBarPercent(
   journeyPercent: number,
   parts: FlightProgressPart[],
 ): number {
   const totalMinutes = parts.reduce((sum, part) => sum + part.minutes, 0);
-  const flightMinutes = parts
-    .filter((part) => part.kind === "flight")
-    .reduce((sum, part) => sum + part.minutes, 0);
+  const flightMinutes = totalFlightMinutes(parts);
 
   if (totalMinutes <= 0 || flightMinutes <= 0) return journeyPercent;
 
@@ -114,41 +224,38 @@ function visualBarPercent(
   return 100;
 }
 
-function TransitMarker({
+const codeClass =
+  "text-[11px] font-semibold leading-none tracking-wide text-stone-500 uppercase sm:text-[10px]";
+const metaTextClass =
+  "text-[10px] leading-none font-medium whitespace-nowrap text-stone-600 sm:text-[9px]";
+
+function AnchorLabel({
+  percent,
   children,
   className = "",
-  valign = "top",
 }: {
+  percent: number;
   children: React.ReactNode;
   className?: string;
-  valign?: "top" | "center";
 }) {
+  const edge = percent <= 0 || percent >= 100;
   return (
     <div
       className={[
-        "relative w-0 shrink-0",
-        valign === "center" ? "self-center" : "",
+        "absolute top-0",
+        anchorAlignClass(percent),
+        edge
+          ? percent >= 100
+            ? "max-w-none whitespace-nowrap"
+            : "max-w-[50%] whitespace-nowrap"
+          : "whitespace-nowrap",
+        className,
       ].join(" ")}
+      style={anchorStyle(percent)}
     >
-      <div
-        className={[
-          "absolute left-0 -translate-x-1/2 whitespace-nowrap",
-          valign === "center" ? "top-1/2 -translate-y-1/2" : "top-0",
-          className,
-        ].join(" ")}
-      >
-        {children}
-      </div>
+      {children}
     </div>
   );
-}
-
-function firstFlightIndex(parts: FlightProgressPart[]): number {
-  return parts.findIndex((part) => part.kind === "flight");
-}
-
-function lastFlightIndex(parts: FlightProgressPart[]): number {
-  return parts.findLastIndex((part) => part.kind === "flight");
 }
 
 export function FlightProgressBar({ item }: { item: ItineraryItem }) {
@@ -195,147 +302,83 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
   const planePercent = clampPlanePercent(
     visualBarPercent(journeyPercent, parts),
   );
-  const firstFlight = firstFlightIndex(parts);
-  const lastFlight = lastFlightIndex(parts);
-  const singleFlight = firstFlight === lastFlight && firstFlight >= 0;
+  const singleFlight = !progress.isMultiSegment;
+  const anchors = singleFlight
+    ? []
+    : buildFlightBarAnchors(parts, progress, destinationLabel);
+  const showInlineStatus =
+    singleFlight &&
+    progress.phase === "upcoming" &&
+    Boolean(belowPlaneLabel);
+  const showMetaRow =
+    !singleFlight && anchors.some((anchor) => Boolean(anchor.meta));
+  const showFollowingPlaneLabel = Boolean(belowPlaneLabel) && !showInlineStatus;
+  const transitAnchors = anchors.filter((anchor) => anchor.isTransit);
 
   return (
     <div className="mt-3 border-t border-stone-100 pt-3">
-      {/* Airport codes */}
-      <div className="flex leading-none">
-        {parts.map((part, index) => {
-          if (part.kind === "transit") {
-            return (
-              <TransitMarker key={`code-${part.kind}-${index}`}>
-                <span className="text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
-                  {part.fromLabel}
-                </span>
-              </TransitMarker>
-            );
-          }
+      {singleFlight ? (
+        <div className="flex items-center justify-between leading-none">
+          <span className={codeClass}>{progress.fromLabel}</span>
+          <span className={codeClass}>{progress.toLabel}</span>
+        </div>
+      ) : (
+        <div className="relative h-3.5">
+          {anchors.map((anchor) => (
+            <AnchorLabel key={`${anchor.key}-code`} percent={anchor.percent}>
+              <span className={codeClass}>{anchor.code}</span>
+            </AnchorLabel>
+          ))}
+        </div>
+      )}
 
-          const isFirstFlight = index === firstFlight;
-          const isLastFlight = index === lastFlight;
+      {showInlineStatus ? (
+        <p className="mt-1 text-[10px] leading-none font-medium text-stone-600 sm:text-[11px]">
+          {belowPlaneLabel}
+        </p>
+      ) : null}
 
-          return (
-            <div
-              key={`code-${part.kind}-${index}`}
-              className={[
-                "relative min-w-0",
-                singleFlight && isFirstFlight ? "flex justify-between" : "",
-              ].join(" ")}
-              style={{ flex: part.minutes }}
-            >
-              {isFirstFlight ? (
-                <span className="text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
-                  {progress.fromLabel}
-                </span>
-              ) : null}
-              {isLastFlight && !singleFlight ? (
-                <span className="absolute right-0 text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
-                  {progress.toLabel}
-                </span>
-              ) : null}
-              {singleFlight && isLastFlight ? (
-                <span className="text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
-                  {progress.toLabel}
-                </span>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+      {showMetaRow ? (
+        <div className="relative mt-0.5 min-h-3.5">
+          {anchors.map((anchor) =>
+            anchor.meta ? (
+              <AnchorLabel
+                key={`${anchor.key}-meta`}
+                percent={anchor.percent}
+                className={anchor.isTransit ? "hidden sm:block" : undefined}
+              >
+                <span className={metaTextClass}>{anchor.meta}</span>
+              </AnchorLabel>
+            ) : null,
+          )}
+        </div>
+      ) : null}
 
-      {/* Transit duration + total remaining — above the bar, same row */}
-      <div className="mb-1.5 flex leading-none">
-        {parts.map((part, index) => {
-          if (part.kind === "transit") {
-            return (
-              <TransitMarker key={`meta-${part.kind}-${index}`}>
-                {part.layoverMinutes ? (
-                  <p className="text-center text-[9px] leading-none font-medium text-stone-500">
-                    {formatFlightProgressDuration(part.layoverMinutes)} transit
-                  </p>
-                ) : null}
-              </TransitMarker>
-            );
-          }
+      <div className={showMetaRow ? "relative mt-2.5" : "relative mt-1"}>
+        <div className="relative h-6">
+          <div
+            className="absolute top-1/2 right-0 left-0 h-2 -translate-y-1/2 rounded-full bg-sky-200/90"
+            aria-hidden
+          />
 
-          const isLastFlight = index === lastFlight;
-
-          return (
-            <div
-              key={`meta-${part.kind}-${index}`}
-              className="relative min-w-0"
-              style={{ flex: part.minutes }}
-            >
-              {isLastFlight && destinationLabel ? (
-                <p className="text-right text-[9px] leading-none font-medium whitespace-nowrap text-stone-600">
-                  {destinationLabel}
-                </p>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Track, transit dots, plane, leg time below plane */}
-      <div className="relative py-3 pb-5">
-        <div className="relative flex items-center">
-          {parts.map((part, index) => {
-            if (part.kind === "transit") {
-              return (
-                <TransitMarker key={`track-${part.kind}-${index}`} valign="center">
-                  <span
-                    className="block h-2.5 w-2.5 rounded-full bg-white ring-2 ring-stone-300"
-                    aria-hidden
-                  />
-                </TransitMarker>
-              );
-            }
-
-            const isFirstFlight = index === firstFlight;
-            const isLastFlight = index === lastFlight;
-
-            return (
-            <div
-              key={`track-${part.kind}-${index}`}
-              className="relative min-w-0"
-              style={{ flex: part.minutes }}
-            >
-              <div
-                className={[
-                  "h-2 w-full bg-sky-200/90",
-                  isFirstFlight && isLastFlight
-                    ? "rounded-full"
-                    : [
-                        isFirstFlight ? "rounded-l-full" : "rounded-l-none",
-                        isLastFlight ? "rounded-r-full" : "rounded-r-none",
-                      ].join(" "),
-                ].join(" ")}
-                aria-hidden
-              />
-            </div>
-            );
-          })}
+          {transitAnchors.map((anchor) => (
+            <span
+              key={`${anchor.key}-dot`}
+              className="absolute top-1/2 z-10 block h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-2 ring-stone-300"
+              style={{ left: `${anchor.percent}%` }}
+              aria-hidden
+            />
+          ))}
 
           <div
-            className="pointer-events-none absolute top-1/2 left-0 h-2 -translate-y-1/2 rounded-full bg-gradient-to-r from-sky-400 to-sky-600 transition-[width] duration-500"
+            className="pointer-events-none absolute top-1/2 left-0 z-[1] h-2 -translate-y-1/2 rounded-full bg-gradient-to-r from-sky-400 to-sky-600 transition-[width] duration-500"
             style={{ width: `${planePercent}%` }}
             aria-hidden
           />
 
           <div
             className="pointer-events-none absolute top-1/2 z-20 transition-[left,right] duration-500"
-            style={{
-              ...planeHorizontalStyle(planePercent),
-              transform:
-                planePercent <= 0
-                  ? "translateY(-50%)"
-                  : planePercent >= 100
-                    ? "translate(-100%, -50%)"
-                    : "translate(-50%, -50%)",
-            }}
+            style={planeHorizontalStyle(planePercent)}
           >
             <span
               className={[
@@ -351,27 +394,20 @@ export function FlightProgressBar({ item }: { item: ItineraryItem }) {
               />
             </span>
           </div>
+        </div>
 
-          {belowPlaneLabel ? (
+        {showFollowingPlaneLabel ? (
+          <div className="relative mt-2 h-3.5">
             <div
-              className="pointer-events-none absolute z-20 transition-[left,right] duration-500"
-              style={{
-                ...planeHorizontalStyle(planePercent),
-                top: "calc(50% + 18px)",
-                transform:
-                  planePercent <= 0
-                    ? "translateX(0)"
-                    : planePercent >= 100
-                      ? "translateX(-100%)"
-                      : "translateX(-50%)",
-              }}
+              className="pointer-events-none absolute top-0 z-20 transition-[left,right] duration-500"
+              style={planeLabelStyle(planePercent)}
             >
-              <span className="block max-w-[96px] truncate text-center text-[9px] font-medium whitespace-nowrap text-stone-600">
+              <span className="block min-w-max text-center text-[10px] leading-none font-medium whitespace-nowrap text-stone-600 sm:text-[9px]">
                 {belowPlaneLabel}
               </span>
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
