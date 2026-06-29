@@ -161,7 +161,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
         ) : subItems.length === 0 ? (
           <p className="mt-3 text-sm text-stone-400">No sub-items yet.</p>
         ) : (
-          <div className="mt-3 space-y-2 border-l-2 border-[#d4a853]/40 pl-3">
+          <div className="mt-3 space-y-2 border-l-2 border-accent/40 pl-3">
             {subItems.map((subItem) => (
               <SubItemDetailRow
                 key={subItem.id}
@@ -233,7 +233,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
             <button
               type="submit"
               disabled={saving || !title.trim()}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
               {saving ? "Adding…" : "Add sub-item"}

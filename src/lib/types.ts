@@ -1,3 +1,9 @@
+import {
+  DEFAULT_USER_PREFERENCES,
+  type UserPreferences,
+} from "./user-preferences";
+import { formatDateOnlyWithPrefs } from "./display-format";
+
 export const CATEGORIES = [
   "activity",
   "flight",
@@ -295,31 +301,6 @@ export function mapsUrl(address: string, lat?: number, lng?: number): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
-const WEEKDAY_LONG = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-] as const;
-
-const MONTH_LONG = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-] as const;
-
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 const MONTH_SHORT = [
@@ -337,11 +318,12 @@ const MONTH_SHORT = [
   "Dec",
 ] as const;
 
-/** Stable long date string — avoids SSR/client `toLocaleDateString` differences. */
-export function formatDate(dateStr: string): string {
-  const d = new Date(`${dateStr}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return `${WEEKDAY_LONG[d.getDay()]}, ${d.getDate()} ${MONTH_LONG[d.getMonth()]} ${d.getFullYear()}`;
+/** Calendar date using display preferences (defaults to DD-MM-YYYY). */
+export function formatDate(
+  dateStr: string,
+  preferences: UserPreferences = DEFAULT_USER_PREFERENCES,
+): string {
+  return formatDateOnlyWithPrefs(dateStr, preferences);
 }
 
 export function formatDateTime(iso: string | Date | null | undefined): string {

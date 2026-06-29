@@ -401,7 +401,7 @@ export function UserManagement({
                             disabled={isSelf}
                             onChange={() => toggleViewTraveller(user.username)}
                           />
-                          <span className={isSelf ? "font-medium text-[#1e3a5f]" : ""}>
+                          <span className={isSelf ? "font-medium text-brand-deep" : ""}>
                             {user.username}
                             {isSelf ? " (always included)" : ""}
                           </span>
@@ -412,7 +412,7 @@ export function UserManagement({
                       !users.some((user) => user.username === lockedUsername) && (
                         <label className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
                           <input type="checkbox" checked disabled readOnly />
-                          <span className="font-medium text-[#1e3a5f]">
+                          <span className="font-medium text-brand-deep">
                             {lockedUsername} (always included)
                           </span>
                         </label>
@@ -428,7 +428,7 @@ export function UserManagement({
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white"
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
           >
             <Save className="h-4 w-4" />
             {saving ? "Saving…" : editingId ? "Update user" : "Create user"}
@@ -499,7 +499,7 @@ export function UserManagement({
         Selected users will be logged out immediately and must sign in with the
         new password.
       </p>
-      <div className="mt-3 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-stone-200 bg-[#faf8f5] p-2">
+      <div className="mt-3 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-stone-200 bg-surface-soft p-2">
         {users.map((user) => (
           <label
             key={user.id}
@@ -525,7 +525,7 @@ export function UserManagement({
           type="button"
           disabled={saving || !forceUserIds.length || !forcePassword}
           onClick={() => void forcePasswordReset()}
-          className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           Force reset
         </button>

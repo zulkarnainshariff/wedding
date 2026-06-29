@@ -25,7 +25,7 @@ export function InvitationCards({
   }
 
   if (!activeEvent) {
-    return <p className="text-stone-500">Invitation details coming soon.</p>;
+    return <p className="text-muted">Invitation details coming soon.</p>;
   }
 
   return (
@@ -49,10 +49,8 @@ export function InvitationCards({
               aria-selected={index === activeIndex}
               onClick={() => selectEvent(index)}
               className={[
-                "rounded-full px-5 py-2 text-sm font-medium transition",
-                index === activeIndex
-                  ? "bg-[#1e3a5f] text-white shadow-sm"
-                  : "border border-stone-200 bg-white/80 text-stone-600 hover:bg-white",
+                "invitation-event-tab rounded-full px-5 py-2 text-sm font-medium transition",
+                index === activeIndex ? "invitation-event-tab--active" : "",
               ].join(" ")}
             >
               {event.name}
@@ -68,7 +66,7 @@ export function InvitationCards({
         onFlip={() => setFlipped((current) => !current)}
       />
 
-      <p className="mt-8 max-w-sm text-center text-sm text-stone-500">
+      <p className="mt-8 max-w-sm text-center text-sm text-muted">
         {events.length > 1
           ? "Choose a celebration above, then tap the card to reveal the day’s schedule."
           : "Tap the card to reveal the day’s schedule."}

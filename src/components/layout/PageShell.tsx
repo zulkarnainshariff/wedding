@@ -11,13 +11,13 @@ export function PageShell({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-stone-200/70 bg-[#f5f1eb] pb-4">
+      <div className="relative z-30 shrink-0 border-b border-border/60 bg-background/80 pb-4 backdrop-blur-sm">
         {eyebrow && (
-          <p className="text-xs font-semibold tracking-[0.2em] text-[#d4a853] uppercase">
+          <p className="theme-eyebrow text-xs font-semibold uppercase">
             {eyebrow}
           </p>
         )}
-        <h1 className="mt-1 font-serif text-3xl text-[#1e3a5f]">{title}</h1>
+        <h1 className="mt-1 font-serif text-3xl text-brand-deep">{title}</h1>
         {toolbar ? <div className="mt-4">{toolbar}</div> : null}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto pt-4">{children}</div>
@@ -37,9 +37,9 @@ export function SectionShell({
   footer?: React.ReactNode;
 }) {
   return (
-    <section className="flex w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-      <div className="shrink-0 border-b border-stone-100 bg-white px-6 py-4">
-        <h2 className="font-serif text-xl text-[#1e3a5f]">{title}</h2>
+    <section className="theme-card flex w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-sm">
+      <div className="theme-gradient-header shrink-0 border-b border-border/50 px-6 py-4">
+        <h2 className="font-serif text-xl text-brand-deep">{title}</h2>
         {toolbar ? <div className="mt-4">{toolbar}</div> : null}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>

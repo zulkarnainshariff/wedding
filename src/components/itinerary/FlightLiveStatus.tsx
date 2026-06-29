@@ -13,7 +13,6 @@ import {
   formatFlightDuration,
   formatFlightStatusLabel,
   type FlightLiveEndpoint,
-  type FlightLiveStatus,
 } from "@/lib/flight-tracking";
 import { formatFlightNumberDisplay, formatJourneyFlightLabel } from "@/lib/flight-numbers";
 import {
@@ -21,8 +20,12 @@ import {
   resolveTrackingLegEndpoints,
 } from "@/lib/flight-segment-timing";
 import { getFlightDetails } from "@/lib/types";
-import { subscribeSyncUpdated } from "@/lib/sync-client";
 import type { ItineraryItem } from "@/lib/schema";
+import {
+  fetchFlightStatus,
+  pollIntervalForStatus,
+  type FlightStatusResponse,
+} from "@/lib/flight-status-client";
 
 function Row({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;
@@ -130,7 +133,7 @@ export function FlightLiveStatusPanel({
 }) {
   const { effectiveDate, effectiveDateString } = useTripTime();
   const { formatDateTime, formatInstant } = useDisplayFormat();
-  const [live, setLive] = useState<FlightLiveStatus | null>(null);
+  const [live, setLive] = useState<FlightStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchLive = useMemo(
@@ -160,32 +163,25 @@ export function FlightLiveStatusPanel({
     return formatJourneyFlightLabel(details);
   }, [item, effectiveDate]);
 
-  const refresh = useCallback(async () => {
-    if (!fetchLive) return;
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `/api/flights/${itemId}/status?asOf=${encodeURIComponent(effectiveDateString)}`,
-      );
-      if (response.ok) {
-        setLive(await response.json());
-      } else {
+  const refresh = useCallback(
+    async (options?: { force?: boolean; includeSchedule?: boolean }) => {
+      if (!fetchLive) return;
+      setLoading(true);
+      try {
+        const data = await fetchFlightStatus(itemId, effectiveDateString, options);
+        setLive(data);
+      } catch {
         setLive({
           available: false,
           reason: "provider_error",
           message: "Unable to load live flight data.",
         });
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setLive({
-        available: false,
-        reason: "provider_error",
-        message: "Unable to load live flight data.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchLive, itemId, effectiveDateString]);
+    },
+    [fetchLive, itemId, effectiveDateString],
+  );
 
   useEffect(() => {
     if (!fetchLive) {
@@ -193,26 +189,21 @@ export function FlightLiveStatusPanel({
       setLive(null);
       return;
     }
-    void refresh();
+    void refresh({ includeSchedule: true });
   }, [fetchLive, refresh]);
 
   useEffect(() => {
     if (!fetchLive || !live?.available) return;
-    const atEta =
-      live.flightStatus === "active" && (live.remainingMinutes ?? 1) <= 0;
-    const intervalMs = atEta ? 30_000 : 60_000;
-    const interval = window.setInterval(() => {
-      void refresh();
-    }, intervalMs);
-    return () => window.clearInterval(interval);
-  }, [fetchLive, live?.available, live?.flightStatus, live?.remainingMinutes, refresh]);
 
-  useEffect(() => {
-    if (!fetchLive) return;
-    return subscribeSyncUpdated(() => {
+    const delayMs = pollIntervalForStatus(live);
+    if (!delayMs) return;
+
+    const timer = window.setTimeout(() => {
       void refresh();
-    });
-  }, [fetchLive, refresh]);
+    }, delayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [fetchLive, live, refresh]);
 
   if (showSavedOnly) {
     return (

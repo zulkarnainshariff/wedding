@@ -80,7 +80,7 @@ export function ItemDetailModal() {
           role="dialog"
           aria-modal="true"
         >
-          {loadingItem && !selectedItem && (
+          {!selectedItem && !itemLoadError && (
             <div className="rounded-3xl border border-stone-200 bg-white p-10 text-center text-stone-500">
               Loading...
             </div>
@@ -110,11 +110,15 @@ export function ItemDetailModal() {
             />
           )}
 
-          {!loadingItem && !selectedItem && (
+          {itemLoadError === "forbidden" && !selectedItem && !loadingItem && (
             <div className="rounded-3xl border border-stone-200 bg-white p-10 text-center text-stone-500">
-              {itemLoadError === "forbidden"
-                ? "You do not have permission to view this item."
-                : "Item not found."}
+              You do not have permission to view this item.
+            </div>
+          )}
+
+          {itemLoadError === "not_found" && !selectedItem && !loadingItem && (
+            <div className="rounded-3xl border border-stone-200 bg-white p-10 text-center text-stone-500">
+              Item not found.
             </div>
           )}
         </div>

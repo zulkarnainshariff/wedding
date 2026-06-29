@@ -99,7 +99,7 @@ function Dialog({
         ref={ref}
         className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
       >
-        <h3 className="font-serif text-xl text-[#1e3a5f]">{title}</h3>
+        <h3 className="font-serif text-xl text-brand-deep">{title}</h3>
         <p className="mt-2 text-sm text-stone-600">{message}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -113,7 +113,7 @@ function Dialog({
             <button
               type="button"
               onClick={onConfirm}
-              className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm text-white"
+              className="rounded-lg bg-brand-deep px-4 py-2 text-sm text-white"
             >
               {confirmLabel ?? "Yes"}
             </button>

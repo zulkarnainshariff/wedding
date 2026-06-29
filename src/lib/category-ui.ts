@@ -28,39 +28,39 @@ export const CATEGORY_STYLES: Record<
   { bg: string; text: string; border: string; dot: string }
 > = {
   activity: {
-    bg: "bg-indigo-50",
-    text: "text-indigo-700",
-    border: "border-indigo-200",
-    dot: "bg-indigo-500",
-  },
-  flight: {
     bg: "bg-sky-50",
     text: "text-sky-700",
     border: "border-sky-200",
-    dot: "bg-sky-500",
+    dot: "bg-sky-400",
+  },
+  flight: {
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    border: "border-blue-200",
+    dot: "bg-brand",
   },
   pet_relocation: {
     bg: "bg-rose-50",
     text: "text-rose-700",
     border: "border-rose-200",
-    dot: "bg-rose-500",
+    dot: "bg-rose-400",
   },
   accommodation: {
-    bg: "bg-emerald-50",
-    text: "text-emerald-700",
-    border: "border-emerald-200",
-    dot: "bg-emerald-500",
+    bg: "bg-teal-50",
+    text: "text-teal-700",
+    border: "border-teal-200",
+    dot: "bg-teal-400",
   },
   car_rental: {
-    bg: "bg-amber-50",
-    text: "text-amber-800",
-    border: "border-amber-200",
-    dot: "bg-amber-500",
+    bg: "bg-cyan-50",
+    text: "text-cyan-800",
+    border: "border-cyan-200",
+    dot: "bg-cyan-500",
   },
   travel_insurance: {
     bg: "bg-violet-50",
     text: "text-violet-700",
     border: "border-violet-200",
-    dot: "bg-violet-500",
+    dot: "bg-violet-400",
   },
 };

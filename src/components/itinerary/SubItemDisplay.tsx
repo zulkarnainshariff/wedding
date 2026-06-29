@@ -21,7 +21,7 @@ function SubItemTime({
     : raw;
 
   return (
-    <span className="shrink-0 text-xs font-semibold tracking-wide text-[#d4a853] uppercase">
+    <span className="shrink-0 text-xs font-semibold tracking-wide text-accent uppercase">
       {formatted}
     </span>
   );
@@ -65,7 +65,7 @@ export function SubItemRow({
           target="_blank"
           rel="noopener noreferrer"
           onClick={(event) => event.stopPropagation()}
-          className="inline-flex shrink-0 items-center gap-1 text-xs text-[#1e3a5f] underline decoration-[#d4a853]/60"
+          className="inline-flex shrink-0 items-center gap-1 text-xs text-brand-deep underline decoration-accent/60"
           title={location.name ?? "Open in Google Maps"}
         >
           <MapPin className="h-3.5 w-3.5" />
@@ -125,7 +125,7 @@ export function SubItemCascade({
       <p className="mb-2 text-[11px] font-semibold tracking-wide text-stone-400 uppercase">
         {subItems.length} sub-item{subItems.length === 1 ? "" : "s"}
       </p>
-      <div className="space-y-0.5 border-l-2 border-[#d4a853]/40 pl-3">
+      <div className="space-y-0.5 border-l-2 border-accent/40 pl-3">
         {subItems.map((subItem) => (
           <SubItemRow
             key={subItem.id}

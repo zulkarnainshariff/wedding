@@ -198,7 +198,7 @@ export function InvitationManagement({
               className={[
                 "rounded-full px-4 py-1.5 text-sm font-medium",
                 event.id === selectedId
-                  ? "bg-[#1e3a5f] text-white"
+                  ? "bg-brand-deep text-white"
                   : "border border-stone-200 text-stone-600",
               ].join(" ")}
             >
@@ -323,7 +323,7 @@ export function InvitationManagement({
         type="button"
         disabled={busy}
         onClick={() => void saveEvent()}
-        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white"
+        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
       >
         <Save className="h-4 w-4" />
         Save invitation
@@ -340,7 +340,7 @@ export function InvitationManagement({
         {selected.schedule.map((item) => (
           <div
             key={item.id}
-            className="rounded-xl border border-stone-200 bg-[#faf8f5] p-4"
+            className="rounded-xl border border-stone-200 bg-surface-soft p-4"
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm">
@@ -427,7 +427,7 @@ export function InvitationManagement({
           type="button"
           disabled={busy}
           onClick={() => void addScheduleItem()}
-          className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white"
+          className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
         >
           <Plus className="h-4 w-4" />
           Add item

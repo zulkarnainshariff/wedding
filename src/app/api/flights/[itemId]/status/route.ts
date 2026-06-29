@@ -61,6 +61,8 @@ export async function GET(request: Request, { params }: Params) {
   }
 
   const asOfParam = new URL(request.url).searchParams.get("asOf");
+  const includeSchedule =
+    new URL(request.url).searchParams.get("schedule") === "1";
   const effectiveDate = parseEffectiveDate(asOfParam) ?? new Date();
   const onFlightDay = isFlightCalendarDay(item, effectiveDate);
 
@@ -96,7 +98,7 @@ export async function GET(request: Request, { params }: Params) {
   const flightDate = getItemCalendarDate(item);
   const activeLeg = resolveTrackingLegEndpoints(item);
   const scheduleLookup =
-    operatingFlightNumber && flightDate
+    includeSchedule && operatingFlightNumber && flightDate
       ? await lookupFlightSchedule({
           operatingFlightNumber,
           flightDate,
@@ -111,7 +113,7 @@ export async function GET(request: Request, { params }: Params) {
   const lookupDetails = schedulePatch?.details ?? flightDetails;
 
   const { status: live, trackingState, details: trackedDetails } =
-    await getFlightLiveStatus(item, lookupDetails);
+    await getFlightLiveStatus(item, lookupDetails, { effectiveDate });
 
   let mergedDetails = syncMultiSegmentRouteFields(
     withTrackingState(trackedDetails, trackingState),
@@ -143,12 +145,16 @@ export async function GET(request: Request, { params }: Params) {
         JSON.stringify(schedulePatch.details) !== JSON.stringify(flightDetails)),
   );
 
-  if (detailsUpdated || trackingChanged || scheduleChanged) {
+  const shouldPersistTracking =
+    trackingChanged && !detailsUpdated && !scheduleChanged;
+  const shouldPersistVisibleChanges = detailsUpdated || scheduleChanged;
+
+  if (shouldPersistVisibleChanges || shouldPersistTracking) {
     await db
       .update(itineraryItems)
       .set({
         details: mergedDetails,
-        ...(schedulePatch
+        ...(schedulePatch && shouldPersistVisibleChanges
           ? {
               eventDate: schedulePatch.eventDate,
               startDatetime: schedulePatch.startDatetime
@@ -161,7 +167,10 @@ export async function GET(request: Request, { params }: Params) {
           : {}),
       })
       .where(eq(itineraryItems.id, itemId));
-    await bumpSyncVersion();
+
+    if (shouldPersistVisibleChanges) {
+      await bumpSyncVersion();
+    }
   }
 
   let currentItem = item;

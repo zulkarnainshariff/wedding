@@ -135,7 +135,7 @@ function RsvpContent() {
     const contact = data.rsvpSettings;
     return (
       <div className="rounded-2xl border border-stone-200 bg-white p-8 shadow-sm">
-        <h1 className="font-serif text-2xl text-[#1e3a5f]">RSVP closed</h1>
+        <h1 className="font-serif text-2xl text-brand-deep">RSVP closed</h1>
         <p className="mt-3 text-stone-600">
           The RSVP deadline for {data.event.name} has passed. Please contact:
         </p>
@@ -163,10 +163,10 @@ function RsvpContent() {
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-8 shadow-sm">
-      <p className="text-xs font-semibold tracking-[0.2em] text-[#d4a853] uppercase">
+      <p className="text-xs font-semibold tracking-[0.2em] text-accent uppercase">
         You&apos;re invited
       </p>
-      <h1 className="mt-2 font-serif text-3xl text-[#1e3a5f]">{data.event.name}</h1>
+      <h1 className="mt-2 font-serif text-3xl text-brand-deep">{data.event.name}</h1>
       <p className="mt-1 text-stone-500">
         {data.event.eventDate}
         {data.event.location ? ` · ${data.event.location}` : ""}
@@ -260,7 +260,7 @@ function RsvpContent() {
                       <button
                         type="button"
                         onClick={() => setMemberNames((current) => [...current, ""])}
-                        className="text-sm text-[#1e3a5f] underline"
+                        className="text-sm text-brand-deep underline"
                       >
                         Add another name
                       </button>
@@ -290,7 +290,7 @@ function RsvpContent() {
             type="button"
             disabled={saving}
             onClick={() => void submit()}
-            className="w-full rounded-xl bg-[#1e3a5f] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            className="w-full rounded-xl bg-brand-deep px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
           >
             {saving ? "Saving…" : "Submit RSVP"}
           </button>
@@ -302,7 +302,7 @@ function RsvpContent() {
 
 export function RsvpPageContent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f1eb] px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-lg">
         <Suspense fallback={<p className="text-center text-stone-500">Loading…</p>}>
           <RsvpContent />

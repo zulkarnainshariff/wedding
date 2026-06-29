@@ -1,7 +1,10 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useAnchoredDropdownPosition } from "@/hooks/useAnchoredDropdownPosition";
+import { useDropdownDismiss } from "@/hooks/useDropdownDismiss";
 
 export function ParticipantFilterDropdown({
   options,
@@ -13,12 +16,22 @@ export function ParticipantFilterDropdown({
   onChange: (value: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuStyle = useAnchoredDropdownPosition(open, triggerRef, {
+    minWidth: 224,
+    maxHeight: 280,
+  });
   const showingAll = value.length === 0;
   const summary = showingAll
     ? "Everyone"
     : value.length === 1
       ? value[0]
       : `${value.length} selected`;
+
+  useEffect(() => setMounted(true), []);
+  useDropdownDismiss(open, () => setOpen(false), triggerRef, menuRef);
 
   function toggle(name: string) {
     let next = value.includes(name)
@@ -37,47 +50,59 @@ export function ParticipantFilterDropdown({
   return (
     <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
         className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm shadow-sm"
       >
         <span className="font-medium text-stone-700">Participants: {summary}</span>
-        <ChevronDown className="h-4 w-4 text-stone-400" />
+        <ChevronDown
+          className={[
+            "h-4 w-4 text-stone-400 transition-transform",
+            open ? "rotate-180" : "",
+          ].join(" ")}
+        />
       </button>
-      {open && (
-        <>
-          <button
-            type="button"
-            aria-label="Close participant filter"
-            className="fixed inset-0 z-10"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute right-0 z-20 mt-1 max-h-56 min-w-[14rem] overflow-y-auto rounded-xl border border-stone-200 bg-white p-2 shadow-lg">
-            {value.length > 0 && (
-              <button
-                type="button"
-                onClick={() => onChange([])}
-                className="mb-1 w-full rounded-md px-2 py-1.5 text-left text-sm font-medium text-[#1e3a5f] hover:bg-stone-50"
-              >
-                Show everyone
-              </button>
-            )}
-            {options.map((name) => (
-              <label
-                key={name}
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-50"
-              >
-                <input
-                  type="checkbox"
-                  checked={value.includes(name)}
-                  onChange={() => toggle(name)}
-                />
-                <span>{name}</span>
-              </label>
-            ))}
-          </div>
-        </>
-      )}
+
+      {open && mounted
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="listbox"
+              aria-label="Filter by participant"
+              style={menuStyle}
+              className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl"
+            >
+              <div className="max-h-full overflow-y-auto overscroll-contain p-2">
+                {value.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onChange([])}
+                    className="mb-1 w-full rounded-md px-2 py-1.5 text-left text-sm font-medium text-brand-deep hover:bg-stone-50"
+                  >
+                    Show everyone
+                  </button>
+                )}
+                {options.map((name) => (
+                  <label
+                    key={name}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={value.includes(name)}
+                      onChange={() => toggle(name)}
+                    />
+                    <span>{name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

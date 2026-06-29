@@ -174,8 +174,8 @@ function NavLink({
       className={[
         "group flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
         active
-          ? "bg-[#1e3a5f] text-white shadow-md shadow-[#1e3a5f]/20"
-          : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",
+          ? "bg-brand-deep text-white shadow-md shadow-brand-deep/25"
+          : "text-muted hover:bg-accent-pearl/60 hover:text-brand-deep",
         compact ? "justify-center px-2" : "",
       ].join(" ")}
       title={compact ? label : undefined}
@@ -183,7 +183,7 @@ function NavLink({
       <Icon
         className={[
           "h-5 w-5 shrink-0",
-          active ? "text-[#d4a853]" : "text-stone-400 group-hover:text-stone-600",
+          active ? "text-accent-soft" : "text-muted group-hover:text-brand",
         ].join(" ")}
       />
       {!compact && <span>{label}</span>}
@@ -193,7 +193,7 @@ function NavLink({
 
 function SignedInRow({ username }: { username: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl bg-stone-100 px-3 py-2 text-xs text-stone-600">
+    <div className="flex items-center justify-between gap-2 rounded-xl bg-accent-pearl/50 px-3 py-2 text-xs text-muted">
       <span className="min-w-0 truncate">
         Signed in as{" "}
         <span className="font-medium" title={username}>
@@ -218,11 +218,11 @@ export function Sidebar({ compact = false }: { compact?: boolean }) {
   return (
     <aside
       className={[
-        "flex h-full flex-col border-r border-stone-200/80 bg-[#faf8f5]",
+        "flex h-full flex-col border-r border-border/80 bg-surface-soft",
         compact ? "w-[72px]" : "w-64",
       ].join(" ")}
     >
-      <div className={["border-b border-stone-200/80 p-4", compact ? "px-2" : ""].join(" ")}>
+      <div className={["border-b border-border/80 p-4", compact ? "px-2" : ""].join(" ")}>
         <div className={["flex items-start gap-2", compact ? "flex-col items-center" : ""].join(" ")}>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm">
             <AppMark size={40} />
@@ -231,7 +231,7 @@ export function Sidebar({ compact = false }: { compact?: boolean }) {
         </div>
         {!compact && (
           <div className="mt-3">
-            <p className="font-serif text-lg text-[#1e3a5f]">Wedding</p>
+            <p className="font-serif text-lg text-brand-deep">Wedding</p>
             <p className="text-xs tracking-wide text-stone-500 uppercase">
               Travel Itinerary
             </p>
@@ -256,7 +256,7 @@ export function Sidebar({ compact = false }: { compact?: boolean }) {
         )}
       </nav>
 
-      <div className="space-y-1 border-t border-stone-200/80 p-3">
+      <div className="space-y-1 border-t border-border/80 p-3">
         <ExportPdfPanel compact={compact} />
         <DevModePanel compact={compact} />
         {!compact && user && <SignedInRow username={user.username} />}
@@ -299,9 +299,9 @@ export function MobileHeader({
   onOpenMenu: () => void;
 }) {
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-stone-200/80 bg-[#faf8f5]/95 px-4 py-3 backdrop-blur lg:hidden">
+    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border/80 bg-surface-soft/95 px-4 py-3 backdrop-blur lg:hidden">
       <div>
-        <p className="font-serif text-lg text-[#1e3a5f]">Wedding Itinerary</p>
+        <p className="font-serif text-lg text-brand-deep">Wedding Itinerary</p>
         <p className="text-xs text-stone-500">Wedding travel 2026</p>
       </div>
       <button
@@ -343,9 +343,9 @@ export function MobileDrawer({
         onClick={onClose}
         aria-label="Close menu"
       />
-      <div className="absolute top-0 left-0 h-full w-[min(85vw,18rem)] bg-[#faf8f5] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
-          <p className="font-serif text-lg text-[#1e3a5f]">Menu</p>
+      <div className="absolute top-0 left-0 h-full w-[min(85vw,18rem)] bg-surface-soft shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <p className="font-serif text-lg text-brand-deep">Menu</p>
           <button
             type="button"
             onClick={onClose}
@@ -413,7 +413,7 @@ export function BottomNav() {
   });
 
   return (
-    <nav className="fixed right-0 bottom-0 left-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur md:hidden">
+    <nav className="fixed right-0 bottom-0 left-0 z-30 border-t border-border bg-surface/95 backdrop-blur md:hidden">
       <div
         className="grid"
         style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
@@ -439,10 +439,10 @@ export function BottomNav() {
               href={tab.href}
               className={[
                 "flex flex-col items-center gap-0.5 px-1 py-2 text-[10px] font-medium",
-                active ? "text-[#1e3a5f]" : "text-stone-400",
+                active ? "text-brand-deep" : "text-muted",
               ].join(" ")}
             >
-              <Icon className={["h-5 w-5", active ? "text-[#d4a853]" : ""].join(" ")} />
+              <Icon className={["h-5 w-5", active ? "text-accent" : ""].join(" ")} />
               <span className="truncate">{tab.label}</span>
             </Link>
           );

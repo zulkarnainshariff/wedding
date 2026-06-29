@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { ItemCard } from "@/components/itinerary/ItemCard";
 import { CategoryList } from "@/components/itinerary/CategoryList";
-import { FlightScheduleRefresher } from "@/components/itinerary/FlightScheduleRefresher";
 import { ScheduleToolbar } from "@/components/itinerary/ScheduleToolbar";
 import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
@@ -40,7 +39,7 @@ function FlightTabBar({
           className={[
             "rounded-full px-4 py-1.5 text-sm font-medium",
             tab === entry.id
-              ? "bg-[#1e3a5f] text-white"
+              ? "bg-brand-deep text-white"
               : "border border-stone-200 text-stone-600 hover:bg-stone-50",
           ].join(" ")}
         >
@@ -92,7 +91,6 @@ export function FlightsPanel({
   if (tab === "all") {
     return (
       <PageShell eyebrow="Category" title="Flights" toolbar={<ScheduleToolbar />}>
-        <FlightScheduleRefresher items={items} />
         <FlightTabBar tab={tab} visibleTabs={visibleTabs} onChange={setTab} />
         {visibleItems.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-10 text-center text-stone-500">
@@ -115,7 +113,6 @@ export function FlightsPanel({
 
   return (
     <PageShell eyebrow="Category" title="Flights" toolbar={<ScheduleToolbar />}>
-      <FlightScheduleRefresher items={items} />
       <FlightTabBar tab={tab} visibleTabs={visibleTabs} onChange={setTab} />
       <CategoryList category={displayCategory} items={items} embedded />
     </PageShell>

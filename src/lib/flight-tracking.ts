@@ -1021,7 +1021,7 @@ export async function getFlightLiveStatus(
     : Number.POSITIVE_INFINITY;
   const shouldRefreshActive =
     timingPreview.flightStatus === "active" &&
-    snapshotAgeMs > 5 * 60 * 1000;
+    snapshotAgeMs > 10 * 60 * 1000;
   const etaRefreshDue = isEtaRefreshDue(now, item, trackingState);
   const shouldBootstrapLive =
     isFlightTrackingDay(item, now) && !trackingState.snapshot;

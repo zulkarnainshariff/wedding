@@ -174,7 +174,7 @@ export function SystemDiagnosticsPanel() {
               className={[
                 "rounded-full px-4 py-1.5 text-sm font-medium",
                 kind === tab.id
-                  ? "bg-[#1e3a5f] text-white"
+                  ? "bg-brand-deep text-white"
                   : "border border-stone-200 text-stone-600",
               ].join(" ")}
             >
@@ -217,7 +217,7 @@ export function SystemDiagnosticsPanel() {
           <button
             type="button"
             onClick={() => void load()}
-            className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm text-white"
+            className="rounded-lg bg-brand-deep px-4 py-2 text-sm text-white"
           >
             {loading ? "Loading…" : "Apply filters"}
           </button>
@@ -370,7 +370,7 @@ function AdminAccountsPanel() {
       <button
         type="button"
         onClick={() => void grantAdmin()}
-        className="mb-4 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm text-white"
+        className="mb-4 rounded-lg bg-brand-deep px-4 py-2 text-sm text-white"
       >
         Grant admin access
       </button>

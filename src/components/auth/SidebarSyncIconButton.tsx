@@ -103,7 +103,7 @@ function SyncDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4">
       <div className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
-        <h3 className="font-serif text-xl text-[#1e3a5f]">{title}</h3>
+        <h3 className="font-serif text-xl text-brand-deep">{title}</h3>
         <p className="mt-2 text-sm text-stone-600">{message}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -118,7 +118,7 @@ function SyncDialog({
               type="button"
               disabled={confirmDisabled}
               onClick={onConfirm}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm text-white disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm text-white disabled:opacity-50"
             >
               {confirmDisabled && (
                 <RefreshCw className="h-4 w-4 animate-spin" aria-hidden />

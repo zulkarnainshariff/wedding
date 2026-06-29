@@ -8,18 +8,22 @@ import { ItemSubItemsSection } from "@/components/itinerary/ItemSubItemsSection"
 import { ItemCompleteToggle, type ItemDoneAccent } from "@/components/itinerary/ItemCompleteToggle";
 import { FlightCheckInReminderPill, FlightCheckInToggle } from "@/components/itinerary/FlightCheckInToggle";
 import {
-  formatFlightProgressDuration,
   flightRouteLine,
   flightSummaryExtraParts,
   getFlightTimelineDisplay,
   isFlightInProgress,
 } from "@/lib/flight-progress";
-import { flightSegmentsFromDetails } from "@/lib/flight-segment-timing";
 import { ItemTaskSection } from "@/components/tasks/ItemTaskSection";
 import {
   FlightDetailView,
   PetRelocationDetailView,
 } from "@/components/itinerary/FlightViews";
+import {
+  AccommodationDetailView,
+  CarRentalDetailView,
+} from "@/components/itinerary/BookingDetailViews";
+import { LinkedBookingDetailSection } from "@/components/itinerary/LinkedBookingViews";
+import { useLinkedItem } from "@/hooks/useLinkedItem";
 import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/activity-utils";
 import { getItemLocation } from "@/lib/item-location";
@@ -109,7 +113,7 @@ function MapLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 rounded-xl border border-[#1e3a5f]/20 bg-[#1e3a5f] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#16304f]"
+      className="inline-flex items-center gap-2 rounded-xl border border-brand-deep/20 bg-brand-deep px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-ink"
     >
       <MapPin className="h-4 w-4" />
       {label}
@@ -118,182 +122,14 @@ function MapLink({
   );
 }
 
-function AccommodationDetail({
-  details,
-}: {
-  details: NonNullable<ReturnType<typeof getAccommodationDetails>>;
-}) {
-  const guests = Array.isArray(details.guests)
-    ? details.guests.join(", ")
-    : details.guests;
-
-  const statusLabel =
-    details.bookingStatus === "suggested"
-      ? "Suggested — not booked yet"
-      : details.bookingStatus === "private"
-        ? "Private stay"
-        : "Confirmed";
-
-  return (
-    <div className="space-y-4">
-      {details.bookingStatus === "suggested" && (
-        <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800">
-          This stay is not booked yet. Suggested listings are options you are
-          considering.
-        </div>
-      )}
-
-      <dl>
-        <DetailRow label="Status" value={statusLabel} />
-        <DetailRow label="Platform" value={details.platform} />
-        <DetailRow label="Location" value={details.location} />
-        <DetailRow label="Guests" value={guests} />
-        <DetailRow label="Address" value={details.address ?? undefined} />
-        <DetailRow
-          label="Check-in"
-          value={
-            details.checkInDate
-              ? `${details.checkInDate} at ${details.checkInTime}`
-              : undefined
-          }
-        />
-        <DetailRow
-          label="Check-out"
-          value={
-            details.checkOutDate
-              ? `${details.checkOutDate} at ${details.checkOutTime}`
-              : undefined
-          }
-        />
-        <DetailRow label="Confirmation" value={details.confirmationCode} />
-      </dl>
-
-      <div className="flex flex-wrap gap-3">
-        {details.listingUrl && (
-          <a
-            href={details.listingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
-          >
-            View booking
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        )}
-        {details.mapUrl && (
-          <MapLink label="Open in Google Maps" href={details.mapUrl} />
-        )}
-        {details.address && !details.mapUrl && (
-          <MapLink
-            label="Open in Google Maps"
-            href={mapsUrl(details.address)}
-          />
-        )}
-      </div>
-
-      {details.suggestions && details.suggestions.length > 0 && (
-        <div className="border-t border-stone-100 py-4">
-          <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
-            Suggested listings
-          </h3>
-          <div className="mt-3 space-y-2">
-            {details.suggestions.map((suggestion) => (
-              <a
-                key={suggestion.url}
-                href={suggestion.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3 text-sm text-violet-900 hover:bg-violet-50"
-              >
-                <span>
-                  {suggestion.label}
-                  {suggestion.platform ? ` · ${suggestion.platform}` : ""}
-                </span>
-                <ExternalLink className="h-4 w-4 shrink-0" />
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {details.notes && details.notes.length > 0 && (
-        <div className="border-t border-stone-100 py-4">
-          <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
-            Notes
-          </h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-700">
-            {details.notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CarRentalDetail({
-  details,
-}: {
-  details: NonNullable<ReturnType<typeof getCarRentalDetails>>;
-}) {
-  const notes = Array.isArray(details.notes)
-    ? details.notes.join("; ")
-    : details.notes;
-
-  return (
-    <div className="space-y-6">
-      {details.bookingStatus === "suggested" && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          This car rental is not booked yet. The map link shows a suggested
-          pick-up location only.
-        </div>
-      )}
-
-      <dl>
-        <DetailRow
-          label="Status"
-          value={
-            details.bookingStatus === "suggested"
-              ? "Not booked yet"
-              : "Confirmed"
-          }
-        />
-        <DetailRow label="Company" value={details.company} />
-        <DetailRow label="Vehicle" value={details.vehicleModel} />
-        <DetailRow label="Pickup time" value={details.pickupTime} />
-        <DetailRow label="Pickup location" value={details.pickupLocation} />
-        <DetailRow label="Return time" value={details.returnTime} />
-        <DetailRow label="Return location" value={details.returnLocation} />
-        <DetailRow label="Confirmation" value={details.confirmationCode} />
-        <DetailRow label="Notes" value={notes} />
-      </dl>
-      <div className="flex flex-wrap gap-3">
-        <MapLink
-          label="Pickup on Maps"
-          href={
-            details.mapUrl ??
-            mapsUrl(details.pickupLocation, details.pickupLat, details.pickupLng)
-          }
-        />
-        {(details.returnMapUrl || details.returnLocation !== details.pickupLocation) && (
-          <MapLink
-            label="Return on Maps"
-            href={
-              details.returnMapUrl ??
-              mapsUrl(details.returnLocation, details.returnLat, details.returnLng)
-            }
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
 function ActivityDetail({
   details,
+  linkedItem,
+  canEdit,
 }: {
   details: NonNullable<ReturnType<typeof getActivityDetails>>;
+  linkedItem?: ItineraryItem | null;
+  canEdit?: boolean;
 }) {
   const mapHref =
     details.location?.mapLink ??
@@ -321,12 +157,11 @@ function ActivityDetail({
         <DetailRow label="Airport" value={details.location?.airportCode} />
       </dl>
       {mapHref && <MapLink label="Open in Google Maps" href={mapHref} />}
-      {details.linkedItemId && (
-        <p className="text-sm text-stone-500">
-          Tap this schedule item from the timeline to open the linked booking
-          details.
-        </p>
-      )}
+      {linkedItem ? (
+        <LinkedBookingDetailSection linkedItem={linkedItem} canEdit={canEdit} />
+      ) : details.linkedItemId ? (
+        <p className="text-sm text-stone-500">Loading linked booking…</p>
+      ) : null}
     </div>
   );
 }
@@ -406,7 +241,7 @@ function ModalHeaderIconButton({
       onClick={onClick}
       aria-label={ariaLabel}
       className={[
-        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-stone-200 bg-white text-stone-500 transition-all hover:border-[#1e3a5f]/30 hover:text-[#1e3a5f]",
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-stone-200 bg-white text-stone-500 transition-all hover:border-brand-deep/30 hover:text-brand-deep",
         className,
       ].join(" ")}
     >
@@ -454,9 +289,6 @@ function ItemDetailHeader({
     : null;
   const flightTimeline =
     category === "flight" ? getFlightTimelineDisplay(item) : null;
-  const multiLegFlight =
-    category === "flight" &&
-    flightSegmentsFromDetails(flightDetails).length >= 2;
   const flightRoute =
     category === "flight" ? flightRouteLine(flightTimeline, item.summary) : null;
   const flightSummaryExtras =
@@ -510,7 +342,7 @@ function ItemDetailHeader({
         <button
           type="button"
           onClick={onEdit}
-          className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-[#1e3a5f]/30 hover:text-[#1e3a5f]"
+          className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-brand-deep/30 hover:text-brand-deep"
         >
           <Pencil className="h-4 w-4" />
           <span className="hidden sm:inline">Edit</span>
@@ -578,7 +410,7 @@ function ItemDetailHeader({
                 <FlightCheckInReminderPill item={item} />
               </div>
             )}
-            <h1 className="mt-1 break-words font-serif text-xl text-[#1e3a5f] sm:text-3xl">
+            <h1 className="mt-1 break-words font-serif text-xl text-brand-deep sm:text-3xl">
               {item.title}
             </h1>
             {category === "flight" && flightNumberLabel && (
@@ -627,16 +459,6 @@ function ItemDetailHeader({
                 <span>Arrives: {flightSchedule.arrival}</span>
               )}
             </div>
-            {!multiLegFlight &&
-              flightTimeline?.transitStops.map((stop) => {
-              const layover = formatFlightProgressDuration(stop.layoverMinutes);
-              if (!layover) return null;
-              return (
-                <p key={stop.airport} className="text-amber-800">
-                  Transit {stop.airport} · {layover}
-                </p>
-              );
-            })}
           </>
         ) : (
           <>
@@ -661,6 +483,7 @@ function ItemDetailBody({
   stayDetails,
   carDetails,
   activityDetails,
+  linkedItem,
   canEdit,
 }: {
   item: ItineraryItem;
@@ -670,6 +493,7 @@ function ItemDetailBody({
   stayDetails: ReturnType<typeof getAccommodationDetails>;
   carDetails: ReturnType<typeof getCarRentalDetails>;
   activityDetails: ReturnType<typeof getActivityDetails>;
+  linkedItem?: ItineraryItem | null;
   canEdit: boolean;
 }) {
   return (
@@ -686,13 +510,17 @@ function ItemDetailBody({
         <PetRelocationDetailView details={petDetails} />
       )}
       {category === "accommodation" && stayDetails && (
-        <AccommodationDetail details={stayDetails} />
+        <AccommodationDetailView details={stayDetails} />
       )}
       {category === "car_rental" && carDetails && (
-        <CarRentalDetail details={carDetails} />
+        <CarRentalDetailView details={carDetails} />
       )}
       {category === "activity" && activityDetails && (
-        <ActivityDetail details={activityDetails} />
+        <ActivityDetail
+          details={activityDetails}
+          linkedItem={linkedItem}
+          canEdit={canEdit}
+        />
       )}
       {category === "travel_insurance" && (
         <InsuranceDetail details={item.details as TravelInsuranceDetails} />
@@ -766,6 +594,7 @@ export function ItemDetailView({
   const stayDetails = getAccommodationDetails(item.details);
   const carDetails = getCarRentalDetails(item.details);
   const activityDetails = getActivityDetails(item.details);
+  const { linkedItem } = useLinkedItem(activityDetails?.linkedItemId);
   const sharedLocation = getItemLocation(item.details as Record<string, unknown>);
   const { formatDateTime, formatFlightSchedule } = useDisplayFormat();
 
@@ -795,6 +624,7 @@ export function ItemDetailView({
       stayDetails={stayDetails}
       carDetails={carDetails}
       activityDetails={activityDetails}
+      linkedItem={linkedItem}
       canEdit={canEdit}
     />
   );
@@ -802,7 +632,7 @@ export function ItemDetailView({
   if (modal) {
     return (
       <div className="flex max-h-[92vh] flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-xl sm:rounded-3xl">
-        <div className="shrink-0 border-b border-stone-100 bg-gradient-to-r from-[#faf8f5] to-white px-6 py-6 sm:px-8">
+        <div className="shrink-0 border-b border-stone-100 bg-gradient-to-r from-surface-soft to-white px-6 py-6 sm:px-8">
           {header}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 sm:px-8 sm:pb-8">
@@ -817,14 +647,14 @@ export function ItemDetailView({
     <div className="mx-auto max-w-3xl">
       <Link
         href={`/itinerary/${category}`}
-        className="mb-6 inline-flex items-center gap-2 text-sm text-stone-500 hover:text-[#1e3a5f]"
+        className="mb-6 inline-flex items-center gap-2 text-sm text-stone-500 hover:text-brand-deep"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to {CATEGORY_META[category as Category]?.plural ?? "itinerary"}
       </Link>
 
       <div className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
-        <div className="border-b border-stone-100 bg-gradient-to-r from-[#faf8f5] to-white px-6 py-6 sm:px-8">
+        <div className="border-b border-stone-100 bg-gradient-to-r from-surface-soft to-white px-6 py-6 sm:px-8">
           {header}
         </div>
         <div className="px-6 py-2 pb-8 sm:px-8">{body}</div>

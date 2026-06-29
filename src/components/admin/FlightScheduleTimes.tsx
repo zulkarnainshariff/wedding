@@ -335,7 +335,7 @@ export function FlightScheduleTimes({
             onClick={() => void lookupFlight()}
             disabled={scheduleState.loading}
             title="Look up flight details"
-            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-[#1e3a5f] bg-[#1e3a5f] px-3 py-2 text-white hover:bg-[#162d4a] disabled:opacity-50"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-deep bg-brand-deep px-3 py-2 text-white hover:bg-brand-ink disabled:opacity-50"
           >
             {scheduleState.loading ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />

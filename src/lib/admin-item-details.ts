@@ -8,6 +8,8 @@ import {
 import { airlineInfoFromFlightNumbers } from "@/lib/airlines";
 import { formatFlightNumberDisplay, parseLegacyFlightNumber } from "@/lib/flight-numbers";
 import { buildLocationPayload, getItemLocation } from "@/lib/item-location";
+import { mergeItemPrivacyFields } from "@/lib/admin-item-privacy";
+import { parsePrivateViewers } from "@/lib/item-privacy";
 import { TRAVELLER_NAMES } from "@/lib/travellers";
 import type { UnitsPreference } from "@/lib/user-preferences";
 
@@ -18,6 +20,8 @@ export type StructuredItemDetails = {
   linkedItemId: string;
   locationName: string;
   locationMapUrl: string;
+  isPrivate: boolean;
+  privateViewers: string[];
   travellers: string[];
   bookingGroups: BookingGroup[];
   seats: TravellerRecord[];
@@ -113,6 +117,8 @@ export function emptyStructuredDetails(category: Category): StructuredItemDetail
     linkedItemId: "",
     locationName: "",
     locationMapUrl: "",
+    isPrivate: false,
+    privateViewers: [],
     travellers: [],
     bookingGroups: [],
     seats: [],
@@ -163,6 +169,10 @@ export function parseStructuredDetails(
 
   structured.locationName = location?.name ?? "";
   structured.locationMapUrl = location?.mapLink ?? "";
+  structured.isPrivate = Boolean(details.isPrivate);
+  structured.privateViewers = parsePrivateViewers(
+    details.privateViewers ?? details.extraViewers,
+  );
   structured.notes = Array.isArray(details.notes)
     ? (details.notes as string[]).join("\n")
     : String(details.notes ?? "");
@@ -269,6 +279,16 @@ export function parseStructuredDetails(
       : [];
   }
 
+  if (category === "car_rental") {
+    if (Array.isArray(details.participants)) {
+      structured.participants = (details.participants as string[]).filter(
+        (entry): entry is string => typeof entry === "string",
+      );
+    } else if (typeof details.driver === "string" && details.driver.trim()) {
+      structured.participants = [details.driver.trim()];
+    }
+  }
+
   if (category === "travel_insurance") {
     structured.travellers = Array.isArray(details.travellers)
       ? (details.travellers as string[])
@@ -298,18 +318,21 @@ export function buildStructuredDetailsPayload(
     .filter(Boolean);
 
   if (category === "activity") {
-    return {
-      slug: structured.simple.slug || `activity-${Date.now()}`,
-      activityType: structured.simple.activityType,
-      time: structured.simple.time || null,
-      description: structured.simple.description || undefined,
-      participants: structured.participants,
-      linkedItemId: structured.linkedItemId
-        ? Number(structured.linkedItemId)
-        : undefined,
-      location,
-      notes: notes.length ? notes : undefined,
-    };
+    return mergeItemPrivacyFields(
+      {
+        slug: structured.simple.slug || `activity-${Date.now()}`,
+        activityType: structured.simple.activityType,
+        time: structured.simple.time || null,
+        description: structured.simple.description || undefined,
+        participants: structured.participants,
+        linkedItemId: structured.linkedItemId
+          ? Number(structured.linkedItemId)
+          : undefined,
+        location,
+        notes: notes.length ? notes : undefined,
+      },
+      structured,
+    );
   }
 
   const payload: Record<string, unknown> = {
@@ -395,6 +418,10 @@ export function buildStructuredDetailsPayload(
     payload.suggestions = structured.suggestions.filter((s) => s.label && s.url);
   }
 
+  if (category === "car_rental" && structured.participants.length > 0) {
+    payload.driver = structured.participants[0];
+  }
+
   if (category === "pet_relocation") {
     payload.transportMode = "cargo";
     payload.species = "cat";
@@ -415,7 +442,7 @@ export function buildStructuredDetailsPayload(
       structured.simple.autoInsuranceDetails || undefined;
   }
 
-  return payload;
+  return mergeItemPrivacyFields(payload, structured);
 }
 
 export function defaultTravellerRows(names: string[]): TravellerRecord[] {

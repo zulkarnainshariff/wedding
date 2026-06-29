@@ -29,7 +29,7 @@ export function LogoutConfirmDialog({
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id="logout-title" className="font-serif text-xl text-[#1e3a5f]">
+            <h2 id="logout-title" className="font-serif text-xl text-brand-deep">
               Log out?
             </h2>
             <p className="mt-2 text-sm text-stone-500">
@@ -56,7 +56,7 @@ export function LogoutConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-xl bg-[#1e3a5f] px-4 py-2.5 text-sm font-medium text-white"
+            className="rounded-xl bg-brand-deep px-4 py-2.5 text-sm font-medium text-white"
           >
             Log out
           </button>

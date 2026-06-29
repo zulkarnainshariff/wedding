@@ -126,7 +126,7 @@ export function DatabaseOperationsPanel() {
           type="button"
           onClick={() => setDumpDialogOpen(true)}
           disabled={!meta?.deployConfigured || busy}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm text-white disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm text-white disabled:opacity-50"
         >
           <Upload className="h-4 w-4" />
           Dump &amp; upload {todayDumpName}

@@ -312,7 +312,7 @@ export function GuestListPanel({
                 className={[
                   "rounded-full px-4 py-1.5 text-sm font-medium",
                   event.id === selectedId
-                    ? "bg-[#1e3a5f] text-white"
+                    ? "bg-brand-deep text-white"
                     : "border border-stone-200 text-stone-600",
                 ].join(" ")}
               >
@@ -330,7 +330,7 @@ export function GuestListPanel({
                 className={[
                   "border-b-2 px-4 py-2 text-sm font-medium",
                   activeTab === tab.id
-                    ? "border-[#1e3a5f] text-[#1e3a5f]"
+                    ? "border-brand-deep text-brand-deep"
                     : "border-transparent text-stone-500 hover:text-stone-700",
                 ].join(" ")}
               >
@@ -536,7 +536,7 @@ export function GuestListPanel({
                 type="button"
                 disabled={busy}
                 onClick={() => void saveRsvpSettings()}
-                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white"
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
               >
                 <Save className="h-4 w-4" />
                 Save RSVP settings
@@ -608,7 +608,7 @@ export function GuestListPanel({
                 type="button"
                 disabled={busy}
                 onClick={() => void savePermissions()}
-                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white"
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
               >
                 <Save className="h-4 w-4" />
                 Save permissions
@@ -638,7 +638,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
       <p className="text-xs font-medium tracking-wide text-stone-500 uppercase">
         {label}
       </p>
-      <p className="mt-1 font-serif text-2xl text-[#1e3a5f]">{value}</p>
+      <p className="mt-1 font-serif text-2xl text-brand-deep">{value}</p>
     </div>
   );
 }
@@ -737,7 +737,7 @@ function GuestForm({
           type="button"
           disabled={busy}
           onClick={onSave}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white"
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
         >
           <Plus className="h-4 w-4" />
           {submitLabel}

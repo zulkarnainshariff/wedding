@@ -79,6 +79,14 @@ export const syncMetadata = pgTable("sync_metadata", {
     .notNull(),
 });
 
+export const appSettings = pgTable("app_settings", {
+  id: integer("id").primaryKey().default(1),
+  themeId: text("theme_id").notNull().default("azure-blossom"),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 export const weddingEvents = pgTable("wedding_events", {
   id: serial("id").primaryKey(),
   slug: text("slug").notNull().unique(),
@@ -320,6 +328,7 @@ export type NewItemDocument = typeof itemDocuments.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type SyncMetadata = typeof syncMetadata.$inferSelect;
+export type AppSettingsRow = typeof appSettings.$inferSelect;
 export type WeddingEvent = typeof weddingEvents.$inferSelect;
 export type NewWeddingEvent = typeof weddingEvents.$inferInsert;
 export type PublicScheduleItemRow = typeof publicScheduleItems.$inferSelect;

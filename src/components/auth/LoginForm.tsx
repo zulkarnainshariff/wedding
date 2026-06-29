@@ -69,7 +69,7 @@ export function LoginForm({
           autoFocus={variant === "modal"}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full rounded-xl border border-stone-200 px-4 py-3 text-stone-800 outline-none focus:border-[#1e3a5f]/40 focus:ring-2 focus:ring-[#1e3a5f]/10"
+          className="w-full rounded-xl border border-border px-4 py-3 text-foreground outline-none focus:border-brand/50 focus:ring-2 focus:ring-brand/15"
           required
         />
       </label>
@@ -96,7 +96,7 @@ export function LoginForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl bg-[#1e3a5f] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#162d4a] disabled:opacity-60"
+        className="w-full rounded-xl bg-brand-deep px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-ink disabled:opacity-60"
       >
         {loading ? "Signing in…" : "Sign in"}
       </button>
@@ -113,10 +113,10 @@ export function LoginForm({
     return (
       <div>
         <div className="mb-6 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#1e3a5f] text-[#d4a853]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-deep text-accent">
             <CalendarDays className="h-6 w-6" />
           </div>
-          <h2 className="mt-3 font-serif text-2xl text-[#1e3a5f]">Sign in</h2>
+          <h2 className="mt-3 font-serif text-2xl text-brand-deep">Sign in</h2>
           <p className="mt-1 text-sm text-stone-500">
             Access the family travel itinerary
           </p>
@@ -127,13 +127,13 @@ export function LoginForm({
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f1eb] px-4">
-      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-lg">
-        <div className="border-b border-stone-100 bg-gradient-to-r from-[#faf8f5] to-white px-8 py-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#1e3a5f] text-[#d4a853]">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="theme-card w-full max-w-md overflow-hidden rounded-3xl border border-border/80 bg-surface shadow-lg">
+        <div className="theme-gradient-header border-b border-border/50 px-8 py-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-deep text-accent-pearl shadow-md shadow-brand/20">
             <CalendarDays className="h-7 w-7" />
           </div>
-          <h1 className="mt-4 font-serif text-3xl text-[#1e3a5f]">
+          <h1 className="mt-4 font-serif text-3xl text-brand-deep">
             Wedding Itinerary
           </h1>
           <p className="mt-2 text-sm text-stone-500">

@@ -35,6 +35,15 @@ export function formatDateOnlyWithPrefs(
   return preferences.dateFormat === "mdy" ? `${m}-${day}-${y}` : `${day}-${m}-${y}`;
 }
 
+export function formatDayOptionLabel(
+  day: Pick<{ dayNumber: number; title?: string | null; date: string }, "dayNumber" | "title" | "date">,
+  preferences: UserPreferences = DEFAULT_USER_PREFERENCES,
+): string {
+  const title = day.title?.trim();
+  const dateLabel = formatDateOnlyWithPrefs(day.date, preferences);
+  return `Day ${day.dayNumber} — ${title || dateLabel}`;
+}
+
 export function formatDateRangeCompactWithPrefs(
   start: string | null | undefined,
   end: string | null | undefined,

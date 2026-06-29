@@ -6,8 +6,8 @@ import { TaskIndicatorBadge, ItemTaskIndicator, useTaskIndicators } from "@/comp
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { getDayDisplayTitle, hasRestrictedTravellerView } from "@/lib/day-display";
+import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { filterPastDays, isDayToday } from "@/lib/trip-time";
-import { formatDate } from "@/lib/types";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
 
 type DayWithItems = ItineraryDay & { items: ItineraryItem[] };
@@ -15,6 +15,7 @@ type DayWithItems = ItineraryDay & { items: ItineraryItem[] };
 export function DayTimeline({ days }: { days: DayWithItems[] }) {
   const { user } = useAuth();
   const { effectiveDate, hidePast } = useTripTime();
+  const { formatDateOnly } = useDisplayFormat();
   const restrictedView = hasRestrictedTravellerView(user);
   const visibleDays = filterPastDays(days, effectiveDate, hidePast);
   const { dayCounts, itemSummaries } = useTaskIndicators();
@@ -39,38 +40,42 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
           const dayTitle = getDayDisplayTitle(day, day.items.length, restrictedView);
 
           return (
-            <section key={day.id} id={`day-${day.dayNumber}`}>
+            <section
+              key={day.id}
+              id={`day-${day.dayNumber}`}
+              className="scroll-mt-24"
+            >
               <div
                 className={[
                   "sticky top-0 z-10 mb-4 flex items-center gap-3 py-2 backdrop-blur",
                   isToday
-                    ? "rounded-2xl border border-[#d4a853]/40 bg-[#faf8f5]/95 px-3"
-                    : "bg-[#f5f1eb]/90",
+                    ? "rounded-2xl border border-accent/40 bg-surface-soft/95 px-3"
+                    : "bg-background/90",
                 ].join(" ")}
               >
                 <div
                   className={[
                     "flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold",
                     isToday
-                      ? "bg-[#d4a853] text-[#1e3a5f] ring-2 ring-[#d4a853]/40 ring-offset-2"
-                      : "bg-[#1e3a5f] text-[#d4a853]",
+                      ? "bg-accent text-brand-deep ring-2 ring-accent/40 ring-offset-2"
+                      : "bg-brand-deep text-accent",
                   ].join(" ")}
                 >
                   {day.dayNumber}
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-serif text-xl text-[#1e3a5f]">
+                    <h2 className="font-serif text-xl text-brand-deep">
                       {dayTitle}
                     </h2>
                     {isToday && (
-                      <span className="rounded-full bg-[#1e3a5f] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#d4a853] uppercase">
+                      <span className="rounded-full bg-brand-deep px-2 py-0.5 text-[10px] font-semibold tracking-wide text-accent uppercase">
                         Today
                       </span>
                     )}
                     <TaskIndicatorBadge count={dayCounts[day.id] ?? 0} />
                   </div>
-                  <p className="text-sm text-stone-500">{formatDate(day.date)}</p>
+                  <p className="text-sm text-stone-500">{formatDateOnly(day.date)}</p>
                 </div>
               </div>
 
@@ -83,13 +88,13 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
                   No items scheduled for this day.
                 </p>
               ) : (
-                <div className="relative space-y-3 pl-5 before:absolute before:top-2 before:bottom-2 before:left-[7px] before:w-px before:bg-[#d4a853]/40">
+                <div className="relative space-y-3 pl-5 before:absolute before:top-2 before:bottom-2 before:left-[7px] before:w-px before:bg-accent/40">
                   {day.items.map((item) => (
                     <div key={item.id} className="relative">
                       <span
                         className={[
                           "absolute top-6 -left-5 h-2.5 w-2.5 rounded-full border-2 border-white",
-                          isToday ? "bg-[#1e3a5f]" : "bg-[#d4a853]",
+                          isToday ? "bg-brand-deep" : "bg-accent",
                         ].join(" ")}
                       />
                       <ItemCard
