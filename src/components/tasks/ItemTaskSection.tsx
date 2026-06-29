@@ -559,7 +559,7 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
                       type="button"
                       disabled={busy}
                       onClick={() => void submitCantComplete(task.id)}
-                      className="rounded-lg bg-[#1e3a5f] px-3 py-1.5 text-sm text-white"
+                      className="rounded-lg bg-brand-deep px-3 py-1.5 text-sm text-white"
                     >
                       Save
                     </button>
@@ -650,7 +650,7 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
             type="button"
             disabled={busy || !form.title.trim()}
             onClick={() => void (mode === "create" ? createTask() : saveTask())}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
             {mode === "create" ? "Create task" : "Save changes"}
@@ -688,7 +688,7 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
           <button
             type="button"
             onClick={startCreate}
-            className="inline-flex items-center gap-1 text-sm font-medium text-[#1e3a5f] hover:underline"
+            className="inline-flex items-center gap-1 text-sm font-medium text-brand-deep hover:underline"
           >
             <Plus className="h-4 w-4" />
             Add task

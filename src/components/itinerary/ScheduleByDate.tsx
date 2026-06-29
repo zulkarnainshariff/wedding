@@ -13,8 +13,8 @@ import {
   collectScheduleParticipantOptions,
   filterScheduleItemsByParticipants,
 } from "@/lib/schedule-participant-filter";
+import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { filterPastDays, isDayToday } from "@/lib/trip-time";
-import { formatDate } from "@/lib/types";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
 
 type DayWithItems = ItineraryDay & { items: ItineraryItem[] };
@@ -23,6 +23,7 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
   const { user } = useAuth();
   const { effectiveDate, hidePast } = useTripTime();
   const restrictedView = hasRestrictedTravellerView(user);
+  const { formatDateOnly } = useDisplayFormat();
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
   const allItems = useMemo(
@@ -58,6 +59,8 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
           participantOptions={participantOptions}
           selectedParticipants={selectedParticipants}
           onParticipantsChange={setSelectedParticipants}
+          jumpDays={visibleDays}
+          jumpVariant="schedule"
         />
       }
     >
@@ -76,38 +79,42 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
             const dayTitle = getDayDisplayTitle(day, day.items.length, restrictedView);
 
             return (
-              <section key={day.id} id={`schedule-${day.date}`}>
+              <section
+                key={day.id}
+                id={`schedule-${day.date}`}
+                className="scroll-mt-24"
+              >
                 <div
                   className={[
                     "sticky top-0 z-10 mb-4 flex items-center gap-3 py-2 backdrop-blur",
                     isToday
-                      ? "rounded-2xl border border-[#d4a853]/40 bg-[#faf8f5]/95 px-3"
-                      : "bg-[#f5f1eb]/95",
+                      ? "rounded-2xl border border-accent/40 bg-surface-soft/95 px-3"
+                      : "bg-background/95",
                   ].join(" ")}
                 >
                   <div
                     className={[
                       "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold",
                       isToday
-                        ? "bg-[#d4a853] text-[#1e3a5f] ring-2 ring-[#d4a853]/40 ring-offset-2"
-                        : "bg-[#1e3a5f] text-[#d4a853]",
+                        ? "bg-accent text-brand-deep ring-2 ring-accent/40 ring-offset-2"
+                        : "bg-brand-deep text-accent",
                     ].join(" ")}
                   >
                     {day.dayNumber}
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-serif text-xl text-[#1e3a5f]">
+                      <h2 className="font-serif text-xl text-brand-deep">
                         {dayTitle}
                       </h2>
                       {isToday && (
-                        <span className="rounded-full bg-[#1e3a5f] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#d4a853] uppercase">
+                        <span className="rounded-full bg-brand-deep px-2 py-0.5 text-[10px] font-semibold tracking-wide text-accent uppercase">
                           Today
                         </span>
                       )}
                     </div>
-                    <p className="text-sm font-medium text-[#d4a853]">
-                      {formatDate(day.date)}
+                    <p className="text-sm font-medium text-accent">
+                      {formatDateOnly(day.date)}
                     </p>
                   </div>
                 </div>
@@ -117,13 +124,13 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
                     Nothing scheduled for this date.
                   </p>
                 ) : (
-                  <div className="relative space-y-3 pl-5 before:absolute before:top-2 before:bottom-2 before:left-[7px] before:w-px before:bg-[#d4a853]/40">
+                  <div className="relative space-y-3 pl-5 before:absolute before:top-2 before:bottom-2 before:left-[7px] before:w-px before:bg-accent/40">
                     {day.items.map((item) => (
                       <div key={item.id} className="relative">
                         <span
                           className={[
                             "absolute top-6 -left-5 h-2.5 w-2.5 rounded-full border-2 border-white",
-                            isToday ? "bg-[#1e3a5f]" : "bg-[#d4a853]",
+                            isToday ? "bg-brand-deep" : "bg-accent",
                           ].join(" ")}
                         />
                         <ItemCard item={item} taskSummary={itemSummaries[item.id]} />

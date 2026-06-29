@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ItineraryItem } from "@/lib/schema";
 import {
   defaultTravellerRows,
@@ -9,6 +9,8 @@ import {
   type StructuredItemDetails,
   type TravellerRecord,
 } from "@/lib/admin-item-details";
+import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
+import { travellerMatchesUsername } from "@/lib/item-travellers";
 import type { BookingGroup } from "@/lib/booking-groups";
 import {
   normalizeBookingGroupLinks,
@@ -65,47 +67,6 @@ function TextInput({
   );
 }
 
-function SystemUserMultiSelect({
-  value,
-  onChange,
-  options,
-  label,
-}: {
-  value: string[];
-  onChange: (value: string[]) => void;
-  options: string[];
-  label: string;
-}) {
-  if (!options.length) return null;
-
-  return (
-    <div className="text-sm sm:col-span-2">
-      <p className="mb-2 text-stone-500">{label}</p>
-      <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-stone-200 p-2">
-        {options.map((name) => (
-          <label
-            key={name}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-50"
-          >
-            <input
-              type="checkbox"
-              checked={value.includes(name)}
-              onChange={() =>
-                onChange(
-                  value.includes(name)
-                    ? value.filter((item) => item !== name)
-                    : [...value, name],
-                )
-              }
-            />
-            <span>{name}</span>
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function ParticipantMultiSelect({
   label = "Participants",
   value,
@@ -118,30 +79,78 @@ function ParticipantMultiSelect({
   const options = travellerOptions(value);
 
   return (
-    <div className="text-sm sm:col-span-2">
-      <p className="mb-2 text-stone-500">{label}</p>
-      <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-stone-200 p-2">
-        {options.map((name) => (
-          <label
-            key={name}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-50"
-          >
-            <input
-              type="checkbox"
-              checked={value.includes(name)}
-              onChange={() =>
-                onChange(
-                  value.includes(name)
-                    ? value.filter((item) => item !== name)
-                    : [...value, name],
-                )
-              }
-            />
-            <span>{name}</span>
-          </label>
-        ))}
-      </div>
-    </div>
+    <CheckboxDropdown
+      label={label}
+      options={options}
+      value={value}
+      onChange={onChange}
+      emptyLabel="Select participants…"
+      className="sm:col-span-2"
+    />
+  );
+}
+
+function updateFlightTravellers(
+  structured: StructuredItemDetails,
+  travellers: string[],
+): StructuredItemDetails {
+  const nextGroups = structured.bookingGroups.map((group) => ({
+    ...group,
+    travellers: group.travellers.filter((name) => travellers.includes(name)),
+  }));
+
+  return {
+    ...structured,
+    travellers,
+    bookingGroups: nextGroups,
+    seats:
+      structured.seats.length > 0
+        ? structured.seats
+        : defaultTravellerRows(travellers),
+    baggage:
+      structured.baggage.length > 0
+        ? structured.baggage
+        : defaultTravellerRows(travellers),
+  };
+}
+
+function linkedParticipantsForCategory(
+  structured: StructuredItemDetails,
+  category: Category,
+): string[] {
+  if (category === "flight" || category === "travel_insurance") {
+    return structured.travellers;
+  }
+  return structured.participants;
+}
+
+function patchStructured(
+  structured: StructuredItemDetails,
+  patch: Partial<StructuredItemDetails>,
+): StructuredItemDetails {
+  return {
+    ...structured,
+    ...patch,
+    participants: patch.participants
+      ? [...patch.participants]
+      : [...structured.participants],
+    travellers: patch.travellers
+      ? [...patch.travellers]
+      : [...structured.travellers],
+    privateViewers: patch.privateViewers
+      ? [...patch.privateViewers]
+      : [...structured.privateViewers],
+  };
+}
+
+function usernamesForParticipants(
+  participants: string[],
+  systemUsernames: string[],
+): string[] {
+  return systemUsernames.filter((username) =>
+    participants.some((participant) =>
+      travellerMatchesUsername(participant, username),
+    ),
   );
 }
 
@@ -501,7 +510,16 @@ function FlightSegmentsEditor({
         </div>
         <button
           type="button"
-          onClick={() => onChange([...segments, {}])}
+          onClick={() => {
+            const previous = segments[segments.length - 1];
+            onChange([
+              ...segments,
+              {
+                from: previous?.to,
+                fromIata: previous?.toIata,
+              },
+            ]);
+          }}
           className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2 py-1 text-xs"
         >
           <Plus className="h-3 w-3" />
@@ -716,6 +734,40 @@ export function AdminItemDetailsForm({
   onChange: (next: StructuredItemDetails) => void;
   systemUsernames?: string[];
 }) {
+  const [loadedUsernames, setLoadedUsernames] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (systemUsernames.length > 0) return;
+
+    void fetch("/api/users/brief")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((rows: { username: string }[]) => {
+        setLoadedUsernames(rows.map((row) => row.username));
+      })
+      .catch(() => undefined);
+  }, [systemUsernames.length]);
+
+  const allSystemUsernames = useMemo(
+    () =>
+      [...new Set([...systemUsernames, ...loadedUsernames])].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [loadedUsernames, systemUsernames],
+  );
+
+  const participants = linkedParticipantsForCategory(structured, category);
+  const participantUsernames = usernamesForParticipants(
+    participants,
+    allSystemUsernames,
+  );
+  const privateViewerOptions = useMemo(
+    () =>
+      allSystemUsernames.filter(
+        (username) => !participantUsernames.includes(username),
+      ),
+    [allSystemUsernames, participantUsernames],
+  );
+
   const setSimple = (key: string, value: string) =>
     onChange({
       ...structured,
@@ -758,7 +810,9 @@ export function AdminItemDetailsForm({
           />
           <ParticipantMultiSelect
             value={structured.participants}
-            onChange={(participants) => onChange({ ...structured, participants })}
+            onChange={(participants) =>
+              onChange(patchStructured(structured, { participants }))
+            }
           />
           <label className="block text-sm sm:col-span-2">
             <span className="mb-1 block text-stone-500">Linked booking</span>
@@ -795,27 +849,9 @@ export function AdminItemDetailsForm({
           </label>
           <ParticipantMultiSelect
             value={structured.travellers}
-            onChange={(travellers) => {
-              const nextGroups = structured.bookingGroups.map((group) => ({
-                ...group,
-                travellers: group.travellers.filter((name) =>
-                  travellers.includes(name),
-                ),
-              }));
-              onChange({
-                ...structured,
-                travellers,
-                bookingGroups: nextGroups,
-                seats:
-                  structured.seats.length > 0
-                    ? structured.seats
-                    : defaultTravellerRows(travellers),
-                baggage:
-                  structured.baggage.length > 0
-                    ? structured.baggage
-                    : defaultTravellerRows(travellers),
-              });
-            }}
+            onChange={(travellers) =>
+              onChange(updateFlightTravellers(structured, travellers))
+            }
           />
           <BookingGroupsEditor
             groups={structured.bookingGroups}
@@ -875,16 +911,18 @@ export function AdminItemDetailsForm({
                     segments: [
                       {
                         from: simple.from,
-                        to: simple.to,
                         fromIata: simple.fromIata,
-                        toIata: simple.toIata,
                         marketingFlightNumber: simple.marketingFlightNumber,
                         operatingFlightNumber:
                           simple.operatingFlightNumber ||
                           simple.marketingFlightNumber,
                         departureTime: simple.departureTime,
-                        arrivalTime: simple.arrivalTime,
                         aircraft: simple.aircraft,
+                      },
+                      {
+                        to: simple.to,
+                        toIata: simple.toIata,
+                        arrivalTime: simple.arrivalTime,
                       },
                     ],
                   });
@@ -918,7 +956,9 @@ export function AdminItemDetailsForm({
           <ParticipantMultiSelect
             label="Guests staying"
             value={structured.participants}
-            onChange={(participants) => onChange({ ...structured, participants })}
+            onChange={(participants) =>
+              onChange(patchStructured(structured, { participants }))
+            }
           />
           <TextInput
             label="Guests note (optional)"
@@ -993,6 +1033,13 @@ export function AdminItemDetailsForm({
 
       {category === "car_rental" && (
         <>
+          <ParticipantMultiSelect
+            label="Driver / participants"
+            value={structured.participants}
+            onChange={(participants) =>
+              onChange(patchStructured(structured, { participants }))
+            }
+          />
           <TextInput label="Company" value={structured.simple.company} onChange={(v) => setSimple("company", v)} />
           <label className="block text-sm">
             <span className="mb-1 block text-stone-500">Booking status</span>
@@ -1042,13 +1089,12 @@ export function AdminItemDetailsForm({
               className="w-full rounded-lg border border-stone-200 px-3 py-2"
             />
           </label>
-          <SystemUserMultiSelect
+          <ParticipantMultiSelect
             label="Travellers"
-            options={[
-              ...new Set([...systemUsernames, ...structured.travellers]),
-            ].sort((a, b) => a.localeCompare(b))}
             value={structured.travellers}
-            onChange={(travellers) => onChange({ ...structured, travellers })}
+            onChange={(travellers) =>
+              onChange(patchStructured(structured, { travellers }))
+            }
           />
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
             <input
@@ -1076,6 +1122,58 @@ export function AdminItemDetailsForm({
           )}
         </>
       )}
+
+      <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-4 sm:col-span-2">
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={structured.isPrivate}
+            onChange={(e) =>
+              onChange(patchStructured(structured, { isPrivate: e.target.checked }))
+            }
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-medium text-stone-800">Private item</span>
+            <span className="mt-0.5 block text-xs text-stone-500">
+              Only participants on this item, extra viewers below, and admins can
+              see it — even when someone&apos;s schedule filter is set to
+              Everyone.
+            </span>
+          </span>
+        </label>
+
+        {structured.isPrivate ? (
+          <div className="mt-3 border-t border-stone-200 pt-3">
+            <CheckboxDropdown
+              label="Private viewers (login accounts)"
+              options={privateViewerOptions}
+              value={structured.privateViewers}
+              onChange={(privateViewers) =>
+                onChange(
+                  patchStructured(structured, {
+                    privateViewers: privateViewers.map((username) =>
+                      username.toLowerCase(),
+                    ),
+                  }),
+                )
+              }
+              emptyLabel="Add viewers…"
+            />
+            <p className="mt-2 text-xs text-stone-500">
+              People with accounts who can view this item but are not
+              participants above — for example, a parent viewing their
+              child&apos;s booking.
+            </p>
+            {privateViewerOptions.length === 0 ? (
+              <p className="mt-1 text-xs text-amber-700">
+                No additional accounts available. Everyone listed as a
+                participant already has access.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       <label className="block text-sm sm:col-span-2">
         <span className="mb-1 block text-stone-500">Notes</span>

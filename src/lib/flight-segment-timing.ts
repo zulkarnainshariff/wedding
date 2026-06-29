@@ -4,6 +4,7 @@ import {
   resolveFlightSchedule,
   zonedLocalToUtc,
 } from "@/lib/flight-datetime";
+import { resolveAirportCitySync } from "@/lib/airport-cities";
 import { getAirportTimezone } from "@/lib/airport-timezones";
 import type { ItineraryItem } from "@/lib/schema";
 import { getFlightDetails, type FlightDetails, type FlightSegment } from "@/lib/types";
@@ -105,13 +106,87 @@ function resolveClockInstant(
   return null;
 }
 
-export function flightSegmentsFromDetails(
+function normalizeSegmentIata(value?: string | null): string | null {
+  const code = value?.trim().toUpperCase();
+  return code && code.length === 3 ? code : null;
+}
+
+/**
+ * When a multi-leg booking is split into segments, the first leg often still
+ * carries the journey destination (JFK→MEL) instead of the connection airport
+ * (JFK→LAX). That makes layovers appear at the final city for ~20 hours.
+ */
+export function normalizeConnectingFlightSegments(
+  segments: FlightSegment[],
+): FlightSegment[] {
+  if (segments.length < 2) return segments;
+
+  const normalized = segments.map((segment) => ({ ...segment }));
+  const finalTo = normalizeSegmentIata(
+    normalized[normalized.length - 1].toIata,
+  );
+
+  for (let index = 0; index < normalized.length - 1; index += 1) {
+    const current = normalized[index];
+    const next = normalized[index + 1];
+    const currentTo = normalizeSegmentIata(current.toIata);
+    const nextFrom = normalizeSegmentIata(next.fromIata);
+
+    if (
+      !nextFrom ||
+      currentTo === nextFrom ||
+      (finalTo && currentTo !== finalTo)
+    ) {
+      continue;
+    }
+
+    normalized[index] = {
+      ...current,
+      toIata: nextFrom,
+      to: next.from ?? resolveAirportCitySync(nextFrom) ?? current.to,
+    };
+  }
+
+  return normalized;
+}
+
+function flightSegmentsFromRawDetails(
   details: FlightDetails | null | undefined,
 ): FlightSegment[] {
   if (!details?.segments?.length) return [];
   return details.segments.filter(
     (segment) => !segment.transit && (segment.fromIata || segment.from),
   );
+}
+
+export function flightSegmentsFromDetails(
+  details: FlightDetails | null | undefined,
+): FlightSegment[] {
+  const segments = flightSegmentsFromRawDetails(details);
+  return normalizeConnectingFlightSegments(segments);
+}
+
+export function normalizeFlightDetailsSegments(
+  details: FlightDetails,
+): FlightDetails {
+  if (!details.segments?.length) return details;
+
+  const flightSegments = flightSegmentsFromRawDetails(details);
+  if (flightSegments.length < 2) return details;
+
+  const normalized = normalizeConnectingFlightSegments(flightSegments);
+  let flightIndex = 0;
+
+  const segments = details.segments.map((segment) => {
+    if (segment.transit || !(segment.fromIata || segment.from)) {
+      return segment;
+    }
+    const next = normalized[flightIndex];
+    flightIndex += 1;
+    return next;
+  });
+
+  return { ...details, segments };
 }
 
 export function isMultiSegmentFlightDetails(
@@ -350,11 +425,28 @@ export function resolveMultiSegmentJourneyBounds(
   if (
     fallbackEnd &&
     fallbackEnd.getTime() > scheduledStart.getTime() &&
-    topLevelDestinationMatchesFinal(item.details, segments) &&
-    fallbackEnd.getTime() > windows[0].arr.getTime() &&
-    fallbackEnd.getTime() - scheduledEnd.getTime() <= 6 * 60 * 60_000
+    topLevelDestinationMatchesFinal(item.details, segments)
   ) {
-    scheduledEnd = fallbackEnd;
+    const lastTz = getAirportTimezone(segments[segments.length - 1].toIata);
+    const storedArrivalDate = lastTz
+      ? calendarDateForInstant(fallbackEnd, lastTz)
+      : null;
+    const computedArrivalDate = lastTz
+      ? calendarDateForInstant(scheduledEnd, lastTz)
+      : null;
+
+    if (
+      storedArrivalDate &&
+      computedArrivalDate &&
+      storedArrivalDate > computedArrivalDate
+    ) {
+      scheduledEnd = fallbackEnd;
+    } else if (
+      fallbackEnd.getTime() > windows[0].arr.getTime() &&
+      fallbackEnd.getTime() - scheduledEnd.getTime() <= 6 * 60 * 60_000
+    ) {
+      scheduledEnd = fallbackEnd;
+    }
   }
 
   return { scheduledStart, scheduledEnd, eventDate };
@@ -388,18 +480,19 @@ export function resolveFlightScheduleForItem(
 export function syncMultiSegmentRouteFields(
   details: FlightDetails,
 ): FlightDetails {
-  const segments = flightSegmentsFromDetails(details);
-  if (segments.length < 2) return details;
+  const normalizedDetails = normalizeFlightDetailsSegments(details);
+  const segments = flightSegmentsFromDetails(normalizedDetails);
+  if (segments.length < 2) return normalizedDetails;
 
   const first = segments[0];
   const last = segments[segments.length - 1];
 
   return {
-    ...details,
-    from: first.from ?? details.from,
-    to: last.to ?? details.to,
-    fromIata: first.fromIata ?? details.fromIata,
-    toIata: last.toIata ?? details.toIata,
+    ...normalizedDetails,
+    from: first.from ?? normalizedDetails.from,
+    to: last.to ?? normalizedDetails.to,
+    fromIata: first.fromIata ?? normalizedDetails.fromIata,
+    toIata: last.toIata ?? normalizedDetails.toIata,
   };
 }
 
@@ -485,7 +578,10 @@ export function buildFlightLegDisplayList(
       layoverAfter:
         layoverMinutes > 0
           ? {
-              airport: current.toLabel,
+              airport:
+                current.toLabel === next.fromLabel
+                  ? current.toLabel
+                  : next.fromLabel,
               layoverMinutes: Math.max(1, layoverMinutes),
               departureAtMs: next.dep.getTime(),
             }

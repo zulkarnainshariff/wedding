@@ -124,7 +124,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                     href={`/api/items/documents/${doc.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-w-0 items-center gap-2 text-sm text-[#1e3a5f] hover:underline"
+                    className="inline-flex min-w-0 items-center gap-2 text-sm text-brand-deep hover:underline"
                   >
                     <FileText className="h-4 w-4 shrink-0" />
                     <span className="truncate">
@@ -221,7 +221,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
           <button
             type="submit"
             disabled={uploading}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             <Upload className="h-4 w-4" />
             {uploading ? "Uploading…" : "Upload"}

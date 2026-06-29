@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { canManageUsers, canEditItinerary, isSuperuser, normalizePermissions } from "@/lib/permissions";
 import { getDays, getAllItems } from "@/lib/queries";
 import { getAllInvitationEvents, getScheduleItemsForEventAdmin } from "@/lib/public-queries";
+import { getAppSettings } from "@/lib/app-settings";
 import { users } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
@@ -24,10 +25,11 @@ export default async function AdminPage() {
     redirect("/itinerary");
   }
 
-  const [days, items, invitationEvents] = await Promise.all([
+  const [days, items, invitationEvents, appSettings] = await Promise.all([
     getDays(),
     getAllItems(),
     getAllInvitationEvents(),
+    getAppSettings(),
   ]);
 
   const initialEvents = await Promise.all(
@@ -58,6 +60,7 @@ export default async function AdminPage() {
         showUserManagement={canManageUsers(sessionUser)}
         showFullAdmin={sessionUser.isAdmin}
         showDiagnostics={isSuperuser(sessionUser)}
+        initialThemeId={appSettings.themeId}
       />
     </AppShell>
   );

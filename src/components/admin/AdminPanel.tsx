@@ -7,6 +7,7 @@ import { AdminItemDetailsForm } from "./AdminItemDetailsForm";
 import { FlightScheduleTimes } from "./FlightScheduleTimes";
 import { InvitationManagement } from "./InvitationManagement";
 import { TravelInsurancePanel } from "./TravelInsurancePanel";
+import { AppearanceSettingsPanel } from "./AppearanceSettingsPanel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { GuestListClient } from "@/components/guests/GuestListClient";
 import { TaskPermissionsPanel } from "./TaskPermissionsPanel";
@@ -20,8 +21,10 @@ import {
 } from "@/lib/admin-item-form";
 import { getItemSortTime } from "@/lib/item-schedule-datetime";
 import { useUnsavedChangesGuard } from "@/components/layout/NavigationGuard";
+import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { PageShell, SectionShell } from "@/components/layout/PageShell";
 import { CATEGORY_META, CATEGORIES, type Category } from "@/lib/types";
+import type { AppThemeId } from "@/lib/app-theme";
 import type { ItineraryDay, ItineraryItem, PublicScheduleItemRow, WeddingEvent } from "@/lib/schema";
 
 type AdminTab =
@@ -32,6 +35,7 @@ type AdminTab =
   | "guests"
   | "tasks"
   | "insurance"
+  | "appearance"
   | "diagnostics";
 
 type EventWithSchedule = WeddingEvent & {
@@ -60,6 +64,7 @@ export function AdminPanel({
   showUserManagement = false,
   showFullAdmin = true,
   showDiagnostics = false,
+  initialThemeId,
 }: {
   initialDays: ItineraryDay[];
   initialItems: ItineraryItem[];
@@ -68,6 +73,7 @@ export function AdminPanel({
   showUserManagement?: boolean;
   showFullAdmin?: boolean;
   showDiagnostics?: boolean;
+  initialThemeId: AppThemeId;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<AdminTab>(
@@ -77,6 +83,13 @@ export function AdminPanel({
   const [items, setItems] = useState(initialItems);
   const [itemForm, setItemForm] = useState<ItemFormState>(emptyItemForm());
   const [itemBaseline, setItemBaseline] = useState<ItemFormState>(emptyItemForm());
+  const systemUsernames = useMemo(
+    () =>
+      [...new Set(initialUsers.map((user) => user.username))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [initialUsers],
+  );
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [dayForm, setDayForm] = useState(EMPTY_DAY_FORM);
   const [dayBaseline, setDayBaseline] = useState(EMPTY_DAY_FORM);
@@ -97,6 +110,7 @@ export function AdminPanel({
   );
 
   useUnsavedChangesGuard(dayDirty || itemDirty);
+  const { formatDayOption, formatDateOnly } = useDisplayFormat();
 
   const sortedItems = useMemo(() => sortItems(items), [items]);
 
@@ -108,6 +122,7 @@ export function AdminPanel({
         ["guests", "Guest lists"],
         ["tasks", "Task access"],
         ["insurance", "Travel insurance"],
+        ["appearance", "Appearance"],
         ...(showUserManagement ? ([["users", "Users"]] as const) : []),
         ...(showDiagnostics ? ([["diagnostics", "Diagnostics"]] as const) : []),
       ]
@@ -211,11 +226,19 @@ export function AdminPanel({
       return;
     }
 
-    const cleared = emptyItemForm();
-    setItemForm(cleared);
-    setItemBaseline(cleared);
-    setEditingItemId(null);
-    setStatus("Item saved.");
+    const saved = (await res.json()) as ItineraryItem;
+    if (editingItemId) {
+      const savedForm = itemToForm(saved);
+      setItemForm(savedForm);
+      setItemBaseline(savedForm);
+      setStatus("Item saved.");
+    } else {
+      const cleared = emptyItemForm();
+      setItemForm(cleared);
+      setItemBaseline(cleared);
+      setEditingItemId(null);
+      setStatus("Item saved.");
+    }
     await refresh();
   }
 
@@ -290,7 +313,7 @@ export function AdminPanel({
               className={[
                 "cursor-pointer border-b-2 px-4 py-2 text-sm font-medium",
                 tab === value
-                  ? "border-[#1e3a5f] text-[#1e3a5f]"
+                  ? "border-brand-deep text-brand-deep"
                   : "border-transparent text-stone-500 hover:text-stone-700",
               ].join(" ")}
             >
@@ -326,6 +349,12 @@ export function AdminPanel({
       {tab === "insurance" && (
         <div className={TAB_CONTENT_CLASS}>
           <TravelInsurancePanel initialItems={items} />
+        </div>
+      )}
+
+      {tab === "appearance" && showFullAdmin && (
+        <div className={TAB_CONTENT_CLASS}>
+          <AppearanceSettingsPanel initialThemeId={initialThemeId} />
         </div>
       )}
 
@@ -391,7 +420,7 @@ export function AdminPanel({
                 type="button"
                 disabled={busy}
                 onClick={saveDay}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white"
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
               >
                 <Save className="h-4 w-4" />
                 Save day
@@ -418,7 +447,7 @@ export function AdminPanel({
                     <p className="font-medium text-stone-800">
                       Day {day.dayNumber} · {day.title || "Untitled"}
                     </p>
-                    <p className="text-sm text-stone-500">{day.date}</p>
+                    <p className="text-sm text-stone-500">{formatDateOnly(day.date)}</p>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -484,7 +513,7 @@ export function AdminPanel({
                   <option value="">Unassigned</option>
                   {days.map((day) => (
                     <option key={day.id} value={day.id}>
-                      Day {day.dayNumber} — {day.title || day.date}
+                      {formatDayOption(day)}
                     </option>
                   ))}
                 </select>
@@ -547,7 +576,10 @@ export function AdminPanel({
               category={itemForm.category}
               structured={itemForm.structured}
               allItems={items}
-              onChange={(structured) => setItemForm({ ...itemForm, structured })}
+              systemUsernames={systemUsernames}
+              onChange={(structured) =>
+                setItemForm((current) => ({ ...current, structured }))
+              }
             />
 
             <div className="mt-4 flex gap-2">
@@ -555,7 +587,7 @@ export function AdminPanel({
                 type="button"
                 disabled={busy || !itemForm.title.trim()}
                 onClick={saveItem}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
                 Save item

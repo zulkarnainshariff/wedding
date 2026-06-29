@@ -118,7 +118,7 @@ export function NotificationBell({ compact = false }: { compact?: boolean }) {
                   setUrgent(null);
                   if (urgent.href) router.push(urgent.href);
                 }}
-                className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white"
+                className="rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
               >
                 View task
               </button>
@@ -137,13 +137,13 @@ export function NotificationBell({ compact = false }: { compact?: boolean }) {
           />
           <div className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
-              <h2 className="font-serif text-xl text-[#1e3a5f]">Notifications</h2>
+              <h2 className="font-serif text-xl text-brand-deep">Notifications</h2>
               <div className="flex items-center gap-2">
                 {unreadCount > 0 && (
                   <button
                     type="button"
                     onClick={() => void markAllRead()}
-                    className="text-xs text-[#1e3a5f] underline"
+                    className="text-xs text-brand-deep underline"
                   >
                     Mark all read
                   </button>
@@ -192,7 +192,7 @@ export function NotificationBell({ compact = false }: { compact?: boolean }) {
               )}
             </div>
             <div className="border-t border-stone-200 p-3">
-              <Link href="/tasks" onClick={() => setOpen(false)} className="text-sm text-[#1e3a5f] underline">
+              <Link href="/tasks" onClick={() => setOpen(false)} className="text-sm text-brand-deep underline">
                 View all tasks
               </Link>
             </div>

@@ -49,9 +49,20 @@ export async function POST(request: Request) {
 
   let body = await request.json();
   if (body.category === "flight" && body.details && typeof body.details === "object") {
+    const incoming = body.details as Record<string, unknown>;
+    const enriched = await enrichFlightTimezoneDetails(body.details);
     body = {
       ...body,
-      details: await enrichFlightTimezoneDetails(body.details),
+      details: {
+        ...enriched,
+        isPrivate: Boolean(incoming.isPrivate),
+        privateViewers: Array.isArray(incoming.privateViewers)
+          ? incoming.privateViewers
+          : Array.isArray(incoming.extraViewers)
+            ? incoming.extraViewers
+            : [],
+        extraViewers: undefined,
+      },
     };
   }
   body = applyItemDatetimeOverrides(body);

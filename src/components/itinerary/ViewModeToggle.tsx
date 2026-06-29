@@ -37,7 +37,7 @@ function ToggleButton({
       className={[
         "cursor-pointer rounded-lg px-3 py-1.5 font-medium transition",
         active
-          ? "bg-[#1e3a5f] text-white"
+          ? "bg-brand-deep text-white"
           : "text-stone-500 hover:text-stone-800",
       ].join(" ")}
     >

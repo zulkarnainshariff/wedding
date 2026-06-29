@@ -69,7 +69,7 @@ export function FlightCheckInDialog({
         <div className="flex items-start justify-between gap-4">
           <h2
             id="flight-check-in-title"
-            className="font-serif text-xl text-[#1e3a5f]"
+            className="font-serif text-xl text-brand-deep"
           >
             {title}
           </h2>
@@ -147,7 +147,7 @@ export function FlightCheckInDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy || passengers.length === 0}
-            className="rounded-xl bg-[#1e3a5f] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-xl bg-brand-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
           >
             {busy
               ? "Saving…"

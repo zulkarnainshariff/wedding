@@ -71,7 +71,7 @@ export function ConfirmDialog({
           <div>
             <h2
               id="confirm-dialog-title"
-              className="font-serif text-xl text-[#1e3a5f]"
+              className="font-serif text-xl text-brand-deep"
             >
               {title}
             </h2>
@@ -120,7 +120,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={busy || !phraseMatches}
             className={`rounded-xl px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 ${
-              destructive ? "bg-red-600 hover:bg-red-700" : "bg-[#1e3a5f]"
+              destructive ? "bg-red-600 hover:bg-red-700" : "bg-brand-deep"
             }`}
           >
             {confirmLabel}

@@ -8,6 +8,7 @@ import {
   formatDateOnlyWithPrefs,
   formatDateRangeCompactWithPrefs,
   formatDateTimeWithPrefs,
+  formatDayOptionLabel,
   formatInstantWithPrefs,
   formatStayDateTimeWithPrefs,
 } from "@/lib/display-format";
@@ -31,6 +32,12 @@ export function useDisplayFormat() {
       ) => formatInstantWithPrefs(iso, timeZone, preferences, options),
       formatDateOnly: (value: string | Date | null | undefined) =>
         formatDateOnlyWithPrefs(value, preferences),
+      formatDayOption: (
+        day: Pick<
+          { dayNumber: number; title?: string | null; date: string },
+          "dayNumber" | "title" | "date"
+        >,
+      ) => formatDayOptionLabel(day, preferences),
       formatDateRange: (
         start: string | null | undefined,
         end: string | null | undefined,

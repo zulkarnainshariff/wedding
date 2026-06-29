@@ -36,16 +36,32 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({
+  children,
+  hasSession = true,
+}: {
+  children: React.ReactNode;
+  hasSession?: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [guestListAccess, setGuestListAccess] = useState<GuestListAccess[]>([]);
   const [taskPermissions, setTaskPermissions] = useState<TaskPermissionAccess[]>([]);
-  const [loading, setLoading] = useState(pathname !== "/login");
+  const [loading, setLoading] = useState(
+    pathname !== "/login" && hasSession,
+  );
 
   const refreshUser = useCallback(async () => {
     if (pathname === "/login") {
+      setUser(null);
+      setGuestListAccess([]);
+      setTaskPermissions([]);
+      setLoading(false);
+      return;
+    }
+
+    if (!hasSession) {
       setUser(null);
       setGuestListAccess([]);
       setTaskPermissions([]);
@@ -72,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [pathname]);
+  }, [pathname, hasSession]);
 
   useEffect(() => {
     void refreshUser();

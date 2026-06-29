@@ -12,7 +12,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f5f1eb]">
+    <div className="flex h-screen overflow-hidden bg-background">
       <div className="hidden h-full shrink-0 lg:block">
         <Sidebar />
       </div>

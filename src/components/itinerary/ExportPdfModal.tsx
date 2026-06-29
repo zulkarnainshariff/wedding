@@ -132,7 +132,7 @@ export function ExportPdfModal({ open, onClose }: Props) {
           <div>
             <h2
               id="export-pdf-title"
-              className="font-serif text-xl text-[#1e3a5f]"
+              className="font-serif text-xl text-brand-deep"
             >
               {isPreview ? "Preview PDF" : "Export to PDF"}
             </h2>
@@ -230,7 +230,7 @@ export function ExportPdfModal({ open, onClose }: Props) {
                 type="button"
                 disabled={!previewBlob}
                 onClick={handleDownload}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#1e3a5f] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
               >
                 <Download className="h-4 w-4" />
                 Download PDF
@@ -242,7 +242,7 @@ export function ExportPdfModal({ open, onClose }: Props) {
                 type="button"
                 disabled={busy || selected.length === 0}
                 onClick={() => void handlePreview()}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#1e3a5f] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
               >
                 <Eye className="h-4 w-4" />
                 {busy ? "Generating preview…" : "Preview PDF"}
@@ -276,9 +276,9 @@ export function ExportPdfButton({
       type="button"
       onClick={onOpen}
       className={[
-        "flex cursor-pointer items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-[#1e3a5f]",
+        "flex cursor-pointer items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-brand-deep",
         inline
-          ? "rounded-lg border border-stone-200 bg-white px-3 py-2 hover:border-[#1e3a5f]/30"
+          ? "rounded-lg border border-stone-200 bg-white px-3 py-2 hover:border-brand-deep/30"
           : [
               "gap-3 rounded-xl px-3 py-2.5 hover:bg-stone-100 hover:text-stone-900",
               compact ? "justify-center px-2" : "w-full",

@@ -13,7 +13,7 @@ export function PublicLanding({
   events: Array<PublicInvitationEvent & { schedule: PublicScheduleItem[] }>;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-[#f5f1eb]">
+    <div className="flex min-h-screen flex-col bg-background">
       <PublicHeader />
       <main className="flex flex-1 flex-col pt-24">
         <InvitationCards events={events} />

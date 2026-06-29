@@ -1,23 +1,143 @@
 @import "tailwindcss";
 
-:root {
+/* Fallback when data-theme is not yet applied (SSR flash, DB unavailable). */
+:root,
+[data-theme="azure-blossom"] {
+  --background: #d4ebf9;
+  --foreground: #1e3d56;
+  --brand: #5aabdf;
+  --brand-deep: #3d8fc9;
+  --brand-ink: #2a75ad;
+  --accent: #e8a8c4;
+  --accent-soft: #f5d4e4;
+  --accent-pearl: #fceef4;
+  --surface: #f5fbff;
+  --surface-soft: #eaf6fd;
+  --border: #a8cfe8;
+  --muted: #4a7a96;
+  --eyebrow: #d488a8;
+  --mark-ink: #fceef4;
+  --invitation-from: #3d8fc9;
+  --invitation-via: #5aabdf;
+  --invitation-to: #3d8fc9;
+  --invitation-border: #e8a8c4;
+  --invitation-headline: #f5d4e4;
+  --invitation-date: #fceef4;
+  --invitation-title: #ffffff;
+  --invitation-body: rgba(255, 255, 255, 0.88);
+  --invitation-body-muted: rgba(255, 255, 255, 0.65);
+  --invitation-hint: rgba(255, 255, 255, 0.5);
+  --theme-card-shadow:
+    0 1px 2px rgba(61, 143, 201, 0.08),
+    0 8px 24px rgba(232, 168, 196, 0.12);
+  --body-background-image:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(232, 168, 196, 0.22), transparent),
+    radial-gradient(ellipse 60% 40% at 95% 5%, rgba(90, 171, 223, 0.28), transparent),
+    radial-gradient(ellipse 50% 35% at 50% 100%, rgba(212, 235, 249, 0.5), transparent),
+    url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23a8cfe8' stroke-width='0.45' opacity='0.4'%3E%3Cpath d='M0 40c20-12 40-12 60 0s40 12 60 0'/%3E%3Cpath d='M0 20c20 8 40 8 60 0s40-8 60 0'/%3E%3Cpath d='M0 60c20-8 40-8 60 0s40 8 60 0'/%3E%3C/g%3E%3Cg fill='%23e8a8c4' opacity='0.14'%3E%3Ccircle cx='12' cy='12' r='1.5'/%3E%3Ccircle cx='68' cy='18' r='1'/%3E%3Ccircle cx='40' cy='68' r='1.25'/%3E%3Ccircle cx='72' cy='58' r='0.9'/%3E%3C/g%3E%3C/svg%3E");
+  --font-sans: var(--font-nunito);
+}
+
+[data-theme="heritage-gold"] {
   --background: #f5f1eb;
   --foreground: #292524;
-  --navy: #1e3a5f;
-  --gold: #d4a853;
+  --brand: #1e3a5f;
+  --brand-deep: #1e3a5f;
+  --brand-ink: #254a75;
+  --accent: #d4a853;
+  --accent-soft: #e8cc7a;
+  --accent-pearl: #faf8f5;
+  --surface: #ffffff;
+  --surface-soft: #faf8f5;
+  --border: #e7e5e4;
+  --muted: #78716c;
+  --eyebrow: #d4a853;
+  --mark-ink: #e8cc7a;
+  --invitation-from: #1e3a5f;
+  --invitation-via: #254a75;
+  --invitation-to: #1e3a5f;
+  --invitation-border: #d4a853;
+  --invitation-headline: #d4a853;
+  --invitation-date: #e8cc7a;
+  --invitation-title: #ffffff;
+  --invitation-body: rgba(255, 255, 255, 0.9);
+  --invitation-body-muted: rgba(255, 255, 255, 0.72);
+  --invitation-hint: rgba(255, 255, 255, 0.5);
+  --theme-card-shadow:
+    0 1px 2px rgba(30, 58, 95, 0.06),
+    0 8px 24px rgba(212, 168, 83, 0.1);
+  --body-background-image:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(212, 168, 83, 0.14), transparent),
+    radial-gradient(ellipse 60% 40% at 95% 5%, rgba(30, 58, 95, 0.08), transparent),
+    radial-gradient(ellipse 50% 35% at 50% 100%, rgba(245, 241, 235, 0.9), transparent);
+  --font-sans: var(--font-dm-sans);
+}
+
+[data-theme="pearl-blossom"] {
+  --background: #ffffff;
+  --foreground: #3d4f5c;
+  --brand: #7ec4ef;
+  --brand-deep: #5aabdf;
+  --brand-ink: #4a94c4;
+  --accent: #e8a8c4;
+  --accent-soft: #f8e0ec;
+  --accent-pearl: #fff8fb;
+  --surface: #ffffff;
+  --surface-soft: #fafbfc;
+  --border: #e8e4e6;
+  --muted: #7a8f9c;
+  --eyebrow: #d488a8;
+  --mark-ink: #fceef4;
+  --invitation-from: #e8b8d0;
+  --invitation-via: #e8a8c4;
+  --invitation-to: #d98eb0;
+  --invitation-border: #f5d4e4;
+  --invitation-headline: #ffffff;
+  --invitation-date: #fff5f9;
+  --invitation-title: #ffffff;
+  --invitation-body: rgba(255, 255, 255, 0.92);
+  --invitation-body-muted: rgba(255, 255, 255, 0.75);
+  --invitation-hint: rgba(255, 255, 255, 0.55);
+  --theme-card-shadow:
+    0 1px 2px rgba(216, 142, 176, 0.08),
+    0 8px 24px rgba(232, 168, 196, 0.14);
+  --body-background-image:
+    radial-gradient(ellipse 65% 40% at 88% 8%, rgba(232, 168, 196, 0.12), transparent),
+    radial-gradient(ellipse 50% 30% at 8% 92%, rgba(126, 196, 239, 0.06), transparent);
+  --font-sans: var(--font-nunito);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-ink: var(--brand-ink);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-pearl: var(--accent-pearl);
+  --color-surface: var(--surface);
+  --color-surface-soft: var(--surface-soft);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-eyebrow: var(--eyebrow);
   --font-sans: var(--font-sans);
   --font-serif: var(--font-serif);
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
+  background-image: var(--body-background-image);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+[data-theme="azure-blossom"] body,
+[data-theme="pearl-blossom"] body {
+  font-family: var(--font-nunito), system-ui, sans-serif;
+}
+
+[data-theme="heritage-gold"] body {
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
 }
 
 .font-serif {
@@ -29,6 +149,97 @@ select,
 textarea,
 button {
   font: inherit;
+}
+
+.theme-card {
+  border-color: color-mix(in srgb, var(--brand) 22%, white);
+  box-shadow: var(--theme-card-shadow);
+}
+
+.theme-gradient-header {
+  background: linear-gradient(
+    135deg,
+    var(--surface-soft) 0%,
+    var(--accent-pearl) 45%,
+    var(--surface) 100%
+  );
+}
+
+.theme-eyebrow {
+  color: var(--eyebrow);
+  letter-spacing: 0.2em;
+}
+
+.theme-progress-bar {
+  background: linear-gradient(90deg, var(--brand-deep), var(--accent));
+}
+
+.invitation-card-face {
+  border: 1px solid color-mix(in srgb, var(--invitation-border) 35%, transparent);
+  background: linear-gradient(
+    to bottom right,
+    var(--invitation-from),
+    var(--invitation-via),
+    var(--invitation-to)
+  );
+  color: var(--invitation-title);
+}
+
+.invitation-card-frame {
+  border-color: color-mix(in srgb, var(--invitation-border) 28%, transparent);
+}
+
+.invitation-card-headline {
+  color: var(--invitation-headline);
+}
+
+.invitation-card-title {
+  color: var(--invitation-title);
+}
+
+.invitation-card-date {
+  color: var(--invitation-date);
+}
+
+.invitation-card-body {
+  color: var(--invitation-body);
+}
+
+.invitation-card-body-muted {
+  color: var(--invitation-body-muted);
+}
+
+.invitation-card-hint {
+  color: var(--invitation-hint);
+}
+
+.invitation-event-tab {
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--muted);
+}
+
+.invitation-event-tab:not(.invitation-event-tab--active):hover {
+  background: var(--surface-soft);
+  color: var(--foreground);
+  border-color: color-mix(in srgb, var(--brand) 30%, var(--border));
+}
+
+.invitation-event-tab--active {
+  border-color: color-mix(in srgb, var(--invitation-border) 40%, transparent);
+  background: linear-gradient(
+    to bottom right,
+    var(--invitation-from),
+    var(--invitation-via),
+    var(--invitation-to)
+  );
+  color: var(--invitation-title);
+  box-shadow: var(--theme-card-shadow);
+}
+
+.invitation-event-tab--active:hover {
+  color: var(--invitation-title);
+  filter: brightness(1.06);
 }
 
 @media (prefers-reduced-motion: reduce) {

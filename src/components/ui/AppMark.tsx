@@ -15,13 +15,13 @@ export function AppMark({
       className={className}
       aria-hidden
     >
-      <circle cx="16" cy="16" r="16" fill="#1e3a5f" />
+      <circle cx="16" cy="16" r="16" fill="var(--brand-deep)" />
       <circle
         cx="16"
         cy="16"
         r="13.25"
         fill="none"
-        stroke="#d4a853"
+        stroke="var(--accent)"
         strokeWidth="0.65"
         opacity="0.9"
       />
@@ -30,15 +30,15 @@ export function AppMark({
         cy="16"
         r="11.5"
         fill="none"
-        stroke="#d4a853"
+        stroke="var(--accent-soft)"
         strokeWidth="0.35"
-        opacity="0.45"
+        opacity="0.55"
       />
       <text
         x="16"
         y="21.5"
         textAnchor="middle"
-        fill="#e8cc7a"
+        fill="var(--mark-ink)"
         fontFamily="Georgia, 'Times New Roman', serif"
         fontSize="15"
         fontWeight="400"

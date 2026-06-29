@@ -124,6 +124,7 @@ export function ItineraryUIProvider({ children }: { children: React.ReactNode })
     }
 
     setIsClosingItem(false);
+    setItemLoadError(null);
     let cancelled = false;
     setLoadingItem(true);
 

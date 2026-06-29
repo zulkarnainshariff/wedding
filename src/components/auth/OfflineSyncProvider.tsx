@@ -3,8 +3,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useTripTime } from "@/components/itinerary/TripTimeContext";
-import { shouldFetchFlightLiveStatus } from "@/lib/flight-live-eligibility";
 import {
   readOfflineCache,
   writeOfflineCache,
@@ -35,7 +33,6 @@ async function fetchSync(query: string, signal?: AbortSignal) {
 export function OfflineSyncProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { effectiveDate, effectiveDateString } = useTripTime();
   const [updateId, setUpdateId] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -43,7 +40,7 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
   const [cache, setCache] = useState<OfflineCache | null>(null);
   const updateIdRef = useRef<string | null>(null);
   const syncInFlightRef = useRef(false);
-  const flightRefreshKeyRef = useRef<string | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     updateIdRef.current = updateId;
@@ -60,7 +57,12 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
       const previousId = updateIdRef.current;
       if (previousId && previousId !== payload.updateId) {
         dispatchSyncUpdated({ updateId: payload.updateId });
-        router.refresh();
+        if (refreshTimerRef.current) {
+          clearTimeout(refreshTimerRef.current);
+        }
+        refreshTimerRef.current = setTimeout(() => {
+          router.refresh();
+        }, 300);
       }
     },
     [router],
@@ -170,6 +172,7 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
           const payload = JSON.parse(event.data) as { updateId?: string };
           if (
             payload.updateId &&
+            updateIdRef.current &&
             payload.updateId !== updateIdRef.current
           ) {
             void syncNow();
@@ -207,21 +210,12 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
   }, [authLoading, user, checkForUpdates, syncNow]);
 
   useEffect(() => {
-    if (!user || !cache?.items?.length) return;
-
-    const key = `${user.id}:${cache.cachedAt}`;
-    if (flightRefreshKeyRef.current === key) return;
-    flightRefreshKeyRef.current = key;
-
-    for (const item of cache.items) {
-      if (item.category !== "flight" || !item.id) continue;
-      if (!shouldFetchFlightLiveStatus(item, effectiveDate)) continue;
-      void fetch(
-        `/api/flights/${item.id}/status?asOf=${encodeURIComponent(effectiveDateString)}`,
-        { cache: "no-store" },
-      );
-    }
-  }, [user, cache, effectiveDate, effectiveDateString]);
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
+  }, []);
 
   const getCachedItem = useCallback(
     (id: number) => cache?.items.find((item) => item.id === id) ?? null,

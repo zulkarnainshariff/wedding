@@ -27,16 +27,6 @@ export function TravelInsurancePanel({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [systemUsernames, setSystemUsernames] = useState<string[]>([]);
-
-  useEffect(() => {
-    void fetch("/api/users/brief")
-      .then((response) => (response.ok ? response.json() : []))
-      .then((rows: { username: string }[]) => {
-        setSystemUsernames(rows.map((row) => row.username));
-      })
-      .catch(() => undefined);
-  }, []);
 
   useEffect(() => {
     if (existing) {
@@ -119,7 +109,6 @@ export function TravelInsurancePanel({
         category="travel_insurance"
         structured={form.structured}
         allItems={initialItems}
-        systemUsernames={systemUsernames}
         onChange={(structured) => setForm((current) => ({ ...current, structured }))}
       />
 
@@ -138,7 +127,7 @@ export function TravelInsurancePanel({
         type="button"
         disabled={busy}
         onClick={() => void save()}
-        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
         <Save className="h-4 w-4" />
         {itemId ? "Save changes" : "Create travel insurance item"}

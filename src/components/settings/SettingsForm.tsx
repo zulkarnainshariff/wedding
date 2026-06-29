@@ -81,7 +81,7 @@ export function SettingsForm({
       )}
 
       <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
-        <h2 className="font-serif text-xl text-[#1e3a5f]">Display preferences</h2>
+        <h2 className="font-serif text-xl text-brand-deep">Display preferences</h2>
         <label className="block text-sm">
           <span className="mb-1 block text-stone-500">Units</span>
           <select
@@ -148,14 +148,14 @@ export function SettingsForm({
           type="button"
           disabled={saving}
           onClick={() => void savePreferences()}
-          className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white"
+          className="rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
         >
           Save preferences
         </button>
       </section>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
-        <h2 className="font-serif text-xl text-[#1e3a5f]">Change password</h2>
+        <h2 className="font-serif text-xl text-brand-deep">Change password</h2>
         <label className="block text-sm">
           <span className="mb-1 block text-stone-500">Current password</span>
           <PasswordInput
@@ -184,7 +184,7 @@ export function SettingsForm({
           type="button"
           disabled={saving || !currentPassword || !newPassword}
           onClick={() => void changePassword()}
-          className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           Update password
         </button>

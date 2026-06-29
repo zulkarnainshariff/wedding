@@ -8,9 +8,13 @@ import { formatBookingGroupsDisplay } from "@/lib/booking-groups";
 import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
 import { formatSeatsSummary } from "@/lib/seats";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/activity-utils";
+import { FlightItinerarySummary } from "@/components/itinerary/FlightViews";
 import { getAccommodationTileLines, enrichStayDetailsFromItem, buildAccommodationCompactSummary } from "@/lib/accommodation-utils";
 import { useStackedAccommodationLayout } from "@/hooks/useStackedAccommodationLayout";
-import { getItemLocation } from "@/lib/item-location";
+import { getItemLocation, getItemMapLink } from "@/lib/item-location";
+import { isItemPrivate } from "@/lib/item-privacy";
+import { ItemMapLink } from "@/components/itinerary/ItemMapLink";
+import { LinkedBookingCardPreview } from "@/components/itinerary/LinkedBookingViews";
 import {
   CATEGORY_META,
   formatTravellerLabel,
@@ -59,6 +63,14 @@ function StatusPill({ status }: { status?: "confirmed" | "tbc" }) {
   );
 }
 
+function PrivateItemPill() {
+  return (
+    <span className="rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-semibold text-stone-700 uppercase">
+      Private
+    </span>
+  );
+}
+
 function BookingStatusPill({
   status,
 }: {
@@ -96,12 +108,12 @@ function InlineDetail({
 }
 
 function FlightDetailedPreview({
+  item,
   details,
-  formatClockTime,
   formatBaggage,
 }: {
+  item: ItineraryItem;
   details: FlightDetails;
-  formatClockTime: (time: string | null | undefined) => string;
   formatBaggage: (value: number | null | undefined) => string;
 }) {
   const bookingRefs = formatBookingGroupsDisplay(
@@ -130,15 +142,8 @@ function FlightDetailedPreview({
   const firstSegment = details.segments?.find((s) => !s.transit);
 
   return (
-    <div className="mt-3 space-y-1 border-t border-stone-100 pt-3">
-      <InlineDetail
-        label="Departs"
-        value={formatClockTime(details.departureTime ?? undefined)}
-      />
-      <InlineDetail
-        label="Arrives"
-        value={formatClockTime(details.arrivalTime ?? undefined)}
-      />
+    <div className="mt-3 space-y-3 border-t border-stone-100 pt-3">
+      <FlightItinerarySummary item={item} compact />
       <InlineDetail
         label="Dep. terminal"
         value={
@@ -175,7 +180,7 @@ function FlightDetailedPreview({
 
 function LinkedPill() {
   return (
-    <span className="rounded-full bg-[#1e3a5f]/10 px-2 py-0.5 text-[10px] font-semibold text-[#1e3a5f] uppercase">
+    <span className="rounded-full bg-brand-deep/10 px-2 py-0.5 text-[10px] font-semibold text-brand-deep uppercase">
       View booking
     </span>
   );
@@ -206,6 +211,10 @@ export function ItemCard({
   const carDetails = getCarRentalDetails(item.details);
   const activityDetails = getActivityDetails(item.details);
   const itemLocation = getItemLocation(item.details as Record<string, unknown>);
+  const itemMapLink = getItemMapLink(
+    item.details as Record<string, unknown>,
+    category,
+  );
   const status = flightDetails?.status ?? petDetails?.status;
   const linkedItemId = activityDetails?.linkedItemId;
 
@@ -307,8 +316,8 @@ export function ItemCard({
   return (
     <div
       className={[
-        "group w-full rounded-2xl border bg-white shadow-sm transition-all",
-        "hover:-translate-y-0.5 hover:border-[#1e3a5f]/20 hover:shadow-md",
+        "group theme-card w-full rounded-2xl border bg-surface shadow-sm transition-all",
+        "hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md",
         styles.border,
         completed
           ? doneAccent === "amber"
@@ -345,11 +354,12 @@ export function ItemCard({
                   </p>
                 )}
                 <StatusPill status={status} />
+                {isItemPrivate(item.details) ? <PrivateItemPill /> : null}
                 <BookingStatusPill status={stayDetails?.bookingStatus} />
                 <BookingStatusPill status={carDetails?.bookingStatus} />
                 {linkedItemId && <LinkedPill />}
                 {subItems.length > 0 && (
-                  <span className="rounded-full bg-[#d4a853]/15 px-2 py-0.5 text-[10px] font-semibold text-[#1e3a5f] uppercase">
+                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-brand-deep uppercase">
                     {subItems.length} sub-item{subItems.length === 1 ? "" : "s"}
                   </span>
                 )}
@@ -360,7 +370,7 @@ export function ItemCard({
               </div>
               <h3
                 className={[
-                  "mt-0.5 break-words font-medium group-hover:text-[#1e3a5f]",
+                  "mt-0.5 break-words font-medium group-hover:text-brand-deep",
                   completed
                     ? doneAccent === "amber"
                       ? "text-stone-500 line-through decoration-amber-600/40"
@@ -371,7 +381,12 @@ export function ItemCard({
                 {item.title}
               </h3>
             </div>
-            <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-stone-300 group-hover:text-[#d4a853]" />
+            <div className="flex shrink-0 items-center gap-1.5">
+              {itemMapLink ? (
+                <ItemMapLink href={itemMapLink.href} label={itemMapLink.label} />
+              ) : null}
+              <ChevronRight className="mt-1 h-4 w-4 text-stone-300 group-hover:text-accent" />
+            </div>
           </div>
 
           {category === "flight" && flightRoute ? (
@@ -406,22 +421,9 @@ export function ItemCard({
 
           {category !== "flight" &&
             category !== "accommodation" &&
-            itemLocation?.name && (
-            <p className="mt-1 text-sm">
-              {itemLocation.mapLink ? (
-                <a
-                  href={itemLocation.mapLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(event) => event.stopPropagation()}
-                  className="text-[#1e3a5f] underline decoration-[#d4a853]/60"
-                >
-                  {itemLocation.name}
-                </a>
-              ) : (
-                <span className="text-stone-600">{itemLocation.name}</span>
-              )}
-            </p>
+            itemLocation?.name &&
+            !itemMapLink && (
+            <p className="mt-1 text-sm text-stone-600">{itemLocation.name}</p>
           )}
 
           {displayTime &&
@@ -445,7 +447,8 @@ export function ItemCard({
                   {flightSchedule.arrival}
                 </p>
               )}
-              {flightTimeline?.transitStops.map((stop) => {
+              {viewMode === "condensed" &&
+                flightTimeline?.transitStops.map((stop) => {
                 const layover = formatFlightProgressDuration(stop.layoverMinutes);
                 if (!layover) return null;
                 return (
@@ -474,8 +477,8 @@ export function ItemCard({
 
           {showFlightDetails && (
             <FlightDetailedPreview
+              item={item}
               details={flightDetails}
-              formatClockTime={formatClockTime}
               formatBaggage={formatBaggage}
             />
           )}
@@ -546,6 +549,14 @@ export function ItemCard({
           <ItemCompleteToggle item={item} compact accent={doneAccent} />
         </div>
       </div>
+
+      {viewMode === "detailed" &&
+        category === "activity" &&
+        linkedItemId != null && (
+          <div className="pr-4 pb-4 pl-[4.5rem]">
+            <LinkedBookingCardPreview linkedItemId={linkedItemId} />
+          </div>
+        )}
 
       <SubItemCascade
         subItems={subItems}

@@ -3,6 +3,7 @@ import {
   flightSegmentsFromDetails,
   resolveFlightScheduleForItem,
   segmentLabel,
+  type FlightScheduleItem,
 } from "@/lib/flight-segment-timing";
 import type { ItineraryItem } from "@/lib/schema";
 import { getFlightDetails } from "@/lib/types";
@@ -365,6 +366,27 @@ export function resolveFlightSchedule(
     arrivalDate = resolvedEnd.arrivalDate;
   }
 
+  if (
+    fallbackEnd &&
+    !Number.isNaN(fallbackEnd.getTime()) &&
+    startDatetime &&
+    fallbackEnd.getTime() > startDatetime.getTime()
+  ) {
+    const explicitArrivalDate = arrivalTz
+      ? calendarDateInTimezoneInternal(fallbackEnd, arrivalTz)
+      : null;
+    if (
+      !endDatetime ||
+      (explicitArrivalDate &&
+        arrivalDate &&
+        explicitArrivalDate > arrivalDate) ||
+      fallbackEnd.getTime() > endDatetime.getTime() + 30 * 60_000
+    ) {
+      endDatetime = fallbackEnd;
+      arrivalDate = explicitArrivalDate ?? arrivalDate;
+    }
+  }
+
   return {
     startDatetime,
     endDatetime,
@@ -555,12 +577,16 @@ export function flightFormDatetimes(item: ItineraryItem): {
   };
 
   const flight = getFlightDetails(item.details);
-  const schedule = resolveFlightSchedule({
-    eventDate: item.eventDate,
-    startDatetime: item.startDatetime,
-    endDatetime: item.endDatetime,
-    details: item.details,
-  });
+  const segments = flightSegmentsFromDetails(flight);
+  const schedule =
+    segments.length >= 2
+      ? resolveFlightScheduleForItem(item)
+      : resolveFlightSchedule({
+          eventDate: item.eventDate,
+          startDatetime: item.startDatetime,
+          endDatetime: item.endDatetime,
+          details: item.details,
+        });
 
   const departureTz = getAirportTimezone(
     flight?.fromIata ?? flight?.from,
@@ -604,7 +630,18 @@ export function applyFlightDatetimeOverrides<T extends {
 }>(body: T): T {
   if (body.category !== "flight") return body;
 
-  const resolved = resolveFlightSchedule(body);
+  const segments = flightSegmentsFromDetails(getFlightDetails(body.details));
+  const multiSegmentItem: FlightScheduleItem = {
+    category: "flight",
+    eventDate: body.eventDate ?? null,
+    startDatetime: body.startDatetime ? new Date(body.startDatetime) : null,
+    endDatetime: body.endDatetime ? new Date(body.endDatetime) : null,
+    details: body.details,
+  };
+  const resolved =
+    segments.length >= 2
+      ? resolveFlightScheduleForItem(multiSegmentItem)
+      : resolveFlightSchedule(body);
   return {
     ...body,
     eventDate: resolved.eventDate ?? body.eventDate ?? null,

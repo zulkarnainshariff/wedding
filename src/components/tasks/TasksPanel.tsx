@@ -484,7 +484,7 @@ export function TasksPanel() {
                       type="button"
                       disabled={busy}
                       onClick={() => void submitCantComplete(task.id)}
-                      className="rounded-lg bg-[#1e3a5f] px-3 py-1.5 text-sm text-white"
+                      className="rounded-lg bg-brand-deep px-3 py-1.5 text-sm text-white"
                     >
                       Save
                     </button>
@@ -604,7 +604,7 @@ export function TasksPanel() {
                     type="button"
                     disabled={busy || !subtaskForm.title.trim()}
                     onClick={() => void createSubtask(task.id)}
-                    className="mt-2 inline-flex items-center gap-1 rounded-lg bg-[#1e3a5f] px-3 py-1.5 text-sm font-medium text-white"
+                    className="mt-2 inline-flex items-center gap-1 rounded-lg bg-brand-deep px-3 py-1.5 text-sm font-medium text-white"
                   >
                     <Plus className="h-4 w-4" />
                     Add subtask

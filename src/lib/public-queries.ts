@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   DEFAULT_CARD_FRONT,
@@ -84,13 +84,37 @@ export async function getInvitationEventsWithSchedules(): Promise<
   Array<PublicInvitationEvent & { schedule: PublicScheduleItem[] }>
 > {
   const events = await getPublishedInvitationEvents();
-  const schedules = await Promise.all(
-    events.map((event) => getPublishedScheduleForEvent(event.id)),
-  );
+  if (events.length === 0) return [];
 
-  return events.map((event, index) => ({
+  const eventIds = events.map((event) => event.id);
+  const rows = await db
+    .select()
+    .from(publicScheduleItems)
+    .where(
+      and(
+        inArray(publicScheduleItems.eventId, eventIds),
+        eq(publicScheduleItems.published, true),
+      ),
+    )
+    .orderBy(asc(publicScheduleItems.sortOrder), asc(publicScheduleItems.id));
+
+  const scheduleByEventId = new Map<number, PublicScheduleItem[]>();
+  for (const row of rows) {
+    const schedule = scheduleByEventId.get(row.eventId) ?? [];
+    schedule.push({
+      id: row.id,
+      eventId: row.eventId,
+      timeLabel: row.timeLabel,
+      title: row.title,
+      description: row.description,
+      sortOrder: row.sortOrder,
+    });
+    scheduleByEventId.set(row.eventId, schedule);
+  }
+
+  return events.map((event) => ({
     ...event,
-    schedule: schedules[index] ?? [],
+    schedule: scheduleByEventId.get(event.id) ?? [],
   }));
 }
 

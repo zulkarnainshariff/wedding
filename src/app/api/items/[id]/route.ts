@@ -6,6 +6,11 @@ import { db } from "@/lib/db";
 import { deleteDocumentFile } from "@/lib/item-documents";
 import { applyItemDatetimeOverrides } from "@/lib/item-schedule-datetime";
 import { enrichFlightTimezoneDetails } from "@/lib/airport-timezone-resolver";
+import {
+  normalizeFlightDetailsSegments,
+  syncMultiSegmentRouteFields,
+} from "@/lib/flight-segment-timing";
+import { getFlightDetails } from "@/lib/types";
 import { normalizeItemSchedule } from "@/lib/item-scheduling";
 import { filterItemsByPermission } from "@/lib/permissions";
 import { itemDocuments, itineraryDays, itineraryItems } from "@/lib/schema";
@@ -60,9 +65,23 @@ export async function PUT(request: Request, { params }: Params) {
   const { id } = await params;
   let body = await request.json();
   if (body.category === "flight" && body.details && typeof body.details === "object") {
+    const incoming = body.details as Record<string, unknown>;
+    let flightDetails = await enrichFlightTimezoneDetails(body.details);
+    flightDetails = syncMultiSegmentRouteFields(
+      normalizeFlightDetailsSegments(getFlightDetails(flightDetails) ?? flightDetails),
+    );
     body = {
       ...body,
-      details: await enrichFlightTimezoneDetails(body.details),
+      details: {
+        ...flightDetails,
+        isPrivate: Boolean(incoming.isPrivate),
+        privateViewers: Array.isArray(incoming.privateViewers)
+          ? incoming.privateViewers
+          : Array.isArray(incoming.extraViewers)
+            ? incoming.extraViewers
+            : [],
+        extraViewers: undefined,
+      },
     };
   }
   body = applyItemDatetimeOverrides(body);

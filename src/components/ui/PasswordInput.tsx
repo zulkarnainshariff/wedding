@@ -9,7 +9,7 @@ export function PasswordInput({
   placeholder,
   autoComplete,
   required,
-  className = "w-full rounded-xl border border-stone-200 px-4 py-3 pr-11 text-stone-800 outline-none focus:border-[#1e3a5f]/40 focus:ring-2 focus:ring-[#1e3a5f]/10",
+  className = "w-full rounded-xl border border-stone-200 px-4 py-3 pr-11 text-stone-800 outline-none focus:border-brand-deep/40 focus:ring-2 focus:ring-brand-deep/10",
 }: {
   value: string;
   onChange: (value: string) => void;

@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
-import { formatDate } from "@/lib/types";
+import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 
 type Props = {
   open: boolean;
@@ -18,6 +18,7 @@ export function DevModeModal({ open, onClose }: Props) {
     resetSimulatedDate,
     effectiveDateString,
   } = useTripTime();
+  const { formatDateOnly } = useDisplayFormat();
 
   if (!open) return null;
 
@@ -40,7 +41,7 @@ export function DevModeModal({ open, onClose }: Props) {
           <div>
             <h2
               id="dev-mode-title"
-              className="font-serif text-xl text-[#1e3a5f]"
+              className="font-serif text-xl text-brand-deep"
             >
               Dev mode
             </h2>
@@ -92,8 +93,8 @@ export function DevModeModal({ open, onClose }: Props) {
 
             <p className="text-sm text-stone-600">
               App is treating today as{" "}
-              <span className="font-medium text-[#1e3a5f]">
-                {formatDate(effectiveDateString)}
+              <span className="font-medium text-brand-deep">
+                {formatDateOnly(effectiveDateString)}
               </span>
               .
             </p>
@@ -112,7 +113,7 @@ export function DevModeModal({ open, onClose }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-[#1e3a5f] px-4 py-2.5 text-sm font-medium text-white"
+            className="rounded-xl bg-brand-deep px-4 py-2.5 text-sm font-medium text-white"
           >
             Done
           </button>

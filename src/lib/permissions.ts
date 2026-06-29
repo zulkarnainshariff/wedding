@@ -4,6 +4,7 @@ import {
   itemIncludesEveryone,
   travellerMatchesUsername,
 } from "./item-travellers";
+import { isItemPrivate, canViewPrivateItem } from "./item-privacy";
 import { CATEGORIES, type Category } from "./types";
 
 import type { UserPreferences } from "./user-preferences";
@@ -167,6 +168,10 @@ export function canViewItemTravellers(
   item: ItineraryItem,
   user: SessionUser,
 ): boolean {
+  if (isItemPrivate(item.details)) {
+    return canViewPrivateItem(item, user);
+  }
+
   if (isAdminSession(user.roleLevel) || user.permissions.viewTravellers === "all") {
     return true;
   }

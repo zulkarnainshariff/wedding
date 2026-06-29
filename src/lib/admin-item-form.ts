@@ -4,9 +4,16 @@ import {
   parseStructuredDetails,
   type StructuredItemDetails,
 } from "@/lib/admin-item-details";
-import { flightFormDatetimes, resolveFlightSchedule } from "@/lib/flight-datetime";
+import {
+  flightFormDatetimes,
+  parseStoredClockTime,
+  resolveFlightSchedule,
+  zonedLocalToUtc,
+} from "@/lib/flight-datetime";
+import { resolveFlightScheduleForItem } from "@/lib/flight-segment-timing";
+import { getAirportTimezone } from "@/lib/airport-timezones";
 import { wallClockToDate } from "@/lib/item-schedule-datetime";
-import type { Category } from "@/lib/types";
+import type { Category, FlightSegment } from "@/lib/types";
 import type { ItineraryItem } from "@/lib/schema";
 
 export type ItemFormState = {
@@ -44,6 +51,27 @@ function isoFromDateAndClock(date: string, time?: string): string | null {
   return instant ? instant.toISOString() : null;
 }
 
+function formatArrivalTimeValue(date: string | null, clock: string): string {
+  if (date) return `${date}T${clock}`;
+  return clock;
+}
+
+function updateLastFlightSegmentArrival(
+  segments: FlightSegment[],
+  arrivalTime: string,
+): FlightSegment[] {
+  if (!segments.length) return segments;
+
+  const next = [...segments];
+  for (let index = next.length - 1; index >= 0; index -= 1) {
+    const segment = next[index];
+    if (segment.transit || !(segment.fromIata || segment.from)) continue;
+    next[index] = { ...segment, arrivalTime };
+    break;
+  }
+  return next;
+}
+
 function syncStructuredTimes(
   category: Category,
   structured: StructuredItemDetails,
@@ -62,30 +90,73 @@ function syncStructuredTimes(
   let endIso = datetimeLocalToIso(endDatetime);
 
   if (category === "flight") {
+    const depTz = getAirportTimezone(nextSimple.fromIata);
+    const arrTz = getAirportTimezone(nextSimple.toIata);
+
     if (startDatetime) {
       const [date, time] = startDatetime.split("T");
       if (date) nextEventDate = date;
-      if (time) nextSimple.departureTime = time.slice(0, 5);
-    }
-    if (endDatetime) {
-      const [, time] = endDatetime.split("T");
-      if (time) nextSimple.arrivalTime = time.slice(0, 5);
+      if (date && time) {
+        const clock = time.slice(0, 5);
+        nextSimple.departureTime = clock;
+        if (depTz) {
+          startIso =
+            zonedLocalToUtc(date, clock, depTz)?.toISOString() ?? startIso;
+        }
+      }
     }
 
-    const resolved = resolveFlightSchedule({
-      eventDate: nextEventDate,
-      startDatetime: startIso,
-      endDatetime: endIso,
-      details: {
-        ...structured.simple,
-        ...nextSimple,
-        departureTime: nextSimple.departureTime,
-        arrivalTime: nextSimple.arrivalTime,
-      },
-    });
+    if (endDatetime) {
+      const [date, time] = endDatetime.split("T");
+      if (date && time) {
+        const clock = time.slice(0, 5);
+        nextSimple.arrivalTime = formatArrivalTimeValue(date, clock);
+        if (arrTz) {
+          endIso = zonedLocalToUtc(date, clock, arrTz)?.toISOString() ?? endIso;
+        }
+      }
+    }
+
+    let nextStructured = structured;
+    if (structured.segments.length > 0 && nextSimple.arrivalTime) {
+      nextStructured = {
+        ...structured,
+        segments: updateLastFlightSegmentArrival(
+          structured.segments,
+          nextSimple.arrivalTime,
+        ),
+      };
+    }
+
+    const flightDetails = {
+      ...structured.simple,
+      ...nextSimple,
+      segments: nextStructured.segments,
+    };
+    const hasMultiSegment =
+      nextStructured.segments.filter(
+        (segment) => !segment.transit && (segment.fromIata || segment.from),
+      ).length >= 2;
+
+    const resolved = hasMultiSegment
+      ? resolveFlightScheduleForItem({
+          category: "flight",
+          eventDate: nextEventDate ?? null,
+          startDatetime: startIso ? new Date(startIso) : null,
+          endDatetime: endIso ? new Date(endIso) : null,
+          details: flightDetails,
+        })
+      : resolveFlightSchedule({
+          eventDate: nextEventDate,
+          startDatetime: startIso,
+          endDatetime: endIso,
+          details: flightDetails,
+        });
+
+    const resolvedArrival = parseStoredClockTime(nextSimple.arrivalTime);
 
     return {
-      structured: { ...structured, simple: nextSimple },
+      structured: { ...nextStructured, simple: nextSimple },
       eventDate: resolved.eventDate ?? nextEventDate,
       startIso:
         resolved.startDatetime?.toISOString() ??
@@ -96,12 +167,17 @@ function syncStructuredTimes(
       endIso:
         resolved.endDatetime?.toISOString() ??
         endIso ??
-        (nextEventDate && nextSimple.arrivalTime
-          ? isoFromDateAndClock(
-              nextEventDate,
-              nextSimple.arrivalTime,
-            )
-          : null),
+        (resolvedArrival?.embeddedDate &&
+        resolvedArrival.clock &&
+        arrTz
+          ? zonedLocalToUtc(
+              resolvedArrival.embeddedDate,
+              resolvedArrival.clock,
+              arrTz,
+            )?.toISOString() ?? null
+          : nextEventDate && nextSimple.arrivalTime
+            ? isoFromDateAndClock(nextEventDate, nextSimple.arrivalTime)
+            : null),
     };
   }
 
@@ -230,7 +306,6 @@ export function buildItemApiPayload(
   };
 }
 
-/** Keep departure terminal/gate and tracking snapshot when admin saves other fields. */
 function preserveLiveDepartureDetails(
   payload: Record<string, unknown>,
   existing: Record<string, unknown>,
@@ -246,6 +321,29 @@ function preserveLiveDepartureDetails(
   if (existing._flightTracking != null) {
     next._flightTracking = existing._flightTracking;
   }
+
+  if (payload.isPrivate == null && existing.isPrivate != null) {
+    next.isPrivate = existing.isPrivate;
+  }
+  if (
+    (payload.privateViewers == null ||
+      (Array.isArray(payload.privateViewers) &&
+        payload.privateViewers.length === 0)) &&
+    Array.isArray(existing.privateViewers) &&
+    existing.privateViewers.length > 0
+  ) {
+    next.privateViewers = existing.privateViewers;
+  } else if (
+    (payload.privateViewers == null ||
+      (Array.isArray(payload.privateViewers) &&
+        payload.privateViewers.length === 0)) &&
+    Array.isArray(existing.extraViewers) &&
+    existing.extraViewers.length > 0
+  ) {
+    next.privateViewers = existing.extraViewers;
+  }
+
+  delete next.extraViewers;
 
   return next;
 }
