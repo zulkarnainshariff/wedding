@@ -13,8 +13,14 @@ import {
   mergeLiveGateUpdates,
   withTrackingState,
 } from "@/lib/flight-tracking";
+import { resolveTrackingLegEndpoints, syncMultiSegmentRouteFields } from "@/lib/flight-segment-timing";
 import { autoCompleteLandedFlightItem } from "@/lib/flight-auto-complete";
 import { isFlightLanded } from "@/lib/flight-progress";
+import {
+  isFlightCalendarDay,
+  parseEffectiveDate,
+  shouldShowSavedFlightGateInfo,
+} from "@/lib/flight-live-eligibility";
 import { getItemCalendarDate } from "@/lib/item-scheduling";
 import { filterItemsByPermission } from "@/lib/permissions";
 import { itineraryItems } from "@/lib/schema";
@@ -23,7 +29,7 @@ import { bumpSyncVersion } from "@/lib/sync";
 
 type Params = { params: Promise<{ itemId: string }> };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   const user = await requireAuth();
   if (isAuthError(user)) return user;
 
@@ -54,15 +60,48 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Invalid flight details" }, { status: 400 });
   }
 
+  const asOfParam = new URL(request.url).searchParams.get("asOf");
+  const effectiveDate = parseEffectiveDate(asOfParam) ?? new Date();
+  const onFlightDay = isFlightCalendarDay(item, effectiveDate);
+
+  if (!onFlightDay) {
+    if (shouldShowSavedFlightGateInfo(item, effectiveDate)) {
+      return NextResponse.json({
+        available: true,
+        computedOnly: true,
+        cached: true,
+        marketingFlightNumber: flightDetails.marketingFlightNumber ?? null,
+        operatingFlightNumber: flightDetails.operatingFlightNumber ?? null,
+        departure: {
+          terminal: flightDetails.departureTerminal ?? null,
+          gate: flightDetails.departureGate ?? null,
+        },
+        arrival: {
+          terminal: flightDetails.arrivalTerminal ?? null,
+          gate: flightDetails.arrivalGate ?? null,
+        },
+        message:
+          "Early morning flight — showing saved gate details from the itinerary.",
+      });
+    }
+
+    return NextResponse.json({
+      available: false,
+      reason: "not_travel_day",
+      message: "Live updates appear on the day of travel.",
+    });
+  }
+
   const operatingFlightNumber = resolveOperatingFlightNumber(flightDetails);
   const flightDate = getItemCalendarDate(item);
+  const activeLeg = resolveTrackingLegEndpoints(item);
   const scheduleLookup =
     operatingFlightNumber && flightDate
       ? await lookupFlightSchedule({
           operatingFlightNumber,
           flightDate,
-          depIata: flightDetails.fromIata,
-          arrIata: flightDetails.toIata,
+          depIata: activeLeg?.depIata ?? flightDetails.fromIata,
+          arrIata: activeLeg?.arrIata ?? flightDetails.toIata,
         })
       : null;
   const schedulePatch = scheduleLookup
@@ -74,7 +113,9 @@ export async function GET(_request: Request, { params }: Params) {
   const { status: live, trackingState, details: trackedDetails } =
     await getFlightLiveStatus(item, lookupDetails);
 
-  let mergedDetails = withTrackingState(trackedDetails, trackingState);
+  let mergedDetails = syncMultiSegmentRouteFields(
+    withTrackingState(trackedDetails, trackingState),
+  );
   let detailsUpdated = false;
 
   if (live.available) {
@@ -128,8 +169,7 @@ export async function GET(_request: Request, { params }: Params) {
     isFlightLanded({
       ...item,
       details: mergedDetails,
-    }) ||
-    live.flightStatus === "landed"
+    })
   ) {
     const autoCompleted = await autoCompleteLandedFlightItem({
       ...item,

@@ -99,6 +99,22 @@ export function SettingsForm({
           </select>
         </label>
         <label className="block text-sm">
+          <span className="mb-1 block text-stone-500">Date format</span>
+          <select
+            value={preferences.dateFormat}
+            onChange={(e) =>
+              setPreferences({
+                ...preferences,
+                dateFormat: e.target.value as UserPreferences["dateFormat"],
+              })
+            }
+            className="w-full rounded-lg border border-stone-200 px-3 py-2"
+          >
+            <option value="dmy">DD-MM-YYYY</option>
+            <option value="mdy">MM-DD-YYYY</option>
+          </select>
+        </label>
+        <label className="block text-sm">
           <span className="mb-1 block text-stone-500">Time format</span>
           <select
             value={preferences.timeFormat}

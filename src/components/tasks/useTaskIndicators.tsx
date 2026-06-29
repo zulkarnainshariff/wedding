@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { subscribeSyncUpdated } from "@/lib/sync-client";
 import type { ItemTaskSummary } from "@/lib/task-queries";
 import { TaskNoteIcon } from "@/components/tasks/TaskNoteIcon";
 
@@ -36,9 +37,11 @@ export function useTaskIndicators() {
     refresh();
     const onTasksChanged = () => refresh();
     window.addEventListener("tasks-changed", onTasksChanged);
+    const unsubscribeSync = subscribeSyncUpdated(() => refresh());
     const interval = window.setInterval(refresh, 30000);
     return () => {
       window.removeEventListener("tasks-changed", onTasksChanged);
+      unsubscribeSync();
       window.clearInterval(interval);
     };
   }, []);

@@ -58,6 +58,7 @@ export type FlightDetails = {
   flightTime?: string;
   bookingReference?: string | null;
   bookingReferences?: Record<string, string>;
+  bookingGroups?: import("./booking-groups").BookingGroup[];
   baggage?: Record<string, number | null>;
   seats?: Record<string, string | null>;
   aircraft?: string;
@@ -294,26 +295,61 @@ export function mapsUrl(address: string, lat?: number, lng?: number): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
+const WEEKDAY_LONG = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+const MONTH_LONG = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+const MONTH_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+/** Stable long date string — avoids SSR/client `toLocaleDateString` differences. */
 export function formatDate(dateStr: string): string {
-  return new Date(`${dateStr}T12:00:00`).toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return `${WEEKDAY_LONG[d.getDay()]}, ${d.getDate()} ${MONTH_LONG[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export function formatDateTime(iso: string | Date | null | undefined): string {
   if (!iso) return "—";
   const d = typeof iso === "string" ? new Date(iso) : iso;
-  return d.toLocaleString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (Number.isNaN(d.getTime())) return "—";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${WEEKDAY_SHORT[d.getDay()]}, ${d.getDate()} ${MONTH_SHORT[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export function formatTime(iso: string | Date | null | undefined): string {

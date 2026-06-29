@@ -99,21 +99,29 @@ export async function POST(request: Request) {
     })
     .returning();
 
-  await createNotification({
-    userId: assigneeUserId,
-    type: body.isUrgent ? "task_urgent" : "task_assigned",
-    title: body.isUrgent ? "Urgent task assigned" : "New task assigned",
-    body: body.title,
-    href: `/itinerary?item=${itemId}&task=${created.id}`,
-    metadata: { taskId: created.id, urgent: Boolean(body.isUrgent), itemId },
-  });
+  try {
+    await createNotification({
+      userId: assigneeUserId,
+      type: body.isUrgent ? "task_urgent" : "task_assigned",
+      title: body.isUrgent ? "Urgent task assigned" : "New task assigned",
+      body: body.title,
+      href: `/itinerary?item=${itemId}&task=${created.id}`,
+      metadata: { taskId: created.id, urgent: Boolean(body.isUrgent), itemId },
+    });
+  } catch (error) {
+    console.error("Task created but notification failed:", error);
+  }
 
   if (body.remindAt) {
-    await db.insert(taskReminders).values({
-      taskId: created.id,
-      userId: user.id,
-      remindAt: new Date(body.remindAt),
-    });
+    try {
+      await db.insert(taskReminders).values({
+        taskId: created.id,
+        userId: user.id,
+        remindAt: new Date(body.remindAt),
+      });
+    } catch (error) {
+      console.error("Task created but reminder failed:", error);
+    }
   }
 
   return NextResponse.json(created, { status: 201 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { ItemCard } from "./ItemCard";
 import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 import { ScheduleToolbar } from "./ScheduleToolbar";
@@ -8,6 +9,10 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { PageShell } from "@/components/layout/PageShell";
 import { getDayDisplayTitle, hasRestrictedTravellerView } from "@/lib/day-display";
+import {
+  collectScheduleParticipantOptions,
+  filterScheduleItemsByParticipants,
+} from "@/lib/schedule-participant-filter";
 import { filterPastDays, isDayToday } from "@/lib/trip-time";
 import { formatDate } from "@/lib/types";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
@@ -18,8 +23,27 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
   const { user } = useAuth();
   const { effectiveDate, hidePast } = useTripTime();
   const restrictedView = hasRestrictedTravellerView(user);
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
-  const daysWithContent = days.filter(
+  const allItems = useMemo(
+    () => days.flatMap((day) => day.items),
+    [days],
+  );
+  const participantOptions = useMemo(
+    () => collectScheduleParticipantOptions(allItems, user),
+    [allItems, user],
+  );
+
+  const filteredDays = useMemo(
+    () =>
+      days.map((day) => ({
+        ...day,
+        items: filterScheduleItemsByParticipants(day.items, selectedParticipants),
+      })),
+    [days, selectedParticipants],
+  );
+
+  const daysWithContent = filteredDays.filter(
     (day) => day.items.length > 0 || day.title,
   );
   const visibleDays = filterPastDays(daysWithContent, effectiveDate, hidePast);
@@ -29,7 +53,13 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
     <PageShell
       eyebrow="Category"
       title="Daily Schedule"
-      toolbar={<ScheduleToolbar />}
+      toolbar={
+        <ScheduleToolbar
+          participantOptions={participantOptions}
+          selectedParticipants={selectedParticipants}
+          onParticipantsChange={setSelectedParticipants}
+        />
+      }
     >
       <TripProgressIndicator days={daysWithContent} />
 

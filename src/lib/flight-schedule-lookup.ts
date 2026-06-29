@@ -15,6 +15,11 @@ import {
   sliceLegsFromDeparture,
 } from "@/lib/flight-segment-route";
 import { normalizeFlightIata } from "@/lib/flight-numbers";
+import {
+  flightSegmentsFromDetails,
+  resolveMultiSegmentJourneyBounds,
+  segmentLabel,
+} from "@/lib/flight-segment-timing";
 import type { ItineraryItem } from "@/lib/schema";
 import type { FlightDetails, FlightSegment } from "@/lib/types";
 import { getFlightDetails } from "@/lib/types";
@@ -679,12 +684,27 @@ export function applyLookupToFlightDetails(
   details: FlightDetails,
   lookup: FlightScheduleLookupResult,
 ): FlightDetails {
+  const existingSegments = flightSegmentsFromDetails(details);
+  const lookupSegments = lookup.segments ?? existingSegments;
+  const flightSegments = lookupSegments.filter(
+    (segment) => !segment.transit && (segment.fromIata || segment.from),
+  );
+  const firstSegment = flightSegments[0];
+  const lastSegment = flightSegments[flightSegments.length - 1];
+  const preserveMultiLegRoute = existingSegments.length >= 2;
+
   return {
     ...details,
     from: lookup.fromCity ?? details.from,
     to: lookup.toCity ?? details.to,
-    fromIata: lookup.fromIata ?? details.fromIata,
-    toIata: lookup.toIata ?? details.toIata,
+    fromIata:
+      (preserveMultiLegRoute
+        ? firstSegment?.fromIata ?? existingSegments[0]?.fromIata
+        : lookup.fromIata) ?? details.fromIata,
+    toIata:
+      (preserveMultiLegRoute
+        ? lastSegment?.toIata ?? existingSegments.at(-1)?.toIata
+        : lookup.toIata) ?? details.toIata,
     departureTime: lookup.departureTime ?? details.departureTime,
     arrivalTime: lookup.arrivalTime ?? details.arrivalTime,
     aircraft: lookup.aircraft ?? details.aircraft,
@@ -693,7 +713,10 @@ export function applyLookupToFlightDetails(
     departureGate: lookup.departureGate ?? details.departureGate,
     arrivalTerminal: lookup.arrivalTerminal ?? details.arrivalTerminal,
     arrivalGate: lookup.arrivalGate ?? details.arrivalGate,
-    segments: lookup.segments ?? details.segments,
+    segments:
+      preserveMultiLegRoute && existingSegments.length >= 2
+        ? existingSegments
+        : (lookup.segments ?? details.segments),
     airlineIata: lookup.airlineIata ?? details.airlineIata,
     airlineName: lookup.airlineName ?? details.airlineName,
     operatingAirlineIata:
@@ -721,7 +744,36 @@ export function buildFlightScheduleItemPatch(
   if (!lookup.available) return null;
 
   const current = getFlightDetails(item.details) ?? ({} as FlightDetails);
+  const existingSegments = flightSegmentsFromDetails(current);
+  const finalDestination =
+    existingSegments.length >= 2
+      ? segmentLabel(existingSegments[existingSegments.length - 1], "to")
+      : null;
+  const lookupDestination = lookup.toIata?.trim().toUpperCase() ?? null;
+
+  if (
+    finalDestination &&
+    lookupDestination &&
+    lookupDestination !== finalDestination
+  ) {
+    return null;
+  }
+
   const nextDetails = applyLookupToFlightDetails(current, lookup);
+
+  if (existingSegments.length >= 2) {
+    const bounds = resolveMultiSegmentJourneyBounds(
+      { category: "flight", ...item, details: nextDetails },
+      existingSegments,
+    );
+    return {
+      eventDate: bounds.eventDate ?? item.eventDate ?? null,
+      startDatetime: bounds.scheduledStart.toISOString(),
+      endDatetime: bounds.scheduledEnd.toISOString(),
+      details: nextDetails,
+    };
+  }
+
   const resolved: ResolvedFlightSchedule = resolveFlightSchedule({
     eventDate: lookup.eventDate ?? item.eventDate,
     startDatetime: item.startDatetime,

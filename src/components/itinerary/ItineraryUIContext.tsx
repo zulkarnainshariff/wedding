@@ -9,6 +9,7 @@ import {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useOfflineSync } from "@/components/auth/OfflineSyncProvider";
+import { subscribeSyncUpdated } from "@/lib/sync-client";
 import type { ItineraryItem } from "@/lib/schema";
 
 export type ViewMode = "condensed" | "detailed";
@@ -43,7 +44,7 @@ export function ItineraryUIProvider({ children }: { children: React.ReactNode })
   const [loadingItem, setLoadingItem] = useState(false);
   const [itemLoadError, setItemLoadError] = useState<ItemLoadError>(null);
   const [isClosingItem, setIsClosingItem] = useState(false);
-  const { getCachedItem } = useOfflineSync();
+  const { getCachedItem, updateId } = useOfflineSync();
 
   const selectedItemId = itemParam ? Number(itemParam) : null;
 
@@ -160,6 +161,21 @@ export function ItineraryUIProvider({ children }: { children: React.ReactNode })
       cancelled = true;
     };
   }, [selectedItemId, getCachedItem]);
+
+  useEffect(() => {
+    if (!selectedItemId || Number.isNaN(selectedItemId)) return;
+    const cached = getCachedItem(selectedItemId);
+    if (cached) {
+      setSelectedItem(cached);
+    }
+  }, [selectedItemId, getCachedItem, updateId]);
+
+  useEffect(() => {
+    if (!selectedItemId || Number.isNaN(selectedItemId)) return;
+    return subscribeSyncUpdated(() => {
+      void refreshSelectedItem({ silent: true });
+    });
+  }, [selectedItemId, refreshSelectedItem]);
 
   useEffect(() => {
     if (!selectedItemId || isClosingItem) {

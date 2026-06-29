@@ -6,6 +6,7 @@ import { ArrowLeft, ExternalLink, MapPin, Pencil, Trash2, X } from "lucide-react
 import { ItemDocumentsSection } from "@/components/itinerary/ItemDocumentsSection";
 import { ItemSubItemsSection } from "@/components/itinerary/ItemSubItemsSection";
 import { ItemCompleteToggle, type ItemDoneAccent } from "@/components/itinerary/ItemCompleteToggle";
+import { FlightCheckInReminderPill, FlightCheckInToggle } from "@/components/itinerary/FlightCheckInToggle";
 import {
   formatFlightProgressDuration,
   flightRouteLine,
@@ -13,6 +14,7 @@ import {
   getFlightTimelineDisplay,
   isFlightInProgress,
 } from "@/lib/flight-progress";
+import { flightSegmentsFromDetails } from "@/lib/flight-segment-timing";
 import { ItemTaskSection } from "@/components/tasks/ItemTaskSection";
 import {
   FlightDetailView,
@@ -34,7 +36,7 @@ import {
   type Category,
   type TravelInsuranceDetails,
 } from "@/lib/types";
-import { formatFlightNumberDisplay } from "@/lib/flight-numbers";
+import { formatJourneyFlightLabel } from "@/lib/flight-numbers";
 import type { ItineraryItem } from "@/lib/schema";
 
 function NotesBlock({
@@ -387,6 +389,32 @@ function InsuranceDetail({ details }: { details: TravelInsuranceDetails }) {
   );
 }
 
+function ModalHeaderIconButton({
+  onClick,
+  ariaLabel,
+  children,
+  className = "",
+}: {
+  onClick: () => void;
+  ariaLabel: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className={[
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-stone-200 bg-white text-stone-500 transition-all hover:border-[#1e3a5f]/30 hover:text-[#1e3a5f]",
+        className,
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
+
 function ItemDetailHeader({
   item,
   category,
@@ -396,6 +424,7 @@ function ItemDetailHeader({
   sharedLocation,
   formatDateTime,
   formatFlightSchedule,
+  modal = false,
   onEdit,
   onDelete,
   onClose,
@@ -411,6 +440,7 @@ function ItemDetailHeader({
     departure: string | null;
     arrival: string | null;
   };
+  modal?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
   onClose?: () => void;
@@ -420,13 +450,13 @@ function ItemDetailHeader({
   const showLocation = category !== "flight" && sharedLocation?.name;
   const flightDetails = category === "flight" ? getFlightDetails(item.details) : null;
   const flightNumberLabel = flightDetails
-    ? formatFlightNumberDisplay(
-        flightDetails.marketingFlightNumber,
-        flightDetails.operatingFlightNumber,
-      ) ?? flightDetails.flightNumber
+    ? formatJourneyFlightLabel(flightDetails)
     : null;
   const flightTimeline =
     category === "flight" ? getFlightTimelineDisplay(item) : null;
+  const multiLegFlight =
+    category === "flight" &&
+    flightSegmentsFromDetails(flightDetails).length >= 2;
   const flightRoute =
     category === "flight" ? flightRouteLine(flightTimeline, item.summary) : null;
   const flightSummaryExtras =
@@ -450,8 +480,79 @@ function ItemDetailHeader({
       ? "Sub-itinerary"
       : CATEGORY_META[category as Category]?.label;
 
+  const mobileModalActions = modal ? (
+      <div className="flex shrink-0 items-center gap-1.5">
+        {category === "flight" && <FlightCheckInToggle item={item} compact />}
+        <ItemCompleteToggle item={item} accent={doneAccent} compact />
+        {onEdit && (
+          <ModalHeaderIconButton onClick={onEdit} ariaLabel="Edit">
+            <Pencil className="h-4 w-4" />
+          </ModalHeaderIconButton>
+        )}
+        {onClose && (
+          <ModalHeaderIconButton onClick={onClose} ariaLabel="Close">
+            <X className="h-4 w-4" />
+          </ModalHeaderIconButton>
+        )}
+      </div>
+    ) : null;
+
+  const desktopActions = (
+    <div
+      className={[
+        "flex shrink-0 flex-wrap items-center justify-end gap-2 self-stretch sm:self-start",
+        modal ? "hidden sm:flex" : "",
+      ].join(" ")}
+    >
+      {category === "flight" && <FlightCheckInToggle item={item} />}
+      <ItemCompleteToggle item={item} accent={doneAccent} />
+      {onEdit && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-[#1e3a5f]/30 hover:text-[#1e3a5f]"
+        >
+          <Pencil className="h-4 w-4" />
+          <span className="hidden sm:inline">Edit</span>
+        </button>
+      )}
+      {!modal && onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+        >
+          <Trash2 className="h-4 w-4" />
+          <span className="hidden sm:inline">Delete</span>
+        </button>
+      )}
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-full border border-stone-200 bg-white p-2 text-stone-500 shadow-sm hover:bg-stone-50"
+          aria-label="Close details"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <>
+      {modal ? (
+        <div className="mb-3 flex items-center justify-between gap-3 sm:hidden">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <p className="truncate text-xs font-semibold tracking-wide text-stone-400 uppercase">
+              {categoryLabel}
+            </p>
+            {category === "flight" && <FlightCheckInReminderPill item={item} />}
+          </div>
+          {mobileModalActions}
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
           <div
@@ -464,9 +565,19 @@ function ItemDetailHeader({
             <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold tracking-wide text-stone-400 uppercase">
+            <p
+              className={[
+                "text-xs font-semibold tracking-wide text-stone-400 uppercase",
+                modal ? "hidden sm:block" : "",
+              ].join(" ")}
+            >
               {categoryLabel}
             </p>
+            {category === "flight" && (
+              <div className="mt-2 hidden flex-wrap items-center gap-2 sm:flex">
+                <FlightCheckInReminderPill item={item} />
+              </div>
+            )}
             <h1 className="mt-1 break-words font-serif text-xl text-[#1e3a5f] sm:text-3xl">
               {item.title}
             </h1>
@@ -502,39 +613,7 @@ function ItemDetailHeader({
             )}
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-stretch sm:self-start">
-          <ItemCompleteToggle item={item} accent={doneAccent} />
-          {onEdit && (
-            <button
-              type="button"
-              onClick={onEdit}
-              className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-[#1e3a5f]/30 hover:text-[#1e3a5f]"
-            >
-              <Pencil className="h-4 w-4" />
-              <span className="hidden sm:inline">Edit</span>
-            </button>
-          )}
-          {onDelete && (
-            <button
-              type="button"
-              onClick={onDelete}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Delete</span>
-            </button>
-          )}
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full border border-stone-200 bg-white p-2 text-stone-500 shadow-sm hover:bg-stone-50"
-              aria-label="Close details"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+        {desktopActions}
       </div>
 
       <div className="mt-5 flex flex-col gap-1 text-sm text-stone-500">
@@ -548,7 +627,8 @@ function ItemDetailHeader({
                 <span>Arrives: {flightSchedule.arrival}</span>
               )}
             </div>
-            {flightTimeline?.transitStops.map((stop) => {
+            {!multiLegFlight &&
+              flightTimeline?.transitStops.map((stop) => {
               const layover = formatFlightProgressDuration(stop.layoverMinutes);
               if (!layover) return null;
               return (
@@ -597,6 +677,7 @@ function ItemDetailBody({
       {category === "flight" && flightDetails && (
         <FlightDetailView
           details={flightDetails}
+          item={item}
           itemId={item.id}
           canEdit={canEdit}
         />
@@ -620,6 +701,45 @@ function ItemDetailBody({
       {!item.parentItemId && <ItemDocumentsSection item={item} />}
       <ItemTaskSection item={item} />
     </>
+  );
+}
+
+function ItemDetailModalFooter({
+  onDelete,
+  onClose,
+}: {
+  onDelete?: () => void;
+  onClose?: () => void;
+}) {
+  if (!onDelete && !onClose) return null;
+
+  return (
+    <div className="shrink-0 border-t border-stone-100 px-6 py-4 sm:px-8">
+      <div className="flex items-center justify-between gap-3">
+        {onDelete ? (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </button>
+        ) : (
+          <span />
+        )}
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-50"
+          >
+            <X className="h-4 w-4" />
+            Close
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -659,8 +779,9 @@ export function ItemDetailView({
       sharedLocation={sharedLocation}
       formatDateTime={formatDateTime}
       formatFlightSchedule={formatFlightSchedule}
+      modal={modal}
       onEdit={onEdit}
-      onDelete={onDelete}
+      onDelete={modal ? undefined : onDelete}
       onClose={modal ? onClose : undefined}
     />
   );
@@ -684,9 +805,10 @@ export function ItemDetailView({
         <div className="shrink-0 border-b border-stone-100 bg-gradient-to-r from-[#faf8f5] to-white px-6 py-6 sm:px-8">
           {header}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 pb-8 sm:px-8">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 sm:px-8 sm:pb-8">
           {body}
         </div>
+        <ItemDetailModalFooter onDelete={onDelete} onClose={onClose} />
       </div>
     );
   }

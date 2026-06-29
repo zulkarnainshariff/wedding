@@ -1,4 +1,5 @@
 import type { FlightDetails } from "@/lib/types";
+import { getFlightDetails } from "@/lib/types";
 import {
   normalizeFlightIata,
   resolveOperatingFlightNumber,
@@ -11,6 +12,8 @@ import {
   pickDepartureInstant,
   type FlightTimingSnapshot,
 } from "@/lib/flight-instant-picker";
+import { resolveTrackingLegEndpoints, flightSegmentsFromDetails, resolveFlightScheduleForItem } from "@/lib/flight-segment-timing";
+import { isFlightLanded as isJourneyLanded } from "@/lib/flight-progress";
 import { getItemCalendarDate } from "@/lib/item-scheduling";
 import { getTodayDate, toDateString } from "@/lib/trip-time";
 import type { ItineraryItem } from "@/lib/schema";
@@ -42,6 +45,8 @@ export type FlightLiveStatus = {
   arrival?: FlightLiveEndpoint;
   elapsedMinutes?: number | null;
   remainingMinutes?: number | null;
+  depIata?: string | null;
+  arrIata?: string | null;
   lastUpdated?: string;
   cached?: boolean;
   computedOnly?: boolean;
@@ -228,12 +233,7 @@ function mapArrivalEndpoint(
 }
 
 function getFlightSchedule(item: ItineraryItem) {
-  return resolveFlightSchedule({
-    eventDate: item.eventDate,
-    startDatetime: item.startDatetime,
-    endDatetime: item.endDatetime,
-    details: item.details,
-  });
+  return resolveFlightScheduleForItem(item);
 }
 
 function getScheduledDeparture(item: ItineraryItem): Date | null {
@@ -475,6 +475,39 @@ async function fetchFromAviationStack(input: {
   return pool[0] ?? null;
 }
 
+function resolveLiveFetchInput(
+  item: ItineraryItem,
+  details: FlightDetails,
+  now: Date,
+): {
+  operatingFlightNumber: string;
+  depIata: string;
+  arrIata?: string | null;
+  flightDate: string;
+} | null {
+  const activeLeg = resolveTrackingLegEndpoints(item, now);
+  const segments = flightSegmentsFromDetails(details);
+  const segmentOperating =
+    activeLeg && segments[activeLeg.segmentIndex]
+      ? resolveOperatingFlightNumber(segments[activeLeg.segmentIndex])
+      : null;
+  const operatingFlightNumber =
+    segmentOperating ?? resolveOperatingFlightNumber(details);
+  const flightDate = getItemCalendarDate(item);
+  if (!operatingFlightNumber || !flightDate) return null;
+
+  const depIata =
+    activeLeg?.depIata ?? normalizeFlightIata(details.fromIata) ?? null;
+  if (!depIata) return null;
+
+  return {
+    operatingFlightNumber,
+    depIata,
+    arrIata: activeLeg?.arrIata ?? normalizeFlightIata(details.toIata),
+    flightDate,
+  };
+}
+
 function buildSnapshot(flight: AviationStackFlight): FlightTrackingSnapshot {
   return {
     flightStatus: flight.flight_status,
@@ -494,7 +527,7 @@ function isFlightActiveInAir(snapshot?: FlightTrackingSnapshot): boolean {
   return status === "active" || status === "en-route";
 }
 
-function isFlightLanded(snapshot?: FlightTrackingSnapshot): boolean {
+function isSnapshotLanded(snapshot?: FlightTrackingSnapshot): boolean {
   if (!snapshot) return false;
   if (snapshot.flightStatus === "landed") return true;
   return Boolean(snapshot.arrival?.actual);
@@ -503,14 +536,16 @@ function isFlightLanded(snapshot?: FlightTrackingSnapshot): boolean {
 function syncEtaCheckAt(
   state: FlightTrackingState,
   item: ItineraryItem,
+  now = new Date(),
 ): FlightTrackingState {
-  if (isFlightLanded(state.snapshot)) {
+  if (isSnapshotLanded(state.snapshot)) {
     return { ...state, etaCheckAt: null };
   }
 
   const arrivalInstant = pickArrivalInstant(
     item,
     state.snapshot as FlightTimingSnapshot | undefined,
+    now,
   );
   if (!arrivalInstant) {
     return { ...state, etaCheckAt: null };
@@ -524,7 +559,7 @@ function isEtaRefreshDue(
   item: ItineraryItem,
   state: FlightTrackingState,
 ): boolean {
-  if (isFlightLanded(state.snapshot)) return false;
+  if (isSnapshotLanded(state.snapshot)) return false;
 
   const etaCheckAtMs = state.etaCheckAt
     ? new Date(state.etaCheckAt).getTime()
@@ -536,6 +571,7 @@ function isEtaRefreshDue(
   const arrivalInstant = pickArrivalInstant(
     item,
     state.snapshot as FlightTimingSnapshot | undefined,
+    now,
   );
   if (!arrivalInstant) return false;
 
@@ -550,11 +586,12 @@ function isPastArrivalWindow(
   item: ItineraryItem,
   snapshot?: FlightTrackingSnapshot,
 ): boolean {
-  if (isFlightLanded(snapshot)) return false;
+  if (isSnapshotLanded(snapshot)) return false;
 
   const arrivalInstant = pickArrivalInstant(
     item,
     snapshot as FlightTimingSnapshot | undefined,
+    now,
   );
   const sta = getScheduledArrival(item);
   const endMs = Math.max(
@@ -571,7 +608,7 @@ function inferStatus(
   item: ItineraryItem,
   snapshot?: FlightTrackingSnapshot,
 ): string | undefined {
-  if (isFlightLanded(snapshot)) return "landed";
+  if (isJourneyLanded(item, now)) return "landed";
 
   if (snapshot?.flightStatus === "cancelled") return "cancelled";
   if (snapshot?.flightStatus === "diverted") return "diverted";
@@ -587,7 +624,7 @@ function inferStatus(
   if (isFlightActiveInAir(snapshot)) return "active";
 
   if (std && nowMs >= std.getTime()) {
-    if (snapshot && !isFlightLanded(snapshot)) {
+    if (snapshot && !isSnapshotLanded(snapshot)) {
       return "active";
     }
     if (sta && nowMs > sta.getTime() + LANDED_BUFFER_MS) {
@@ -610,10 +647,12 @@ function computeDisplayTiming(
   const departureInstant = pickDepartureInstant(
     item,
     snapshot as FlightTimingSnapshot | undefined,
+    now,
   );
   const arrivalInstant = pickArrivalInstant(
     item,
     snapshot as FlightTimingSnapshot | undefined,
+    now,
   );
 
   if (status === "landed") {
@@ -782,6 +821,7 @@ function buildStatusFromSnapshot(
   const timing = computeDisplayTiming(now, item, state.snapshot);
   const operatingFlightNumber = resolveOperatingFlightNumber(details);
   const endpoints = mergeEndpointsFromDetails(details, state.snapshot);
+  const airports = airportCodesForStatus(item);
 
   return {
     available: true,
@@ -789,10 +829,28 @@ function buildStatusFromSnapshot(
     operatingFlightNumber,
     departure: endpoints.departure,
     arrival: endpoints.arrival,
+    depIata: airports.depIata,
+    arrIata: airports.arrIata,
     ...timing,
     lastUpdated: state.snapshot?.fetchedAt ?? now.toISOString(),
     cached: true,
     computedOnly: options?.computedOnly ?? true,
+  };
+}
+
+function airportCodesForStatus(item: ItineraryItem): {
+  depIata: string | null;
+  arrIata: string | null;
+} {
+  const leg = resolveTrackingLegEndpoints(item);
+  if (leg) {
+    return { depIata: leg.depIata, arrIata: leg.arrIata };
+  }
+
+  const details = getFlightDetails(item.details);
+  return {
+    depIata: normalizeFlightIata(details?.fromIata) ?? null,
+    arrIata: normalizeFlightIata(details?.toIata) ?? null,
   };
 }
 
@@ -851,8 +909,7 @@ export async function getFlightLiveStatus(
       details: item.details,
     });
     const operatingFlightNumber = resolveOperatingFlightNumber(details);
-    const depIata = normalizeFlightIata(details.fromIata);
-    const flightDate = getItemCalendarDate(item);
+    const fetchInput = resolveLiveFetchInput(item, details, now);
     const withinPostLandingWindow =
       schedule.endDatetime &&
       now.getTime() > schedule.endDatetime.getTime() &&
@@ -860,20 +917,14 @@ export async function getFlightLiveStatus(
     const shouldRefreshPastFlight =
       withinPostLandingWindow &&
       hasFlightTrackingApiKey() &&
+      fetchInput &&
       operatingFlightNumber &&
-      depIata &&
-      flightDate &&
       (!trackingState.snapshot ||
         isPastArrivalWindow(now, item, trackingState.snapshot));
 
     if (shouldRefreshPastFlight) {
       try {
-        const flight = await fetchLiveFlight({
-          operatingFlightNumber,
-          depIata,
-          flightDate,
-          arrIata: normalizeFlightIata(details.toIata),
-        });
+        const flight = await fetchLiveFlight(fetchInput);
         if (flight) {
           trackingState = syncEtaCheckAt(
             {
@@ -904,6 +955,7 @@ export async function getFlightLiveStatus(
 
     const timing = computeDisplayTiming(now, item);
     const endpoints = endpointsFromDetails(details, item);
+    const airports = airportCodesForStatus(item);
     return {
       status: {
         available: true,
@@ -912,6 +964,8 @@ export async function getFlightLiveStatus(
         operatingFlightNumber,
         departure: endpoints.departure,
         arrival: endpoints.arrival,
+        depIata: airports.depIata,
+        arrIata: airports.arrIata,
         ...timing,
         message: "Live gate and baggage updates appear on the day of travel.",
       },
@@ -933,26 +987,13 @@ export async function getFlightLiveStatus(
     };
   }
 
-  const depIata = normalizeFlightIata(details.fromIata);
-  if (!depIata) {
+  const fetchInput = resolveLiveFetchInput(item, details, new Date());
+  if (!fetchInput) {
     return {
       status: {
         available: false,
         reason: "missing_airport_code",
         message: "Add the departure airport IATA code (e.g. MEL).",
-      },
-      trackingState,
-      details: workingDetails,
-    };
-  }
-
-  const flightDate = getItemCalendarDate(item);
-  if (!flightDate) {
-    return {
-      status: {
-        available: false,
-        reason: "outside_window",
-        message: "This flight has no travel date.",
       },
       trackingState,
       details: workingDetails,
@@ -992,12 +1033,7 @@ export async function getFlightLiveStatus(
     shouldBootstrapLive
   ) {
     try {
-      const flight = await fetchLiveFlight({
-        operatingFlightNumber,
-        depIata,
-        flightDate,
-        arrIata: normalizeFlightIata(details.toIata),
-      });
+      const flight = await fetchLiveFlight(fetchInput);
 
       if (flight) {
         const snapshot = buildSnapshot(flight);
@@ -1067,6 +1103,7 @@ export async function getFlightLiveStatus(
   if (!trackingState.snapshot) {
     const timing = computeDisplayTiming(now, item);
     const endpoints = endpointsFromDetails(details, item);
+    const airports = airportCodesForStatus(item);
     return {
       status: {
         available: true,
@@ -1075,6 +1112,8 @@ export async function getFlightLiveStatus(
         operatingFlightNumber,
         departure: endpoints.departure,
         arrival: endpoints.arrival,
+        depIata: airports.depIata,
+        arrIata: airports.arrIata,
         ...timing,
         lastUpdated: now.toISOString(),
         message:

@@ -35,6 +35,19 @@ type TaskDetails = {
 
 type UserOption = { id: number; username: string };
 
+type UrgencyFilter = "all" | "urgent" | "non-urgent";
+type TaskSortKey = "dueAt" | "assignee" | "assigner";
+
+function compareNullableDates(
+  a: string | Date | null,
+  b: string | Date | null,
+): number {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return new Date(a).getTime() - new Date(b).getTime();
+}
+
 export function TasksPanel() {
   const router = useRouter();
   const { user, taskPermissions, canManageUsers } = useAuth();
@@ -58,6 +71,8 @@ export function TasksPanel() {
     allowSubtasks: false,
     allowTaggedNotes: false,
   });
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
+  const [sortKey, setSortKey] = useState<TaskSortKey>("dueAt");
 
   const canAssign = taskPermissions.some(
     (entry) => entry.canAssign || entry.canAssignForOthers,
@@ -139,10 +154,29 @@ export function TasksPanel() {
     void loadUsers();
   }, [canManageUsers, canAssign, user, tasks]);
 
-  const rootTasks = useMemo(
-    () => tasks.filter((task) => !task.parentTaskId),
-    [tasks],
-  );
+  const rootTasks = useMemo(() => {
+    let list = tasks.filter((task) => !task.parentTaskId);
+
+    if (urgencyFilter === "urgent") {
+      list = list.filter((task) => task.isUrgent);
+    } else if (urgencyFilter === "non-urgent") {
+      list = list.filter((task) => !task.isUrgent);
+    }
+
+    if (user?.isAdmin) {
+      list = [...list].sort((a, b) => {
+        if (sortKey === "dueAt") {
+          return compareNullableDates(a.dueAt, b.dueAt);
+        }
+        if (sortKey === "assignee") {
+          return a.assignee.localeCompare(b.assignee);
+        }
+        return a.assigner.localeCompare(b.assigner);
+      });
+    }
+
+    return list;
+  }, [tasks, urgencyFilter, sortKey, user?.isAdmin]);
 
   const subtasksByParent = useMemo(() => {
     const map = new Map<number, TaskRow[]>();
@@ -594,6 +628,35 @@ export function TasksPanel() {
 
   return (
     <SectionShell title="Tasks">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <label className="inline-flex items-center gap-2 text-sm text-stone-600">
+          <span>Show</span>
+          <select
+            value={urgencyFilter}
+            onChange={(e) => setUrgencyFilter(e.target.value as UrgencyFilter)}
+            className="rounded-lg border border-stone-200 px-2 py-1.5"
+          >
+            <option value="all">All tasks</option>
+            <option value="urgent">Urgent only</option>
+            <option value="non-urgent">Non-urgent only</option>
+          </select>
+        </label>
+        {user?.isAdmin && (
+          <label className="inline-flex items-center gap-2 text-sm text-stone-600">
+            <span>Sort by</span>
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as TaskSortKey)}
+              className="rounded-lg border border-stone-200 px-2 py-1.5"
+            >
+              <option value="dueAt">Due date</option>
+              <option value="assignee">Assignee</option>
+              <option value="assigner">Assigner</option>
+            </select>
+          </label>
+        )}
+      </div>
+
       {rootTasks.length === 0 ? (
         <p className="text-sm text-stone-500">
           {canAssign

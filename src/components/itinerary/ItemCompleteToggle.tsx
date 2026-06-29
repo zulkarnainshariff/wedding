@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useOfflineSync } from "@/components/auth/OfflineSyncProvider";
 import { useItineraryUI } from "@/components/itinerary/ItineraryUIContext";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { getItemCompletion, isItemCompleted } from "@/lib/item-completion";
@@ -71,6 +72,7 @@ export function ItemCompleteToggle({
   const [, startTransition] = useTransition();
   const { canEdit } = useAuth();
   const { refreshSelectedItem, selectedItemId } = useItineraryUI();
+  const { syncNow } = useOfflineSync();
   const [busy, setBusy] = useState(false);
   const [completed, setCompleted] = useState(() => isItemCompleted(item));
   const [confirmUndoOpen, setConfirmUndoOpen] = useState(false);
@@ -109,6 +111,8 @@ export function ItemCompleteToggle({
       if (selectedItemId === item.id) {
         await refreshSelectedItem({ silent: true });
       }
+
+      await syncNow();
 
       startTransition(() => {
         router.refresh();

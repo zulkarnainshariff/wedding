@@ -1,4 +1,9 @@
 import { getAirportTimezone } from "@/lib/airport-timezones";
+import {
+  flightSegmentsFromDetails,
+  resolveFlightScheduleForItem,
+  segmentLabel,
+} from "@/lib/flight-segment-timing";
 import type { ItineraryItem } from "@/lib/schema";
 import { getFlightDetails } from "@/lib/types";
 
@@ -264,15 +269,27 @@ function resolveArrivalDate(
   return departureDate;
 }
 
+/** Normalize DB/API values to a YYYY-MM-DD travel date. */
+export function normalizeEventDate(
+  value: string | Date | null | undefined,
+): string | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${value.getUTCFullYear()}-${pad(value.getUTCMonth() + 1)}-${pad(value.getUTCDate())}`;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const dateOnly = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+  return dateOnly ? dateOnly[1] : null;
+}
+
 function fallbackDate(input: FlightScheduleInput): string | null {
-  if (input.eventDate) return input.eventDate;
-  if (!input.startDatetime) return null;
-
-  const start = new Date(input.startDatetime);
-  if (Number.isNaN(start.getTime())) return null;
-
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
+  return (
+    normalizeEventDate(input.eventDate) ??
+    normalizeEventDate(input.startDatetime)
+  );
 }
 
 /** Resolve flight start/end using departure and arrival airport local times. */
@@ -310,7 +327,7 @@ export function resolveFlightSchedule(
     flight.toIata ?? flight.to,
     flight.toTimezone,
   );
-  const travelDate = input.eventDate ?? fallbackDate(input);
+  const travelDate = fallbackDate(input);
 
   let startDatetime =
     fallbackStart && !Number.isNaN(fallbackStart.getTime())
@@ -394,23 +411,31 @@ export function formatFlightEndpointLabel(
   if (item.category !== "flight") return null;
 
   const flight = getFlightDetails(item.details);
-  const schedule = resolveFlightSchedule({
-    eventDate: item.eventDate,
-    startDatetime: item.startDatetime,
-    endDatetime: item.endDatetime,
-    details: item.details,
-  });
+  const segments = flightSegmentsFromDetails(flight);
+  const schedule =
+    segments.length >= 2
+      ? resolveFlightScheduleForItem(item)
+      : resolveFlightSchedule({
+          eventDate: item.eventDate,
+          startDatetime: item.startDatetime,
+          endDatetime: item.endDatetime,
+          details: item.details,
+        });
 
   const instant =
     endpoint === "departure" ? schedule.startDatetime : schedule.endDatetime;
   const iata =
     endpoint === "departure"
-      ? (flight?.fromIata ?? flight?.from)
-      : (flight?.toIata ?? flight?.to);
+      ? segments.length >= 2
+        ? segmentLabel(segments[0], "from")
+        : (flight?.fromIata ?? flight?.from)
+      : segments.length >= 2
+        ? segmentLabel(segments[segments.length - 1], "to")
+        : (flight?.toIata ?? flight?.to);
   const clockTime =
     endpoint === "departure"
-      ? flight?.departureTime
-      : flight?.arrivalTime;
+      ? (segments[0]?.departureTime ?? flight?.departureTime)
+      : (segments.at(-1)?.arrivalTime ?? flight?.arrivalTime);
   const timeZone = getAirportTimezone(
     iata,
     endpoint === "departure" ? flight?.fromTimezone : flight?.toTimezone,
@@ -424,8 +449,10 @@ export function formatFlightEndpointLabel(
 
   const travelDate =
     endpoint === "arrival"
-      ? (schedule.arrivalDate ?? schedule.eventDate ?? item.eventDate)
-      : (schedule.eventDate ?? item.eventDate);
+      ? (schedule.arrivalDate ??
+        schedule.eventDate ??
+        normalizeEventDate(item.eventDate))
+      : (schedule.eventDate ?? normalizeEventDate(item.eventDate));
   if (travelDate && clockTime?.trim()) {
     const dateLabel = new Date(`${travelDate}T12:00:00`).toLocaleDateString(
       "en-GB",

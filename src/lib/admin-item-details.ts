@@ -1,4 +1,10 @@
 import type { AccommodationSuggestion, Category, FlightSegment } from "@/lib/types";
+import {
+  flatMapFromGroups,
+  groupsFromDetails,
+  normalizeBookingGroupLinks,
+  type BookingGroup,
+} from "@/lib/booking-groups";
 import { airlineInfoFromFlightNumbers } from "@/lib/airlines";
 import { formatFlightNumberDisplay, parseLegacyFlightNumber } from "@/lib/flight-numbers";
 import { buildLocationPayload, getItemLocation } from "@/lib/item-location";
@@ -13,7 +19,7 @@ export type StructuredItemDetails = {
   locationName: string;
   locationMapUrl: string;
   travellers: string[];
-  bookingReferences: TravellerRecord[];
+  bookingGroups: BookingGroup[];
   seats: TravellerRecord[];
   baggage: TravellerRecord[];
   checkInStatus: Record<string, boolean>;
@@ -108,7 +114,7 @@ export function emptyStructuredDetails(category: Category): StructuredItemDetail
     locationName: "",
     locationMapUrl: "",
     travellers: [],
-    bookingReferences: [],
+    bookingGroups: [],
     seats: [],
     baggage: [],
     checkInStatus: {},
@@ -218,17 +224,7 @@ export function parseStructuredDetails(
       structured.simple.operatingAirlineName =
         structured.simple.operatingAirlineName || airline.operatingAirlineName || "";
     }
-    structured.bookingReferences = recordsFromObject(
-      details.bookingReferences as Record<string, string> | undefined,
-    );
-    if (
-      structured.bookingReferences.length === 0 &&
-      details.bookingReference
-    ) {
-      structured.bookingReferences = [
-        { name: "Booking", value: String(details.bookingReference) },
-      ];
-    }
+    structured.bookingGroups = groupsFromDetails(details);
     structured.seats = recordsFromObject(
       details.seats as Record<string, string | null> | undefined,
     );
@@ -356,9 +352,14 @@ export function buildStructuredDetailsPayload(
     payload.operatingAirlineName =
       structured.simple.operatingAirlineName.trim() || undefined;
     payload.status = structured.simple.status === "tbc" ? "tbc" : "confirmed";
-    payload.bookingReferences = objectFromRecords(
-      structured.bookingReferences,
-    );
+    payload.bookingGroups = normalizeBookingGroupLinks(
+      structured.bookingGroups.filter((group) => group.reference.trim()),
+    ).map((group) => ({
+      reference: group.reference.trim(),
+      travellers: group.travellers.filter((name) => name.trim()),
+      linkedWith: (group.linkedWith ?? []).filter(Boolean),
+    }));
+    payload.bookingReferences = flatMapFromGroups(structured.bookingGroups);
     payload.seats = objectFromRecords(structured.seats);
     payload.baggage = objectFromRecords(structured.baggage, true);
     payload.checkInStatus = structured.checkInStatus;
