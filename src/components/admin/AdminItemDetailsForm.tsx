@@ -1233,7 +1233,7 @@ export function AdminItemDetailsForm({
           <span>
             <span className="font-medium text-stone-800">Private item</span>
             <span className="mt-0.5 block text-xs text-stone-500">
-              Only participants on this item, extra viewers below, and admins can
+              Only participants on this item, additional viewers allowed below, and admins can
               see it — even when someone&apos;s schedule filter is set to
               Everyone.
             </span>
