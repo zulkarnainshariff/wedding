@@ -9,7 +9,10 @@ import {
   useState,
 } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { DEFAULT_USER_PREFERENCES } from "@/lib/user-preferences";
+import {
+  DEFAULT_USER_PREFERENCES,
+  type UserPreferences,
+} from "@/lib/user-preferences";
 import {
   getEffectiveDate,
   getTodayDate,
@@ -27,6 +30,13 @@ type TripTimeContextValue = {
   resetSimulatedDate: () => void;
   hidePast: boolean;
   setHidePast: (hide: boolean) => Promise<void>;
+  hideFreeDays: boolean;
+  setHideFreeDays: (hide: boolean) => Promise<void>;
+  hideUntouchedDays: boolean;
+  setHideUntouchedDays: (hide: boolean) => Promise<void>;
+  hiddenDayIds: ReadonlySet<number>;
+  forceVisibleDayIds: ReadonlySet<number>;
+  setDayVisible: (dayId: number, visible: boolean, isFree: boolean) => Promise<void>;
   effectiveDate: Date;
   effectiveDateString: string;
 };
@@ -43,6 +53,17 @@ function readStoredSimulatedDate(): string {
   return localStorage.getItem(SIMULATED_DATE_KEY) ?? toDateString(getTodayDate());
 }
 
+async function persistPreferences(
+  preferences: UserPreferences,
+): Promise<boolean> {
+  const response = await fetch("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ preferences }),
+  });
+  return response.ok;
+}
+
 export function TripTimeProvider({ children }: { children: React.ReactNode }) {
   const { user, refreshUser } = useAuth();
   const [devMode, setDevModeState] = useState(false);
@@ -50,12 +71,22 @@ export function TripTimeProvider({ children }: { children: React.ReactNode }) {
     toDateString(getTodayDate()),
   );
   const [hydrated, setHydrated] = useState(false);
+  const [optimisticPreferences, setOptimisticPreferences] =
+    useState<UserPreferences | null>(null);
 
   useEffect(() => {
     setDevModeState(readStoredDevMode());
     setSimulatedDateState(readStoredSimulatedDate());
     setHydrated(true);
   }, []);
+
+  const serverPreferences = user?.preferences ?? DEFAULT_USER_PREFERENCES;
+  const preferences = optimisticPreferences ?? serverPreferences;
+  const serverPreferencesKey = JSON.stringify(serverPreferences);
+
+  useEffect(() => {
+    setOptimisticPreferences(null);
+  }, [serverPreferencesKey]);
 
   const isAdmin = user?.isAdmin ?? false;
   const activeDevMode = hydrated && isAdmin && devMode;
@@ -85,29 +116,73 @@ export function TripTimeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(SIMULATED_DATE_KEY, today);
   }, [isAdmin]);
 
-  const hidePast =
-    user?.preferences.hidePastDays ?? DEFAULT_USER_PREFERENCES.hidePastDays;
+  const hidePast = preferences.hidePastDays ?? DEFAULT_USER_PREFERENCES.hidePastDays;
+  const hideFreeDays = preferences.hideFreeDays ?? DEFAULT_USER_PREFERENCES.hideFreeDays;
+  const hideUntouchedDays =
+    preferences.hideUntouchedDays ?? DEFAULT_USER_PREFERENCES.hideUntouchedDays;
+  const hiddenDayIds = useMemo(
+    () => new Set(preferences.hiddenDayIds ?? []),
+    [preferences.hiddenDayIds],
+  );
+  const forceVisibleDayIds = useMemo(
+    () => new Set(preferences.forceVisibleDayIds ?? []),
+    [preferences.forceVisibleDayIds],
+  );
+
+  const updatePreferences = useCallback(
+    async (patch: Partial<UserPreferences>) => {
+      if (!user) return false;
+      const next = { ...preferences, ...patch };
+      setOptimisticPreferences(next);
+      const ok = await persistPreferences(next);
+      if (ok) {
+        await refreshUser();
+      } else {
+        setOptimisticPreferences(null);
+      }
+      return ok;
+    },
+    [user, preferences, refreshUser],
+  );
 
   const setHidePast = useCallback(
     async (hide: boolean) => {
-      if (!user) return;
-
-      const preferences = {
-        ...user.preferences,
-        hidePastDays: hide,
-      };
-
-      const response = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preferences }),
-      });
-
-      if (response.ok) {
-        await refreshUser();
-      }
+      await updatePreferences({ hidePastDays: hide });
     },
-    [user, refreshUser],
+    [updatePreferences],
+  );
+
+  const setHideFreeDays = useCallback(
+    async (hide: boolean) => {
+      await updatePreferences({ hideFreeDays: hide });
+    },
+    [updatePreferences],
+  );
+
+  const setHideUntouchedDays = useCallback(
+    async (hide: boolean) => {
+      await updatePreferences({ hideUntouchedDays: hide });
+    },
+    [updatePreferences],
+  );
+
+  const setDayVisible = useCallback(
+    async (dayId: number, visible: boolean, withoutItems: boolean) => {
+      const nextHidden = new Set(preferences.hiddenDayIds ?? []);
+      const nextForce = new Set(preferences.forceVisibleDayIds ?? []);
+      if (visible) {
+        nextHidden.delete(dayId);
+        if (withoutItems) nextForce.add(dayId);
+      } else {
+        nextHidden.add(dayId);
+        nextForce.delete(dayId);
+      }
+      await updatePreferences({
+        hiddenDayIds: [...nextHidden],
+        forceVisibleDayIds: [...nextForce],
+      });
+    },
+    [preferences.hiddenDayIds, preferences.forceVisibleDayIds, updatePreferences],
   );
 
   const effectiveDate = useMemo(
@@ -127,6 +202,13 @@ export function TripTimeProvider({ children }: { children: React.ReactNode }) {
       resetSimulatedDate,
       hidePast,
       setHidePast,
+      hideFreeDays,
+      setHideFreeDays,
+      hideUntouchedDays,
+      setHideUntouchedDays,
+      hiddenDayIds,
+      forceVisibleDayIds,
+      setDayVisible,
       effectiveDate,
       effectiveDateString: toDateString(effectiveDate),
     }),
@@ -134,11 +216,18 @@ export function TripTimeProvider({ children }: { children: React.ReactNode }) {
       activeDevMode,
       simulatedDate,
       hidePast,
+      hideFreeDays,
+      hideUntouchedDays,
+      hiddenDayIds,
+      forceVisibleDayIds,
       hydrated,
       setDevMode,
       setSimulatedDate,
       resetSimulatedDate,
       setHidePast,
+      setHideFreeDays,
+      setHideUntouchedDays,
+      setDayVisible,
       effectiveDate,
     ],
   );

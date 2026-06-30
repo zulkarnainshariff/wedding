@@ -65,6 +65,11 @@ export function extractItemTravellers(
   addNames(names, d.cargoParty);
   addNames(names, d.seats);
   addNames(names, d.baggage);
+  if (Array.isArray(d.segments)) {
+    for (const segment of d.segments as { seats?: Record<string, unknown> }[]) {
+      addNames(names, segment.seats);
+    }
+  }
   addNames(names, d.bookingReferences);
   if (Array.isArray(d.bookingGroups)) {
     for (const group of d.bookingGroups as { travellers?: string[] }[]) {

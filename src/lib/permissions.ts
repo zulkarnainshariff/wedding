@@ -24,6 +24,8 @@ export type UserPermissions = {
   canManageUsers?: boolean;
   canViewAllGuestLists?: boolean;
   canEditAllGuestLists?: boolean;
+  isWeddingCoordinator?: boolean;
+  canModerateGuestbook?: boolean;
 };
 
 export type SessionUser = {
@@ -51,6 +53,8 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   canManageUsers: true,
   canViewAllGuestLists: true,
   canEditAllGuestLists: true,
+  isWeddingCoordinator: true,
+  canModerateGuestbook: true,
 };
 
 export function normalizeViewTravellers(
@@ -110,7 +114,16 @@ export function normalizePermissions(
       value.canViewAllGuestLists || value.canEditAllGuestLists,
     ),
     canEditAllGuestLists: Boolean(value.canEditAllGuestLists),
+    isWeddingCoordinator: Boolean(value.isWeddingCoordinator),
+    canModerateGuestbook: Boolean(value.canModerateGuestbook),
   };
+}
+
+export function canModerateGuestbook(user: SessionUser): boolean {
+  return (
+    isAdminSession(user.roleLevel) ||
+    Boolean(user.permissions.canModerateGuestbook)
+  );
 }
 
 export function canViewCategory(
@@ -136,7 +149,8 @@ export function canViewAllGuestLists(user: SessionUser): boolean {
   return (
     isAdminSession(user.roleLevel) ||
     canManageUsers(user) ||
-    Boolean(user.permissions.canViewAllGuestLists)
+    Boolean(user.permissions.canViewAllGuestLists) ||
+    Boolean(user.permissions.isWeddingCoordinator)
   );
 }
 
@@ -157,10 +171,18 @@ export function receivesAllGuestListNotifications(user: {
   return (
     isAdminSession(level) ||
     Boolean(user.permissions.canManageUsers) ||
+    Boolean(user.permissions.isWeddingCoordinator) ||
     Boolean(
       user.permissions.canViewAllGuestLists ||
         user.permissions.canEditAllGuestLists,
     )
+  );
+}
+
+export function isWeddingCoordinator(user: SessionUser): boolean {
+  return (
+    isAdminSession(user.roleLevel) ||
+    Boolean(user.permissions.isWeddingCoordinator)
   );
 }
 
@@ -182,7 +204,6 @@ export function canViewItemTravellers(
   if (travellers.length === 0) {
     return (
       item.category === "travel_insurance" ||
-      item.category === "pet_relocation" ||
       item.category === "flight"
     );
   }

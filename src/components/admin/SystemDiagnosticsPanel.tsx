@@ -6,16 +6,18 @@ import { SectionShell } from "@/components/layout/PageShell";
 import { DatabaseOperationsPanel } from "@/components/admin/DatabaseOperationsPanel";
 import { NotificationsAdminPanel } from "@/components/admin/NotificationsAdminPanel";
 
-type LogKind = "login" | "audit" | "usage";
+type LogKind = "login" | "audit" | "usage" | "errors";
 
 type LogRow = {
   id: number;
   username?: string | null;
   eventType?: string | null;
   action?: string | null;
+  operation?: string | null;
   resourceType?: string | null;
   resourceId?: string | null;
   summary?: string | null;
+  errorMessage?: string | null;
   path?: string | null;
   sessionId?: string | null;
   createdAt: string;
@@ -32,13 +34,20 @@ const KIND_TABS: { id: LogKind; label: string }[] = [
   { id: "login", label: "Login" },
   { id: "audit", label: "Data changes" },
   { id: "usage", label: "Usage" },
+  { id: "errors", label: "Errors" },
 ];
 
-export function SystemDiagnosticsPanel() {
+export function SystemDiagnosticsPanel({
+  showSuperuserTools = false,
+}: {
+  showSuperuserTools?: boolean;
+}) {
   const [kind, setKind] = useState<LogKind>("login");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [username, setUsername] = useState("");
+  const [operation, setOperation] = useState("");
+  const [resourceType, setResourceType] = useState("");
   const [rows, setRows] = useState<LogRow[]>([]);
   const [active, setActive] = useState<ActiveUser[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
@@ -52,6 +61,10 @@ export function SystemDiagnosticsPanel() {
     if (from) params.set("from", new Date(from).toISOString());
     if (to) params.set("to", new Date(to).toISOString());
     if (username.trim()) params.set("username", username.trim().toLowerCase());
+    if (kind === "errors") {
+      if (operation.trim()) params.set("operation", operation.trim());
+      if (resourceType.trim()) params.set("resourceType", resourceType.trim());
+    }
 
     const [logsRes, activeRes] = await Promise.all([
       fetch(`/api/system/logs?${params.toString()}`),
@@ -73,7 +86,7 @@ export function SystemDiagnosticsPanel() {
 
     setSelected([]);
     setLoading(false);
-  }, [from, to, kind, username]);
+  }, [from, to, kind, username, operation, resourceType]);
 
   useEffect(() => {
     void load();
@@ -135,7 +148,7 @@ export function SystemDiagnosticsPanel() {
 
   return (
     <div className="space-y-6">
-      <DatabaseOperationsPanel />
+      {showSuperuserTools && <DatabaseOperationsPanel />}
 
       <SectionShell title="Active now">
         <p className="mb-3 text-sm text-stone-500">
@@ -162,8 +175,9 @@ export function SystemDiagnosticsPanel() {
 
       <SectionShell title="Diagnostics logs">
         <p className="mb-4 text-sm text-stone-500">
-          Login events, data changes, and usage sessions. Detailed page views are
-          recorded in development only.
+          {kind === "errors"
+            ? "Failed database operations (items, days, tasks, guests). Filter by operation (create, update, delete), resource type, user, or date."
+            : "Login events, data changes, and usage sessions. Detailed page views are recorded in development only."}
         </p>
         <div className="mb-4 flex flex-wrap gap-2">
           {KIND_TABS.map((tab) => (
@@ -211,6 +225,28 @@ export function SystemDiagnosticsPanel() {
               placeholder="Filter by username"
             />
           </label>
+          {kind === "errors" && (
+            <>
+              <label className="block text-sm">
+                <span className="mb-1 block text-stone-500">Operation</span>
+                <input
+                  value={operation}
+                  onChange={(e) => setOperation(e.target.value)}
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                  placeholder="e.g. create"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block text-stone-500">Resource type</span>
+                <input
+                  value={resourceType}
+                  onChange={(e) => setResourceType(e.target.value)}
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                  placeholder="e.g. guest"
+                />
+              </label>
+            </>
+          )}
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
@@ -267,10 +303,11 @@ export function SystemDiagnosticsPanel() {
                   </td>
                   <td className="px-3 py-2">{row.username ?? "—"}</td>
                   <td className="px-3 py-2">
-                    {row.eventType ?? row.action ?? "—"}
+                    {row.eventType ?? row.action ?? row.operation ?? "—"}
                   </td>
                   <td className="px-3 py-2 text-stone-600">
-                    {row.summary ??
+                    {row.errorMessage ??
+                      row.summary ??
                       row.path ??
                       row.resourceType ??
                       row.sessionId ??

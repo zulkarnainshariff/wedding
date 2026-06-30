@@ -5,19 +5,20 @@ import { TripProgressIndicator } from "./TripProgressIndicator";
 import { TaskIndicatorBadge, ItemTaskIndicator, useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
+import { useDayVisibility } from "@/hooks/useDayVisibility";
 import { getDayDisplayTitle, hasRestrictedTravellerView } from "@/lib/day-display";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
-import { filterPastDays, isDayToday } from "@/lib/trip-time";
+import { isDayToday } from "@/lib/trip-time";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
 
 type DayWithItems = ItineraryDay & { items: ItineraryItem[] };
 
 export function DayTimeline({ days }: { days: DayWithItems[] }) {
   const { user } = useAuth();
-  const { effectiveDate, hidePast } = useTripTime();
+  const { effectiveDate, hidePast, hideFreeDays, hideUntouchedDays } = useTripTime();
   const { formatDateOnly } = useDisplayFormat();
   const restrictedView = hasRestrictedTravellerView(user);
-  const visibleDays = filterPastDays(days, effectiveDate, hidePast);
+  const { visibleDays } = useDayVisibility(days);
   const { dayCounts, itemSummaries } = useTaskIndicators();
 
   if (visibleDays.length === 0) {
@@ -25,14 +26,16 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
       <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-10 text-center text-stone-500">
         {hidePast
           ? "No upcoming days to show. Turn off “Hide past days” to see earlier entries."
-          : "No itinerary days yet. Add days and items from the Manage page."}
+          : hideFreeDays || hideUntouchedDays
+            ? "No days match your Options filters. Turn them off in the toolbar to see more days."
+            : "No itinerary days to show. Adjust day visibility or add days from Manage."}
       </div>
     );
   }
 
   return (
     <>
-      <TripProgressIndicator days={days} />
+      <TripProgressIndicator days={visibleDays} />
 
       <div className="relative space-y-10">
         {visibleDays.map((day) => {

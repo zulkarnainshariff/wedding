@@ -90,7 +90,7 @@ export function FlightsPanel({
 
   if (tab === "all") {
     return (
-      <PageShell eyebrow="Category" title="Flights" toolbar={<ScheduleToolbar />}>
+      <PageShell eyebrow="Category" title="Flights" toolbar={<ScheduleToolbar showDayFilterOptions={false} />}>
         <FlightTabBar tab={tab} visibleTabs={visibleTabs} onChange={setTab} />
         {visibleItems.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-10 text-center text-stone-500">
@@ -112,7 +112,7 @@ export function FlightsPanel({
   }
 
   return (
-    <PageShell eyebrow="Category" title="Flights" toolbar={<ScheduleToolbar />}>
+    <PageShell eyebrow="Category" title="Flights" toolbar={<ScheduleToolbar showDayFilterOptions={false} />}>
       <FlightTabBar tab={tab} visibleTabs={visibleTabs} onChange={setTab} />
       <CategoryList category={displayCategory} items={items} embedded />
     </PageShell>

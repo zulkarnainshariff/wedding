@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Plus, Save, Trash2, X } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/components/ui/ToastProvider";
 import { TaskNoteIcon } from "@/components/tasks/TaskNoteIcon";
 import { SectionShell } from "@/components/layout/PageShell";
+import { scrollToElementById, taskEditSectionId, taskRowId } from "@/lib/day-jump";
 import {
   TASK_STATUSES,
   TASK_STATUS_LABELS,
@@ -38,6 +40,26 @@ type UserOption = { id: number; username: string };
 type UrgencyFilter = "all" | "urgent" | "non-urgent";
 type TaskSortKey = "dueAt" | "assignee" | "assigner";
 
+type TaskEditForm = {
+  title: string;
+  assigneeUserId: string;
+  dueAt: string;
+  assignerNotes: string;
+  isUrgent: boolean;
+  allowSubtasks: boolean;
+  allowTaggedNotes: boolean;
+};
+
+const EMPTY_EDIT_FORM: TaskEditForm = {
+  title: "",
+  assigneeUserId: "",
+  dueAt: "",
+  assignerNotes: "",
+  isUrgent: false,
+  allowSubtasks: false,
+  allowTaggedNotes: false,
+};
+
 function compareNullableDates(
   a: string | Date | null,
   b: string | Date | null,
@@ -51,6 +73,7 @@ function compareNullableDates(
 export function TasksPanel() {
   const router = useRouter();
   const { user, taskPermissions, canManageUsers } = useAuth();
+  const { success: showSuccess, error: showError } = useToast();
   const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -73,10 +96,28 @@ export function TasksPanel() {
   });
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
   const [sortKey, setSortKey] = useState<TaskSortKey>("dueAt");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    title: "",
+    eventId: "",
+    assigneeUserId: "",
+    dueAt: "",
+    assignerNotes: "",
+    isUrgent: false,
+  });
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<TaskEditForm>(EMPTY_EDIT_FORM);
+  const editSectionRef = useRef<HTMLDivElement>(null);
 
-  const canAssign = taskPermissions.some(
-    (entry) => entry.canAssign || entry.canAssignForOthers,
+  const assignableEvents = useMemo(
+    () =>
+      taskPermissions.filter(
+        (entry) => entry.canAssign || entry.canAssignForOthers || user?.isAdmin,
+      ),
+    [taskPermissions, user?.isAdmin],
   );
+
+  const canAssign = assignableEvents.length > 0;
 
   const canViewOthers = useMemo(
     () =>
@@ -87,15 +128,15 @@ export function TasksPanel() {
     [user?.isAdmin, taskPermissions],
   );
 
-  const loadTasks = useCallback(async () => {
-    setLoading(true);
+  const loadTasks = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setLoading(true);
     try {
       const response = await fetch("/api/tasks");
       if (response.ok) {
         setTasks(await response.json());
       }
     } finally {
-      setLoading(false);
+      if (!options?.silent) setLoading(false);
     }
   }, []);
 
@@ -110,12 +151,66 @@ export function TasksPanel() {
       return;
     }
 
+    const urgentParam = searchParams.get("urgent");
+    if (urgentParam === "1" || urgentParam === "true") {
+      setUrgencyFilter("urgent");
+    }
+
     const taskParam = searchParams.get("task");
     if (taskParam) {
       const id = Number(taskParam);
-      if (id) setExpandedId(id);
+      if (id) {
+        setExpandedId(id);
+        setEditingTaskId(id);
+      }
     }
   }, [searchParams, router]);
+
+  function setUrgentOnly(enabled: boolean) {
+    const nextFilter: UrgencyFilter = enabled ? "urgent" : "all";
+    setUrgencyFilter(nextFilter);
+    const params = new URLSearchParams(searchParams.toString());
+    if (enabled) {
+      params.set("urgent", "1");
+    } else {
+      params.delete("urgent");
+    }
+    const query = params.toString();
+    router.replace(query ? `/tasks?${query}` : "/tasks", { scroll: false });
+  }
+
+  useEffect(() => {
+    if (!editingTaskId) return;
+    const task = tasks.find((row) => row.id === editingTaskId);
+    if (!task) return;
+    setEditForm({
+      title: task.title,
+      assigneeUserId: task.assigneeUserId ? String(task.assigneeUserId) : "",
+      dueAt: toDatetimeLocalValue(task.dueAt),
+      assignerNotes: task.assignerNotes ?? "",
+      isUrgent: task.isUrgent,
+      allowSubtasks: task.allowSubtasks,
+      allowTaggedNotes: task.allowTaggedNotes,
+    });
+  }, [editingTaskId, tasks]);
+
+  useEffect(() => {
+    if (!editingTaskId || !editSectionRef.current) return;
+    requestAnimationFrame(() => {
+      scrollToElementById(taskEditSectionId());
+    });
+  }, [editingTaskId]);
+
+  useEffect(() => {
+    if (!expandedId || details[expandedId]) return;
+    void (async () => {
+      const response = await fetch(`/api/tasks/${expandedId}`);
+      if (!response.ok) return;
+      const payload = (await response.json()) as TaskDetails;
+      setDetails((current) => ({ ...current, [expandedId]: payload }));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect -- load details for deep-linked task
+  }, [expandedId, details]);
 
   useEffect(() => {
     if (!user) return;
@@ -158,7 +253,14 @@ export function TasksPanel() {
     let list = tasks.filter((task) => !task.parentTaskId);
 
     if (urgencyFilter === "urgent") {
-      list = list.filter((task) => task.isUrgent);
+      const parentsWithUrgentChildren = new Set(
+        tasks
+          .filter((task) => task.parentTaskId && task.isUrgent)
+          .map((task) => task.parentTaskId as number),
+      );
+      list = list.filter(
+        (task) => task.isUrgent || parentsWithUrgentChildren.has(task.id),
+      );
     } else if (urgencyFilter === "non-urgent") {
       list = list.filter((task) => !task.isUrgent);
     }
@@ -182,19 +284,39 @@ export function TasksPanel() {
     const map = new Map<number, TaskRow[]>();
     for (const task of tasks) {
       if (task.parentTaskId) {
+        if (urgencyFilter === "urgent" && !task.isUrgent) continue;
+        if (urgencyFilter === "non-urgent" && task.isUrgent) continue;
         const list = map.get(task.parentTaskId) ?? [];
         list.push(task);
         map.set(task.parentTaskId, list);
       }
     }
     return map;
-  }, [tasks]);
+  }, [tasks, urgencyFilter]);
 
   const assigneeOptions = useMemo(() => {
     if (!user) return users;
     if (canManageUsers || canAssign) return users;
     return users.filter((option) => option.id === user.id);
   }, [users, user, canManageUsers, canAssign]);
+
+  function canManageTask(task: TaskRow): boolean {
+    if (!user) return false;
+    if (user.isAdmin) return true;
+    if (task.createdByUserId === user.id) return true;
+    return assignableEvents.some(
+      (entry) =>
+        entry.eventId === task.eventId &&
+        (entry.canAssign || entry.canAssignForOthers),
+    );
+  }
+
+  function toDatetimeLocalValue(value: string | Date | null): string {
+    if (!value) return "";
+    const date = typeof value === "string" ? new Date(value) : value;
+    const pad = (part: number) => String(part).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
 
   async function loadDetails(taskId: number) {
     const response = await fetch(`/api/tasks/${taskId}`);
@@ -206,12 +328,75 @@ export function TasksPanel() {
   async function toggleExpand(taskId: number) {
     if (expandedId === taskId) {
       setExpandedId(null);
+      setEditingTaskId(null);
+      setEditForm(EMPTY_EDIT_FORM);
+      router.replace("/tasks", { scroll: false });
       return;
     }
     setExpandedId(taskId);
+    setEditingTaskId(taskId);
+    router.replace(`/tasks?task=${taskId}`, { scroll: false });
     if (!details[taskId]) {
       await loadDetails(taskId);
     }
+  }
+
+  async function saveEditedTask() {
+    if (!editingTaskId || !editForm.title.trim()) {
+      showError("Task title is required.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const response = await fetch(`/api/tasks/${editingTaskId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: editForm.title.trim(),
+        assigneeUserId: Number(editForm.assigneeUserId) || undefined,
+        dueAt: editForm.dueAt || null,
+        assignerNotes: editForm.assignerNotes || null,
+        isUrgent: editForm.isUrgent,
+        allowSubtasks: editForm.allowSubtasks,
+        allowTaggedNotes: editForm.allowTaggedNotes,
+      }),
+    });
+    setBusy(false);
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      const message = data.error ?? "Failed to update task.";
+      setError(message);
+      showError(message);
+      return;
+    }
+    const updated = await response.json();
+    setTasks((current) =>
+      current.map((task) => (task.id === editingTaskId ? { ...task, ...updated } : task)),
+    );
+    if (details[editingTaskId]) {
+      setDetails((current) => ({
+        ...current,
+        [editingTaskId]: {
+          ...current[editingTaskId],
+          task: { ...current[editingTaskId].task, ...updated },
+        },
+      }));
+    }
+    const savedTaskId = editingTaskId;
+    closeTaskEditor();
+    showSuccess("Task saved.");
+    await loadTasks({ silent: true });
+    window.dispatchEvent(new Event("tasks-changed"));
+    requestAnimationFrame(() => {
+      scrollToElementById(taskRowId(savedTaskId));
+    });
+  }
+
+  function closeTaskEditor() {
+    setEditingTaskId(null);
+    setExpandedId(null);
+    setEditForm(EMPTY_EDIT_FORM);
+    router.replace("/tasks", { scroll: false });
   }
 
   async function updateStatus(
@@ -336,6 +521,7 @@ export function TasksPanel() {
       return;
     }
     if (expandedId === taskId) setExpandedId(null);
+    if (editingTaskId === taskId) closeTaskEditor();
     setDetails((current) => {
       const next = { ...current };
       delete next[taskId];
@@ -383,30 +569,74 @@ export function TasksPanel() {
   }
 
   function openTask(task: TaskRow) {
-    if (task.itemId) {
-      router.push(`/itinerary?item=${task.itemId}&task=${task.id}`);
-      return;
-    }
     void toggleExpand(task.id);
   }
 
+  async function createTask() {
+    if (!createForm.title.trim() || !createForm.eventId) {
+      showError("Title and event are required.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const response = await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: createForm.title.trim(),
+        eventId: Number(createForm.eventId),
+        assigneeUserId: createForm.assigneeUserId
+          ? Number(createForm.assigneeUserId)
+          : user?.id,
+        dueAt: createForm.dueAt || null,
+        assignerNotes: createForm.assignerNotes || null,
+        isUrgent: createForm.isUrgent,
+      }),
+    });
+    setBusy(false);
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      const message = data.error ?? "Failed to create task.";
+      setError(message);
+      showError(message);
+      return;
+    }
+    setCreateForm({
+      title: "",
+      eventId: createForm.eventId,
+      assigneeUserId: "",
+      dueAt: "",
+      assignerNotes: "",
+      isUrgent: false,
+    });
+    setShowCreateForm(false);
+    showSuccess("Task created.");
+    await loadTasks();
+    window.dispatchEvent(new Event("tasks-changed"));
+  }
+
   function renderTaskRow(task: TaskRow, depth = 0) {
-    const isExpanded = expandedId === task.id;
-    const taskDetails = details[task.id];
+    const isSelected = editingTaskId === task.id;
     const isAssignee = task.assigneeUserId === user?.id;
     const assignee = assigneeLabel(task);
 
     return (
       <div key={task.id} className={depth > 0 ? "ml-6 border-l border-stone-200 pl-4" : ""}>
-        <div className="py-4">
+        <div
+          id={taskRowId(task.id)}
+          className={[
+            "scroll-mt-24 py-4",
+            isSelected ? "rounded-xl bg-brand-deep/5 px-3 -mx-3" : "",
+          ].join(" ")}
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <button
               type="button"
               onClick={() => openTask(task)}
-              className="flex min-w-0 flex-1 items-start gap-2 text-left"
+              className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 text-left"
             >
-              {isExpanded ? (
-                <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-stone-400" />
+              {isSelected ? (
+                <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-brand-deep" />
               ) : (
                 <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-stone-400" />
               )}
@@ -445,7 +675,7 @@ export function TasksPanel() {
                   type="button"
                   disabled={busy}
                   onClick={() => void deleteTask(task.id)}
-                  className="inline-flex items-center justify-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                  className="inline-flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Delete
@@ -453,166 +683,49 @@ export function TasksPanel() {
               )}
               {isAssignee && (
                 <>
-                <select
-                  value={pendingCantCompleteId === task.id ? "cant_complete" : task.status}
-                  disabled={busy}
-                  onChange={(e) =>
-                    handleStatusChange(task, e.target.value as TaskStatus)
-                  }
-                  className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
-                >
-                  {TASK_STATUSES.map((taskStatus) => (
-                    <option key={taskStatus} value={taskStatus}>
-                      {TASK_STATUS_LABELS[taskStatus]}
-                    </option>
-                  ))}
-                </select>
-                {pendingCantCompleteId === task.id && (
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      value={cantCompleteReason[task.id] ?? ""}
-                      onChange={(e) =>
-                        setCantCompleteReason((current) => ({
-                          ...current,
-                          [task.id]: e.target.value,
-                        }))
-                      }
-                      placeholder="Reason can't complete"
-                      className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
-                    />
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void submitCantComplete(task.id)}
-                      className="rounded-lg bg-brand-deep px-3 py-1.5 text-sm text-white"
-                    >
-                      Save
-                    </button>
-                  </div>
-                )}
+                  <select
+                    value={
+                      pendingCantCompleteId === task.id ? "cant_complete" : task.status
+                    }
+                    disabled={busy}
+                    onChange={(e) =>
+                      handleStatusChange(task, e.target.value as TaskStatus)
+                    }
+                    className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
+                  >
+                    {TASK_STATUSES.map((taskStatus) => (
+                      <option key={taskStatus} value={taskStatus}>
+                        {TASK_STATUS_LABELS[taskStatus]}
+                      </option>
+                    ))}
+                  </select>
+                  {pendingCantCompleteId === task.id && (
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        value={cantCompleteReason[task.id] ?? ""}
+                        onChange={(e) =>
+                          setCantCompleteReason((current) => ({
+                            ...current,
+                            [task.id]: e.target.value,
+                          }))
+                        }
+                        placeholder="Reason can't complete"
+                        className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
+                      />
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void submitCantComplete(task.id)}
+                        className="rounded-lg bg-brand-deep px-3 py-1.5 text-sm text-white"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </div>
           </div>
-
-          {isExpanded && (
-            <div className="mt-4 ml-6 space-y-4 border-l border-stone-100 pl-4">
-              {task.assignerNotes && (
-                <div>
-                  <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">
-                    Assigner notes
-                  </p>
-                  <p className="mt-1 text-sm text-stone-700">{task.assignerNotes}</p>
-                </div>
-              )}
-
-              {taskDetails ? (
-                taskDetails.notes.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">
-                      Notes
-                    </p>
-                    {taskDetails.notes.map(({ note, author }) => (
-                      <div
-                        key={note.id}
-                        className="flex items-start justify-between gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-stone-700">{note.content}</p>
-                          <p className="mt-1 text-xs text-stone-400">{author}</p>
-                        </div>
-                        {user?.isAdmin && (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void deleteNote(task.id, note.id)}
-                            className="shrink-0 rounded p-1 text-red-500 hover:bg-red-50"
-                            aria-label="Delete note"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )
-              ) : (
-                <p className="text-sm text-stone-400">Loading details…</p>
-              )}
-
-              <div className="flex gap-2">
-                <input
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  placeholder="Add a note…"
-                  className="min-w-0 flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm"
-                />
-                <button
-                  type="button"
-                  disabled={busy || !newNote.trim()}
-                  onClick={() => void addNote(task.id)}
-                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
-                >
-                  Add note
-                </button>
-              </div>
-
-              {task.allowSubtasks && isAssignee && (
-                <div className="rounded-lg border border-dashed border-stone-300 p-3">
-                  <p className="text-sm font-medium text-stone-600">Add subtask</p>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    <input
-                      value={subtaskForm.title}
-                      onChange={(e) =>
-                        setSubtaskForm((current) => ({
-                          ...current,
-                          title: e.target.value,
-                        }))
-                      }
-                      placeholder="Subtask title"
-                      className="rounded-lg border border-stone-200 px-3 py-2 text-sm sm:col-span-2"
-                    />
-                    <select
-                      value={subtaskForm.assigneeUserId}
-                      onChange={(e) =>
-                        setSubtaskForm((current) => ({
-                          ...current,
-                          assigneeUserId: e.target.value,
-                        }))
-                      }
-                      className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
-                    >
-                      {assigneeOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.username}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="datetime-local"
-                      value={subtaskForm.dueAt}
-                      onChange={(e) =>
-                        setSubtaskForm((current) => ({
-                          ...current,
-                          dueAt: e.target.value,
-                        }))
-                      }
-                      className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    disabled={busy || !subtaskForm.title.trim()}
-                    onClick={() => void createSubtask(task.id)}
-                    className="mt-2 inline-flex items-center gap-1 rounded-lg bg-brand-deep px-3 py-1.5 text-sm font-medium text-white"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add subtask
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {(subtasksByParent.get(task.id) ?? []).map((subtask) =>
@@ -622,46 +735,433 @@ export function TasksPanel() {
     );
   }
 
+  const editingTask = editingTaskId
+    ? tasks.find((task) => task.id === editingTaskId) ?? null
+    : null;
+  const editingDetails = editingTaskId ? details[editingTaskId] : undefined;
+  const canEditSelectedTask = editingTask ? canManageTask(editingTask) : false;
+  const isEditingAssignee = editingTask?.assigneeUserId === user?.id;
+
   if (loading) {
     return <p className="text-sm text-stone-500">Loading tasks…</p>;
   }
 
   return (
-    <SectionShell title="Tasks">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <label className="inline-flex items-center gap-2 text-sm text-stone-600">
-          <span>Show</span>
-          <select
-            value={urgencyFilter}
-            onChange={(e) => setUrgencyFilter(e.target.value as UrgencyFilter)}
-            className="rounded-lg border border-stone-200 px-2 py-1.5"
-          >
-            <option value="all">All tasks</option>
-            <option value="urgent">Urgent only</option>
-            <option value="non-urgent">Non-urgent only</option>
-          </select>
-        </label>
-        {user?.isAdmin && (
-          <label className="inline-flex items-center gap-2 text-sm text-stone-600">
-            <span>Sort by</span>
-            <select
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as TaskSortKey)}
-              className="rounded-lg border border-stone-200 px-2 py-1.5"
-            >
-              <option value="dueAt">Due date</option>
-              <option value="assignee">Assignee</option>
-              <option value="assigner">Assigner</option>
-            </select>
+    <SectionShell
+      title="Tasks"
+      stickyHeader
+      toolbar={
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm shadow-sm">
+            <input
+              type="checkbox"
+              checked={urgencyFilter === "urgent"}
+              onChange={(event) => setUrgentOnly(event.target.checked)}
+              className="h-4 w-4 rounded border-stone-300"
+            />
+            <span className="font-medium text-stone-700">Urgent only</span>
           </label>
-        )}
-      </div>
+          {user?.isAdmin && (
+            <label className="inline-flex items-center gap-2 text-sm text-stone-600">
+              <span>Sort by</span>
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as TaskSortKey)}
+                className="rounded-lg border border-stone-200 px-2 py-1.5"
+              >
+                <option value="dueAt">Due date</option>
+                <option value="assignee">Assignee</option>
+                <option value="assigner">Assigner</option>
+              </select>
+            </label>
+          )}
+        </div>
+      }
+    >
+      {editingTask && (
+        <div
+          id={taskEditSectionId()}
+          ref={editSectionRef}
+          className="scroll-mt-24 mb-6 rounded-xl border border-brand-deep/20 bg-brand-deep/5 p-4"
+        >
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-brand-deep">Edit task</p>
+              <p className="text-xs text-stone-500">
+                {taskContextLabel(editingTask)} · Assigned by {editingTask.assigner}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={closeTaskEditor}
+              className="rounded-lg p-1.5 text-stone-500 hover:bg-white/80"
+              aria-label="Close editor"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {editingTask.itemId ? (
+            <a
+              href={`/itinerary?item=${editingTask.itemId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-4 inline-flex cursor-pointer items-center gap-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-brand-deep hover:bg-stone-50"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              View linked item
+            </a>
+          ) : null}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              value={editForm.title}
+              onChange={(e) =>
+                setEditForm((current) => ({ ...current, title: e.target.value }))
+              }
+              placeholder="Task title"
+              disabled={!canEditSelectedTask && !editingTask.allowAssigneeEdit}
+              className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm sm:col-span-2 disabled:bg-stone-100"
+            />
+            <select
+              value={editForm.assigneeUserId}
+              onChange={(e) =>
+                setEditForm((current) => ({
+                  ...current,
+                  assigneeUserId: e.target.value,
+                }))
+              }
+              disabled={!canEditSelectedTask}
+              className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm disabled:bg-stone-100"
+            >
+              {assigneeOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.username}
+                </option>
+              ))}
+            </select>
+            <input
+              type="datetime-local"
+              value={editForm.dueAt}
+              onChange={(e) =>
+                setEditForm((current) => ({ ...current, dueAt: e.target.value }))
+              }
+              disabled={!canEditSelectedTask && !editingTask.allowAssigneeEdit}
+              className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm disabled:bg-stone-100"
+            />
+            {canEditSelectedTask ? (
+              <>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isUrgent}
+                    onChange={(e) =>
+                      setEditForm((current) => ({
+                        ...current,
+                        isUrgent: e.target.checked,
+                      }))
+                    }
+                  />
+                  Urgent
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={editForm.allowSubtasks}
+                    onChange={(e) =>
+                      setEditForm((current) => ({
+                        ...current,
+                        allowSubtasks: e.target.checked,
+                      }))
+                    }
+                  />
+                  Allow subtasks
+                </label>
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={editForm.allowTaggedNotes}
+                    onChange={(e) =>
+                      setEditForm((current) => ({
+                        ...current,
+                        allowTaggedNotes: e.target.checked,
+                      }))
+                    }
+                  />
+                  Allow tagged notes
+                </label>
+              </>
+            ) : null}
+            <textarea
+              value={editForm.assignerNotes}
+              onChange={(e) =>
+                setEditForm((current) => ({
+                  ...current,
+                  assignerNotes: e.target.value,
+                }))
+              }
+              placeholder="Assigner notes"
+              rows={3}
+              disabled={!canEditSelectedTask && !editingTask.allowAssigneeEdit}
+              className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm sm:col-span-2 disabled:bg-stone-100"
+            />
+          </div>
+
+          {(canEditSelectedTask || editingTask.allowAssigneeEdit) && (
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void saveEditedTask()}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-brand-deep px-3 py-1.5 text-sm font-medium text-white"
+              >
+                <Save className="h-4 w-4" />
+                Save changes
+              </button>
+              <button
+                type="button"
+                onClick={closeTaskEditor}
+                className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {editingDetails ? (
+            editingDetails.notes.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">
+                  Notes
+                </p>
+                {editingDetails.notes.map(({ note, author }) => (
+                  <div
+                    key={note.id}
+                    className="flex items-start justify-between gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-stone-700">{note.content}</p>
+                      <p className="mt-1 text-xs text-stone-400">{author}</p>
+                    </div>
+                    {user?.isAdmin && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void deleteNote(editingTask.id, note.id)}
+                        className="shrink-0 cursor-pointer rounded p-1 text-red-500 hover:bg-red-50"
+                        aria-label="Delete note"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          ) : (
+            <p className="mt-4 text-sm text-stone-400">Loading notes…</p>
+          )}
+
+          <div className="mt-4 flex gap-2">
+            <input
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              placeholder="Add a note…"
+              className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              disabled={busy || !newNote.trim() || !editingTaskId}
+              onClick={() => editingTaskId && void addNote(editingTaskId)}
+              className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm"
+            >
+              Add note
+            </button>
+          </div>
+
+          {editingTask.allowSubtasks && isEditingAssignee && (
+            <div className="mt-4 rounded-lg border border-dashed border-stone-300 bg-white/70 p-3">
+              <p className="text-sm font-medium text-stone-600">Add subtask</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <input
+                  value={subtaskForm.title}
+                  onChange={(e) =>
+                    setSubtaskForm((current) => ({
+                      ...current,
+                      title: e.target.value,
+                    }))
+                  }
+                  placeholder="Subtask title"
+                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm sm:col-span-2"
+                />
+                <select
+                  value={subtaskForm.assigneeUserId}
+                  onChange={(e) =>
+                    setSubtaskForm((current) => ({
+                      ...current,
+                      assigneeUserId: e.target.value,
+                    }))
+                  }
+                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                >
+                  {assigneeOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.username}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="datetime-local"
+                  value={subtaskForm.dueAt}
+                  onChange={(e) =>
+                    setSubtaskForm((current) => ({
+                      ...current,
+                      dueAt: e.target.value,
+                    }))
+                  }
+                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={busy || !subtaskForm.title.trim()}
+                onClick={() => void createSubtask(editingTask.id)}
+                className="mt-2 inline-flex cursor-pointer items-center gap-1 rounded-lg bg-brand-deep px-3 py-1.5 text-sm font-medium text-white"
+              >
+                <Plus className="h-4 w-4" />
+                Add subtask
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {canAssign && (
+        <div className="mb-6 rounded-xl border border-dashed border-stone-300 p-4">
+          {showCreateForm ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <p className="text-sm font-medium text-stone-600 sm:col-span-2">
+                New Task
+              </p>
+              <input
+                value={createForm.title}
+                onChange={(e) =>
+                  setCreateForm((current) => ({ ...current, title: e.target.value }))
+                }
+                placeholder="Task title"
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm sm:col-span-2"
+              />
+              <select
+                value={createForm.eventId}
+                onChange={(e) =>
+                  setCreateForm((current) => ({ ...current, eventId: e.target.value }))
+                }
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+              >
+                <option value="">Select event</option>
+                {assignableEvents.map((event) => (
+                  <option key={event.eventId} value={event.eventId}>
+                    {event.eventName}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={createForm.assigneeUserId}
+                onChange={(e) =>
+                  setCreateForm((current) => ({
+                    ...current,
+                    assigneeUserId: e.target.value,
+                  }))
+                }
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+              >
+                <option value="">Assign to me</option>
+                {assigneeOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.username}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="datetime-local"
+                value={createForm.dueAt}
+                onChange={(e) =>
+                  setCreateForm((current) => ({ ...current, dueAt: e.target.value }))
+                }
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+              />
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={createForm.isUrgent}
+                  onChange={(e) =>
+                    setCreateForm((current) => ({
+                      ...current,
+                      isUrgent: e.target.checked,
+                    }))
+                  }
+                />
+                Urgent
+              </label>
+              <textarea
+                value={createForm.assignerNotes}
+                onChange={(e) =>
+                  setCreateForm((current) => ({
+                    ...current,
+                    assignerNotes: e.target.value,
+                  }))
+                }
+                placeholder="Assigner notes (optional)"
+                rows={2}
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm sm:col-span-2"
+              />
+              <div className="flex gap-2 sm:col-span-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void createTask()}
+                  className="inline-flex items-center gap-1 rounded-lg bg-brand-deep px-3 py-1.5 text-sm font-medium text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create task
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(false)}
+                  className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreateForm(true);
+                if (!createForm.eventId && assignableEvents[0]) {
+                  setCreateForm((current) => ({
+                    ...current,
+                    eventId: String(assignableEvents[0].eventId),
+                  }));
+                }
+              }}
+              className="inline-flex items-center gap-1 text-sm font-medium text-brand-deep"
+            >
+              <Plus className="h-4 w-4" />
+              Add task
+            </button>
+          )}
+        </div>
+      )}
 
       {rootTasks.length === 0 ? (
         <p className="text-sm text-stone-500">
-          {canAssign
-            ? "No tasks yet. Create tasks from an itinerary item's detail view."
-            : "No tasks yet."}
+          {urgencyFilter === "urgent"
+            ? "No urgent tasks."
+            : canAssign
+              ? "No tasks yet. Create one above or from an itinerary item."
+              : "No tasks yet."}
         </p>
       ) : (
         <div className="divide-y divide-stone-100">

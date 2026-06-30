@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth, isAuthError } from "@/lib/api-auth";
 import { isSuperuser } from "@/lib/permissions";
+import { getAppSettings, isGuestbookEnabled } from "@/lib/app-settings";
 import { getGuestListAccessForUser } from "@/lib/guest-queries";
 import { getTaskPermissionsForUser } from "@/lib/task-queries";
 
@@ -23,6 +24,14 @@ export async function GET() {
     console.error("Failed to load task permissions:", error);
   }
 
+  let guestbookEnabled = false;
+  try {
+    const settings = await getAppSettings();
+    guestbookEnabled = isGuestbookEnabled(settings);
+  } catch (error) {
+    console.error("Failed to load app settings:", error);
+  }
+
   return NextResponse.json({
     user: {
       id: user.id,
@@ -33,6 +42,7 @@ export async function GET() {
       canAccessDiagnostics: isSuperuser(user),
       guestListAccess,
       taskPermissions,
+      guestbookEnabled,
     },
   });
 }

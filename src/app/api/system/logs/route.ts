@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import {
+  deleteErrorLogRows,
+  deleteErrorLogsInRange,
+  listErrorLogs,
+} from "@/lib/error-log";
+import {
   deleteLogRows,
   deleteLogsInRange,
   listActiveUsers,
@@ -7,10 +12,10 @@ import {
   listLoginLogs,
   listUsageLogs,
 } from "@/lib/activity-log";
-import { isAuthError, requireSuperuserAccess } from "@/lib/api-auth";
+import { isAuthError, requireAuth, requireSuperuserAccess } from "@/lib/api-auth";
 
 export async function GET(request: Request) {
-  const user = await requireSuperuserAccess();
+  const user = await requireAuth();
   if (isAuthError(user)) return user;
 
   const { searchParams } = new URL(request.url);
@@ -19,8 +24,19 @@ export async function GET(request: Request) {
   const to = searchParams.get("to");
   const username = searchParams.get("username") ?? undefined;
   const resourceType = searchParams.get("resourceType") ?? undefined;
+  const operation = searchParams.get("operation") ?? undefined;
   const eventType = searchParams.get("eventType") ?? undefined;
   const activeOnly = searchParams.get("activeOnly") === "true";
+
+  const { isSuperuser } = await import("@/lib/permissions");
+  const adminReadable = kind === "errors" || activeOnly;
+  if (adminReadable) {
+    if (!user.isAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  } else if (!isSuperuser(user)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   if (activeOnly) {
     const active = await listActiveUsers();
@@ -34,6 +50,11 @@ export async function GET(request: Request) {
     limit: 1000,
   };
 
+  if (kind === "errors") {
+    return NextResponse.json({
+      rows: await listErrorLogs({ ...range, resourceType, operation }),
+    });
+  }
   if (kind === "audit") {
     return NextResponse.json({
       rows: await listAuditLogs({ ...range, resourceType }),
@@ -55,7 +76,7 @@ export async function DELETE(request: Request) {
   if (isAuthError(user)) return user;
 
   const body = (await request.json()) as {
-    kind: "login" | "audit" | "usage";
+    kind: "login" | "audit" | "usage" | "errors";
     ids?: number[];
     from?: string;
     to?: string;
@@ -66,15 +87,24 @@ export async function DELETE(request: Request) {
   }
 
   if (Array.isArray(body.ids) && body.ids.length > 0) {
-    const deleted = await deleteLogRows({ kind: body.kind, ids: body.ids });
+    const deleted =
+      body.kind === "errors"
+        ? await deleteErrorLogRows(body.ids)
+        : await deleteLogRows({ kind: body.kind, ids: body.ids });
     return NextResponse.json({ deleted });
   }
 
-  const deleted = await deleteLogsInRange({
-    kind: body.kind,
-    from: body.from ? new Date(body.from) : undefined,
-    to: body.to ? new Date(body.to) : undefined,
-  });
+  const deleted =
+    body.kind === "errors"
+      ? await deleteErrorLogsInRange({
+          from: body.from ? new Date(body.from) : undefined,
+          to: body.to ? new Date(body.to) : undefined,
+        })
+      : await deleteLogsInRange({
+          kind: body.kind,
+          from: body.from ? new Date(body.from) : undefined,
+          to: body.to ? new Date(body.to) : undefined,
+        });
 
   return NextResponse.json({ deleted });
 }

@@ -1,5 +1,10 @@
 import type { ItineraryItem } from "@/lib/schema";
 import { resolveFlightScheduleForItem } from "@/lib/flight-segment-timing";
+import {
+  applySegmentSeatDraftToDetails,
+  usesPerSegmentSeats,
+  type SegmentSeatDraft,
+} from "@/lib/flight-seats";
 import type { FlightDetails } from "@/lib/types";
 import { getFlightDetails } from "@/lib/types";
 
@@ -47,6 +52,40 @@ export function buildSeatMapFromPassengers(
   }
 
   return next;
+}
+
+export function applyCheckInSeatUpdates(
+  details: FlightDetails,
+  passengers: string[],
+  options: {
+    shouldCheckIn: boolean;
+    seatDraft?: Record<string, string>;
+    segmentSeatDraft?: SegmentSeatDraft;
+  },
+): FlightDetails {
+  const { shouldCheckIn, seatDraft = {}, segmentSeatDraft = {} } = options;
+
+  if (!shouldCheckIn) {
+    return {
+      ...details,
+      checkInStatus: buildCheckInStatusFromPassengers(passengers, false),
+    };
+  }
+
+  const checkInStatus = buildCheckInStatusFromPassengers(passengers, true);
+
+  if (usesPerSegmentSeats(details)) {
+    return {
+      ...applySegmentSeatDraftToDetails(details, passengers, segmentSeatDraft),
+      checkInStatus,
+    };
+  }
+
+  return {
+    ...details,
+    seats: buildSeatMapFromPassengers(details, seatDraft),
+    checkInStatus,
+  };
 }
 
 export function buildCheckInStatusFromPassengers(

@@ -14,8 +14,15 @@ import {
   isFlightFullyCheckedIn,
   isFlightPartiallyCheckedIn,
 } from "@/lib/flight-check-in";
+import {
+  initialSegmentSeatDraft,
+  segmentRouteLabel,
+  usesPerSegmentSeats,
+  type SegmentSeatDraft,
+} from "@/lib/flight-seats";
 import type { ItineraryItem } from "@/lib/schema";
 import { getFlightDetails } from "@/lib/types";
+import { flightSegmentsFromDetails } from "@/lib/flight-segment-timing";
 
 function initialSeatDraft(
   passengers: string[],
@@ -92,6 +99,14 @@ export function FlightCheckInToggle({
   const partiallyCheckedIn = isFlightPartiallyCheckedIn(flightDetails);
 
   const [seatDraft, setSeatDraft] = useState<Record<string, string>>({});
+  const [segmentSeatDraft, setSegmentSeatDraft] = useState<SegmentSeatDraft>({});
+  const perSegmentSeats = usesPerSegmentSeats(flightDetails);
+  const segmentLegs = perSegmentSeats
+    ? flightSegmentsFromDetails(flightDetails).map((segment, index) => ({
+        index,
+        label: segmentRouteLabel(segment),
+      }))
+    : [];
 
   if (item.category !== "flight" || passengers.length === 0) {
     return null;
@@ -108,6 +123,7 @@ export function FlightCheckInToggle({
         body: JSON.stringify({
           checkedIn,
           seats: seatDraft,
+          segmentSeats: perSegmentSeats ? segmentSeatDraft : undefined,
         }),
       });
 
@@ -135,6 +151,7 @@ export function FlightCheckInToggle({
     event.stopPropagation();
     if (!canEdit || busy) return;
     setSeatDraft(initialSeatDraft(passengers, flightDetails?.seats));
+    setSegmentSeatDraft(initialSegmentSeatDraft(flightDetails, passengers));
     setDialogOpen(true);
   }
 
@@ -150,6 +167,9 @@ export function FlightCheckInToggle({
         passengers={passengers}
         seatDraft={seatDraft}
         onSeatDraftChange={setSeatDraft}
+        segmentSeatDraft={segmentSeatDraft}
+        onSegmentSeatDraftChange={setSegmentSeatDraft}
+        segmentLegs={segmentLegs}
         checkedIn={fullyCheckedIn}
         busy={busy}
         onClose={() => {

@@ -112,6 +112,7 @@ export function buildDaysWithItems(
       date,
       title: "Additional items",
       notes: null,
+      hidden: false,
       items: prepareItems(orphanItems),
     }));
 

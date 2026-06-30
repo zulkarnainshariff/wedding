@@ -7,7 +7,7 @@ import {
   formatJourneyFlightLabel,
   normalizeFlightDetails,
 } from "@/lib/flight-numbers";
-import { formatSeatsSummary } from "@/lib/seats";
+import { formatFlightSeatsSummary } from "@/lib/flight-seats";
 import {
   formatTravellerLabel,
   getAccommodationDetails,
@@ -745,7 +745,7 @@ function buildFlightDetailsBlock(
   if (details.aircraft) lines.push({ text: `A/C ${details.aircraft}` });
 
   const passengers = details.passengers ?? details.travellers;
-  const seats = formatSeatsSummary(details.seats, passengers);
+  const seats = formatFlightSeatsSummary(details, passengers);
   if (seats && seats !== "—") lines.push({ text: `Seats: ${seats}` });
   if (details.notes?.length) lines.push({ text: `Note ${details.notes.join("; ")}` });
 

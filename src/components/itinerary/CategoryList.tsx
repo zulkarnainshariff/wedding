@@ -54,7 +54,11 @@ export function CategoryList({
     <PageShell
       eyebrow="Category"
       title={meta.plural}
-      toolbar={showViewToggle ? <ScheduleToolbar /> : undefined}
+      toolbar={
+        showViewToggle ? (
+          <ScheduleToolbar showDayFilterOptions={false} />
+        ) : undefined
+      }
     >
       {list}
     </PageShell>

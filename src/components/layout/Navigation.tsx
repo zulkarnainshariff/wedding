@@ -130,9 +130,9 @@ function NavLink({
       ? pathname === "/invitation"
       : href === "/guests"
         ? pathname.startsWith("/guests")
-        : href === "/tasks"
-          ? pathname.startsWith("/tasks")
-          : category === "all"
+          : href === "/tasks"
+            ? pathname.startsWith("/tasks")
+            : category === "all"
             ? pathname === "/itinerary"
             : category === "flights_hub"
               ? pathname === "/itinerary/flight" ||

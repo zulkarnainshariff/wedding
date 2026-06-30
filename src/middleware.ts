@@ -9,7 +9,19 @@ function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}?`))) {
     return true;
   }
-  if (pathname === "/" || pathname.startsWith("/api/public/") || pathname === "/rsvp") {
+  if (
+    pathname === "/" ||
+    pathname.startsWith("/api/public/") ||
+    pathname === "/rsvp" ||
+    pathname === "/guestbook" ||
+    pathname.startsWith("/guestbook?") ||
+    pathname === "/gallery" ||
+    pathname.startsWith("/gallery?") ||
+    pathname === "/api/guestbook" ||
+    pathname.startsWith("/api/guestbook") ||
+    pathname === "/api/gallery" ||
+    pathname.startsWith("/api/gallery")
+  ) {
     return true;
   }
   return false;

@@ -4,6 +4,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -12,9 +13,10 @@ import {
 export const itineraryDays = pgTable("itinerary_days", {
   id: serial("id").primaryKey(),
   dayNumber: integer("day_number").notNull().unique(),
-  date: date("date").notNull(),
+  date: date("date").notNull().unique(),
   title: text("title"),
   notes: text("notes"),
+  hidden: boolean("hidden").default(false).notNull(),
 });
 
 export const itineraryItems = pgTable("itinerary_items", {
@@ -79,9 +81,17 @@ export const syncMetadata = pgTable("sync_metadata", {
     .notNull(),
 });
 
+export type AppFeatureFlags = {
+  guestbookEnabled?: boolean;
+  photoGalleryEnabled?: boolean;
+  tripStartDate?: string | null;
+  tripEndDate?: string | null;
+};
+
 export const appSettings = pgTable("app_settings", {
   id: integer("id").primaryKey().default(1),
   themeId: text("theme_id").notNull().default("azure-blossom"),
+  features: jsonb("features").$type<AppFeatureFlags>().notNull().default({}),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -308,6 +318,59 @@ export const usageLogs = pgTable("usage_logs", {
     .notNull(),
 });
 
+export const errorLogs = pgTable("error_logs", {
+  id: serial("id").primaryKey(),
+  operation: text("operation").notNull(),
+  resourceType: text("resource_type").notNull(),
+  resourceId: text("resource_id"),
+  summary: text("summary").notNull(),
+  errorMessage: text("error_message").notNull(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  username: text("username"),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const guestbookEntries = pgTable("guestbook_entries", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id")
+    .notNull()
+    .references(() => weddingEvents.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  message: text("message").notNull(),
+  email: text("email"),
+  hidden: boolean("hidden").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const galleryPhotos = pgTable("gallery_photos", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id")
+    .notNull()
+    .references(() => weddingEvents.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  caption: text("caption"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const galleryPhotoTags = pgTable(
+  "gallery_photo_tags",
+  {
+    photoId: integer("photo_id")
+      .notNull()
+      .references(() => galleryPhotos.id, { onDelete: "cascade" }),
+    email: text("email"),
+    guestName: text("guest_name").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.photoId, table.guestName] })],
+);
+
 export const userActivitySessions = pgTable("user_activity_sessions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id")
@@ -348,3 +411,7 @@ export type LoginLog = typeof loginLogs.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type UsageLog = typeof usageLogs.$inferSelect;
 export type UserActivitySession = typeof userActivitySessions.$inferSelect;
+export type ErrorLog = typeof errorLogs.$inferSelect;
+export type GuestbookEntry = typeof guestbookEntries.$inferSelect;
+export type GalleryPhoto = typeof galleryPhotos.$inferSelect;
+export type GalleryPhotoTag = typeof galleryPhotoTags.$inferSelect;

@@ -24,6 +24,7 @@ type AuthContextValue = {
   user: SessionUser | null;
   guestListAccess: GuestListAccess[];
   taskPermissions: TaskPermissionAccess[];
+  guestbookEnabled: boolean;
   loading: boolean;
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
@@ -48,6 +49,7 @@ export function AuthProvider({
   const [user, setUser] = useState<SessionUser | null>(null);
   const [guestListAccess, setGuestListAccess] = useState<GuestListAccess[]>([]);
   const [taskPermissions, setTaskPermissions] = useState<TaskPermissionAccess[]>([]);
+  const [guestbookEnabled, setGuestbookEnabled] = useState(false);
   const [loading, setLoading] = useState(
     pathname !== "/login" && hasSession,
   );
@@ -57,6 +59,7 @@ export function AuthProvider({
       setUser(null);
       setGuestListAccess([]);
       setTaskPermissions([]);
+      setGuestbookEnabled(false);
       setLoading(false);
       return;
     }
@@ -65,6 +68,7 @@ export function AuthProvider({
       setUser(null);
       setGuestListAccess([]);
       setTaskPermissions([]);
+      setGuestbookEnabled(false);
       setLoading(false);
       return;
     }
@@ -75,16 +79,19 @@ export function AuthProvider({
         setUser(null);
         setGuestListAccess([]);
         setTaskPermissions([]);
+        setGuestbookEnabled(false);
         return;
       }
       const data = await response.json();
       setUser(data.user);
       setGuestListAccess(data.user.guestListAccess ?? []);
       setTaskPermissions(data.user.taskPermissions ?? []);
+      setGuestbookEnabled(Boolean(data.user.guestbookEnabled));
     } catch {
       setUser(null);
       setGuestListAccess([]);
       setTaskPermissions([]);
+      setGuestbookEnabled(false);
     } finally {
       setLoading(false);
     }
@@ -108,6 +115,7 @@ export function AuthProvider({
       user,
       guestListAccess,
       taskPermissions,
+      guestbookEnabled,
       loading,
       refreshUser,
       logout,
@@ -117,7 +125,7 @@ export function AuthProvider({
       isAdmin: user?.isAdmin ?? false,
       canAccessDiagnostics: user ? isSuperuser(user) : false,
     }),
-    [user, guestListAccess, taskPermissions, loading, refreshUser, logout],
+    [user, guestListAccess, taskPermissions, guestbookEnabled, loading, refreshUser, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

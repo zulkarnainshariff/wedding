@@ -6,7 +6,7 @@ import { ChevronRight } from "lucide-react";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { formatBookingGroupsDisplay } from "@/lib/booking-groups";
 import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
-import { formatSeatsSummary } from "@/lib/seats";
+import { formatFlightSeatsSummary } from "@/lib/flight-seats";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/activity-utils";
 import { FlightItinerarySummary } from "@/components/itinerary/FlightViews";
 import { getAccommodationTileLines, enrichStayDetailsFromItem, buildAccommodationCompactSummary } from "@/lib/accommodation-utils";
@@ -134,8 +134,8 @@ function FlightDetailedPreview({
         .join(" · ")
     : null;
 
-  const seatsSummary = formatSeatsSummary(
-    details.seats,
+  const seatsSummary = formatFlightSeatsSummary(
+    details,
     details.passengers ?? details.travellers,
   );
 

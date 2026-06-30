@@ -704,17 +704,16 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
 
       {tasks.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label className="inline-flex items-center gap-2 text-sm text-stone-600">
-            <span>Show</span>
-            <select
-              value={urgencyFilter}
-              onChange={(e) => setUrgencyFilter(e.target.value as UrgencyFilter)}
-              className="rounded-lg border border-stone-200 px-2 py-1.5"
-            >
-              <option value="all">All tasks</option>
-              <option value="urgent">Urgent only</option>
-              <option value="non-urgent">Non-urgent only</option>
-            </select>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm shadow-sm">
+            <input
+              type="checkbox"
+              checked={urgencyFilter === "urgent"}
+              onChange={(event) =>
+                setUrgencyFilter(event.target.checked ? "urgent" : "all")
+              }
+              className="h-4 w-4 rounded border-stone-300"
+            />
+            <span className="font-medium text-stone-700">Urgent only</span>
           </label>
           {user?.isAdmin && (
             <label className="inline-flex items-center gap-2 text-sm text-stone-600">
@@ -734,7 +733,11 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
       )}
 
       {rootTasks.length === 0 ? (
-        <p className="mt-2 text-sm text-stone-500">No tasks linked to this item yet.</p>
+        <p className="mt-2 text-sm text-stone-500">
+          {urgencyFilter === "urgent"
+            ? "No urgent tasks for this item."
+            : "No tasks linked to this item yet."}
+        </p>
       ) : (
         <div className="mt-3 space-y-2">
           {rootTasks.map((task) => renderTaskRow(task))}

@@ -1,9 +1,11 @@
 import { and, desc, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  isWeddingCoordinator,
   normalizePermissions,
   receivesAllGuestListNotifications,
 } from "@/lib/permissions";
+import { DEFAULT_USER_PREFERENCES } from "@/lib/user-preferences";
 import {
   guestListPermissions,
   notifications,
@@ -97,6 +99,52 @@ export async function notifyGuestListWatchers(
       body,
       href,
       metadata: { eventId },
+    })),
+  );
+}
+
+export async function notifyWeddingCoordinatorsOnGuestInvite(input: {
+  eventId: number;
+  guestLabel: string;
+  guestId: number;
+}) {
+  const allUsers = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      isAdmin: users.isAdmin,
+      roleLevel: users.roleLevel,
+      permissions: users.permissions,
+    })
+    .from(users);
+
+  const coordinatorIds = allUsers
+    .filter((row) =>
+      isWeddingCoordinator({
+        id: row.id,
+        username: row.username,
+        roleLevel: row.roleLevel,
+        isAdmin: row.isAdmin,
+        permissions: normalizePermissions(
+          row.permissions,
+          row.isAdmin,
+          row.username,
+        ),
+        preferences: DEFAULT_USER_PREFERENCES,
+      }),
+    )
+    .map((row) => row.id);
+
+  if (!coordinatorIds.length) return;
+
+  await db.insert(notifications).values(
+    coordinatorIds.map((userId) => ({
+      userId,
+      type: "guest_invited",
+      title: "New guest invitation",
+      body: input.guestLabel,
+      href: `/guests`,
+      metadata: { eventId: input.eventId, guestId: input.guestId },
     })),
   );
 }

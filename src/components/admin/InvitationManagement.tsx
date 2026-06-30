@@ -243,13 +243,18 @@ export function InvitationManagement({
             className="w-full rounded-lg border border-stone-200 px-3 py-2"
           />
         </label>
-        <label className="flex items-center gap-2 text-sm sm:col-span-2">
+        <label className="flex items-center gap-2 text-sm sm:col-span-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
           <input
             type="checkbox"
             checked={selected.published}
             onChange={(e) => updateSelected({ published: e.target.checked })}
           />
-          Published on public landing page
+          <span>
+            <span className="font-medium text-stone-700">Show on public landing</span>
+            <span className="mt-0.5 block text-xs text-stone-500">
+              When off, this event is hidden from the public home page.
+            </span>
+          </span>
         </label>
       </div>
 

@@ -174,5 +174,7 @@ function parsePermissionsBody(
       value.canViewAllGuestLists || value.canEditAllGuestLists,
     ),
     canEditAllGuestLists: Boolean(value.canEditAllGuestLists),
+    isWeddingCoordinator: Boolean(value.isWeddingCoordinator),
+    canModerateGuestbook: Boolean(value.canModerateGuestbook),
   };
 }

@@ -13,5 +13,8 @@ export function getDayDisplayTitle(
   if (restrictedView && visibleItemCount === 0) {
     return "Unplanned";
   }
+  if (visibleItemCount === 0 && !day.title?.trim()) {
+    return "Free day";
+  }
   return day.title || `Day ${day.dayNumber}`;
 }
