@@ -69,7 +69,6 @@ export function ItemDetailModal() {
     <>
       <div
         className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
-        onClick={handleClose}
         role="presentation"
       >
         <div className="absolute inset-0 bg-stone-900/45 backdrop-blur-[2px]" />

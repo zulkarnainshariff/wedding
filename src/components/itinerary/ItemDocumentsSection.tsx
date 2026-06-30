@@ -76,7 +76,14 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
       const payload = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
-      setError(payload?.error ?? "Upload failed.");
+      setError(
+        payload?.error ??
+          (response.status === 403
+            ? "You do not have permission to upload documents."
+            : response.status === 401
+              ? "Please sign in again."
+              : `Upload failed (${response.status}).`),
+      );
       return;
     }
 

@@ -23,17 +23,19 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV RUNNING_IN_CONTAINER=1
 
-RUN apk add --no-cache postgresql-client openssh-client sshpass \
+RUN apk add --no-cache postgresql-client openssh-client sshpass su-exec \
   && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs \
-  && mkdir -p /app/data/dumps /app/seeds \
+  && mkdir -p /app/data/dumps /app/data/uploads /app/seeds \
   && chown -R nextjs:nodejs /app/data /app/seeds
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-USER nextjs
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 EXPOSE 3000
 ENV PORT=3000
@@ -46,4 +48,4 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 
-CMD ["sh", "-c", "npm run db:push && npm run db:migrate-task-view-permissions && npm run db:migrate-system-logs && npm run db:migrate-app-settings && npm run db:migrate-error-logs && npm run db:migrate-public-features && npm run db:migrate-trip-days && npm run db:migrate-guestbook-moderation && npm run db:migrate-pet-relocation-participants"]
+CMD ["npm", "run", "db:migrate-all"]

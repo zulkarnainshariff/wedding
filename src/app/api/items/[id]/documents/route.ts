@@ -6,9 +6,10 @@ import {
   buildStorageKey,
   ensureUploadDir,
   filterVisibleDocuments,
-  isAllowedDocumentMime,
+  isAllowedDocumentUpload,
   MAX_DOCUMENT_BYTES,
   parseExtraViewers,
+  resolveDocumentMimeType,
   writeDocumentFile,
 } from "@/lib/item-documents";
 import { filterItemsByPermission } from "@/lib/permissions";
@@ -53,94 +54,110 @@ export async function POST(request: Request, { params }: Params) {
   const user = await requireEditAccess();
   if (isAuthError(user)) return user;
 
-  const { id: rawId } = await params;
-  const itemId = Number(rawId);
+  try {
+    const { id: rawId } = await params;
+    const itemId = Number(rawId);
 
-  const [item] = await db
-    .select()
-    .from(itineraryItems)
-    .where(eq(itineraryItems.id, itemId))
-    .limit(1);
+    const [item] = await db
+      .select()
+      .from(itineraryItems)
+      .where(eq(itineraryItems.id, itemId))
+      .limit(1);
 
-  if (!item) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+    if (!item) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
 
-  const formData = await request.formData();
-  const file = formData.get("file");
-  const travellerName = String(formData.get("travellerName") ?? "").trim();
-  const coveredRaw = String(formData.get("coveredTravellers") ?? "").trim();
-  const coveredFromField = coveredRaw
-    ? coveredRaw
+    const formData = await request.formData();
+    const file = formData.get("file");
+    const travellerName = String(formData.get("travellerName") ?? "").trim();
+    const coveredRaw = String(formData.get("coveredTravellers") ?? "").trim();
+    const coveredFromField = coveredRaw
+      ? coveredRaw
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+      : travellerName
+        ? [travellerName]
+        : [];
+    const coversTravellers = [
+      ...new Set(
+        coveredFromField
+          .map((name) => normalizeTravellerName(name))
+          .filter(Boolean),
+      ),
+    ];
+    const label = String(formData.get("label") ?? "").trim() || "Document";
+    const extraViewers = parseExtraViewers(
+      String(formData.get("extraViewers") ?? "")
         .split(",")
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-    : travellerName
-      ? [travellerName]
-      : [];
-  const coversTravellers = [
-    ...new Set(
-      coveredFromField.map((name) => normalizeTravellerName(name)).filter(Boolean),
-    ),
-  ];
-  const label = String(formData.get("label") ?? "").trim() || "Document";
-  const extraViewers = parseExtraViewers(
-    String(formData.get("extraViewers") ?? "")
-      .split(",")
-      .map((entry) => entry.trim()),
-  );
-
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "File is required" }, { status: 400 });
-  }
-
-  if (!travellerName && coversTravellers.length === 0) {
-    return NextResponse.json(
-      { error: "At least one traveller is required" },
-      { status: 400 },
+        .map((entry) => entry.trim()),
     );
-  }
 
-  const primaryTraveller = normalizeTravellerName(
-    travellerName || coversTravellers[0],
-  );
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "File is required" }, { status: 400 });
+    }
 
-  if (!isAllowedDocumentMime(file.type)) {
-    return NextResponse.json(
-      { error: "Only PDF and image files are allowed" },
-      { status: 400 },
+    if (!travellerName && coversTravellers.length === 0) {
+      return NextResponse.json(
+        { error: "At least one traveller is required" },
+        { status: 400 },
+      );
+    }
+
+    const primaryTraveller = normalizeTravellerName(
+      travellerName || coversTravellers[0],
     );
+
+    if (!isAllowedDocumentUpload(file.name, file.type || null)) {
+      return NextResponse.json(
+        { error: "Only PDF and image files are allowed" },
+        { status: 400 },
+      );
+    }
+
+    if (file.size > MAX_DOCUMENT_BYTES) {
+      return NextResponse.json(
+        { error: "File is too large (max 12 MB)" },
+        { status: 400 },
+      );
+    }
+
+    const mimeType = resolveDocumentMimeType(file.name, file.type || null);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const storageKey = buildStorageKey(itemId, file.name);
+    await ensureUploadDir();
+    await writeDocumentFile(storageKey, bytes);
+
+    const [doc] = await db
+      .insert(itemDocuments)
+      .values({
+        itemId,
+        travellerName: primaryTraveller,
+        coversTravellers:
+          coversTravellers.length > 0 ? coversTravellers : [primaryTraveller],
+        label,
+        fileName: file.name,
+        storageKey,
+        mimeType,
+        fileSize: file.size,
+        uploadedByUserId: user.id,
+        extraViewers: extraViewers,
+      })
+      .returning();
+
+    await bumpSyncVersion();
+    return NextResponse.json(doc, { status: 201 });
+  } catch (error) {
+    console.error("Document upload failed:", error);
+    const message =
+      error instanceof Error ? error.message : "Document upload failed";
+    const hint =
+      message.includes("EACCES") || message.includes("permission denied")
+        ? "Server could not write the upload folder. Check data/uploads permissions."
+        : message.includes("item_documents")
+          ? "Documents table may be missing — run database migrations."
+          : message;
+    return NextResponse.json({ error: hint }, { status: 500 });
   }
-
-  if (file.size > MAX_DOCUMENT_BYTES) {
-    return NextResponse.json(
-      { error: "File is too large (max 12 MB)" },
-      { status: 400 },
-    );
-  }
-
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const storageKey = buildStorageKey(itemId, file.name);
-  await ensureUploadDir();
-  await writeDocumentFile(storageKey, bytes);
-
-  const [doc] = await db
-    .insert(itemDocuments)
-    .values({
-      itemId,
-      travellerName: primaryTraveller,
-      coversTravellers:
-        coversTravellers.length > 0 ? coversTravellers : [primaryTraveller],
-      label,
-      fileName: file.name,
-      storageKey,
-      mimeType: file.type,
-      fileSize: file.size,
-      uploadedByUserId: user.id,
-      extraViewers: extraViewers,
-    })
-    .returning();
-
-  await bumpSyncVersion();
-  return NextResponse.json(doc, { status: 201 });
 }

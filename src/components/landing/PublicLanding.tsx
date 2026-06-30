@@ -16,12 +16,13 @@ export function PublicLanding({
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <PublicHeader
-        guestbookEnabled={guestbookEnabled}
-        photoGalleryEnabled={photoGalleryEnabled}
-      />
+      <PublicHeader />
       <main className="flex flex-1 flex-col pt-24">
-        <InvitationCards events={events} />
+        <InvitationCards
+          events={events}
+          guestbookEnabled={guestbookEnabled}
+          photoGalleryEnabled={photoGalleryEnabled}
+        />
       </main>
     </div>
   );

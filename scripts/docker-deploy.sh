@@ -23,8 +23,10 @@ if [[ -z "${SESSION_SECRET:-}" ]]; then
   exit 1
 fi
 
-echo "Building image..."
-docker compose build
+# migrate is behind the "tools" profile, so plain `docker compose build` only builds wedding.
+echo "Building images..."
+docker compose build wedding
+docker compose --profile tools build migrate
 
 echo "Pushing database schema..."
 docker compose --profile tools run --rm migrate

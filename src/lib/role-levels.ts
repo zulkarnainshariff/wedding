@@ -7,10 +7,17 @@ export function roleLevelFromDb(
   roleLevel: number | null | undefined,
   isAdmin: boolean,
 ): number {
+  let level: number;
   if (typeof roleLevel === "number" && Number.isFinite(roleLevel)) {
-    return roleLevel;
+    level = roleLevel;
+  } else {
+    level = isAdmin ? ROLE_ADMIN : ROLE_USER;
   }
-  return isAdmin ? ROLE_ADMIN : ROLE_USER;
+
+  if (level === ROLE_SUPERUSER) return ROLE_SUPERUSER;
+  // Reconcile legacy rows where is_admin was set before role_level migration ran.
+  if (isAdmin && level > ROLE_ADMIN) return ROLE_ADMIN;
+  return level;
 }
 
 export function isSuperuserRole(roleLevel: number): boolean {
