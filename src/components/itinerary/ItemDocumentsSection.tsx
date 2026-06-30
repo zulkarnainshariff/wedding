@@ -1,20 +1,188 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { FileText, Trash2, Upload } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FileText, Pencil, Trash2, Upload, X } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { parseCoveredTravellers, extractTravellerOptions } from "@/lib/item-document-utils";
+import { useToast } from "@/components/ui/ToastProvider";
+import {
+  ADDITIONAL_VIEWERS_LABEL,
+  DOCUMENT_LINKED_TRAVELLERS_LABEL,
+  extractTravellerOptions,
+  formatExtraViewersInput,
+  parseCoveredTravellers,
+  parseExtraViewersInput,
+} from "@/lib/item-document-utils";
 import type { ItemDocument, ItineraryItem } from "@/lib/schema";
+
+function defaultLabelFromFileName(fileName: string): string {
+  const base = fileName.replace(/\.[^.]+$/, "").trim();
+  return base || "Document";
+}
+
+function uploadFormDataWithProgress(
+  url: string,
+  body: FormData,
+  onProgress: (percent: number) => void,
+): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      }
+    };
+    xhr.onload = () => {
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        json: async () => {
+          try {
+            return JSON.parse(xhr.responseText) as unknown;
+          } catch {
+            return {};
+          }
+        },
+      });
+    };
+    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.send(body);
+  });
+}
+
+function TravellerCheckboxList({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: string[];
+  selected: string[];
+  onToggle: (name: string) => void;
+}) {
+  if (options.length === 0) {
+    return (
+      <p className="text-sm text-stone-400">No travellers listed on this item yet.</p>
+    );
+  }
+
+  return (
+    <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-stone-200 p-2">
+      {options.map((name) => (
+        <label
+          key={name}
+          className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-50"
+        >
+          <input
+            type="checkbox"
+            checked={selected.includes(name)}
+            onChange={() => onToggle(name)}
+          />
+          <span>{name}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function DocumentEditForm({
+  doc,
+  travellerOptions,
+  busy,
+  onCancel,
+  onSave,
+}: {
+  doc: ItemDocument;
+  travellerOptions: string[];
+  busy: boolean;
+  onCancel: () => void;
+  onSave: (coversTravellers: string[], extraViewers: string) => Promise<void>;
+}) {
+  const [coveredTravellers, setCoveredTravellers] = useState(() =>
+    parseCoveredTravellers(doc),
+  );
+  const [extraViewers, setExtraViewers] = useState(() =>
+    formatExtraViewersInput(doc.extraViewers),
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  function toggleTraveller(name: string) {
+    setCoveredTravellers((current) =>
+      current.includes(name)
+        ? current.filter((entry) => entry !== name)
+        : [...current, name],
+    );
+  }
+
+  async function handleSave() {
+    if (coveredTravellers.length === 0) {
+      setError("Select at least one traveller.");
+      return;
+    }
+    setError(null);
+    await onSave(coveredTravellers, extraViewers);
+  }
+
+  return (
+    <div className="mt-3 space-y-3 rounded-lg border border-brand/20 bg-white p-3">
+      <div className="text-sm">
+        <p className="mb-2 text-stone-500">{DOCUMENT_LINKED_TRAVELLERS_LABEL}</p>
+        <TravellerCheckboxList
+          options={travellerOptions}
+          selected={coveredTravellers}
+          onToggle={toggleTraveller}
+        />
+      </div>
+      <label className="block text-sm">
+        <span className="mb-1 block text-stone-500">
+          {ADDITIONAL_VIEWERS_LABEL} (usernames, comma-separated)
+        </span>
+        <input
+          value={extraViewers}
+          onChange={(e) => setExtraViewers(e.target.value)}
+          placeholder="e.g. natalie, zulkarnain"
+          className="w-full rounded-lg border border-stone-200 px-3 py-2"
+        />
+      </label>
+      {error && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void handleSave()}
+          className="rounded-lg bg-brand-deep px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {busy ? "Saving…" : "Save changes"}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onCancel}
+          className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-600"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
   const { canEdit } = useAuth();
+  const toast = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<ItemDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [coveredTravellers, setCoveredTravellers] = useState<string[]>([]);
-  const [label, setLabel] = useState("ESTA");
+  const [label, setLabel] = useState("");
   const [extraViewers, setExtraViewers] = useState("");
+  const [editingDocId, setEditingDocId] = useState<number | null>(null);
+  const [savingDocId, setSavingDocId] = useState<number | null>(null);
 
   const travellerOptions = useMemo(
     () => extractTravellerOptions(item),
@@ -45,51 +213,99 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
     );
   }
 
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    setSelectedFileName(file?.name ?? null);
+    setError(null);
+  }
+
   async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const fileInput = form.elements.namedItem("file") as HTMLInputElement;
-    const file = fileInput.files?.[0];
+    const file = fileInputRef.current?.files?.[0];
     if (!file || coveredTravellers.length === 0) {
       setError("Choose at least one traveller and a file.");
       return;
     }
 
     setUploading(true);
+    setUploadProgress(0);
     setError(null);
 
     const body = new FormData();
     body.append("file", file);
     body.append("travellerName", coveredTravellers[0]);
     body.append("coveredTravellers", coveredTravellers.join(","));
-    body.append("label", label);
+    body.append(
+      "label",
+      label.trim() || defaultLabelFromFileName(file.name),
+    );
     body.append("extraViewers", extraViewers);
 
-    const response = await fetch(`/api/items/${item.id}/documents`, {
-      method: "POST",
-      body,
-    });
+    try {
+      const response = await uploadFormDataWithProgress(
+        `/api/items/${item.id}/documents`,
+        body,
+        setUploadProgress,
+      );
 
-    setUploading(false);
-
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      setError(
-        payload?.error ??
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        const message =
+          payload.error ??
           (response.status === 403
             ? "You do not have permission to upload documents."
             : response.status === 401
               ? "Please sign in again."
-              : `Upload failed (${response.status}).`),
-      );
+              : `Upload failed (${response.status}).`);
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setSelectedFileName(null);
+      setCoveredTravellers([]);
+      setLabel("");
+      setExtraViewers("");
+      setUploadProgress(100);
+      toast.success(`Uploaded ${file.name}`);
+      await refresh();
+    } catch {
+      const message = "Upload failed — check your connection and try again.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setUploading(false);
+      window.setTimeout(() => setUploadProgress(null), 800);
+    }
+  }
+
+  async function handleSaveDocument(
+    docId: number,
+    covers: string[],
+    viewers: string,
+  ) {
+    setSavingDocId(docId);
+    const response = await fetch(`/api/items/documents/${docId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        coversTravellers: covers,
+        extraViewers: viewers,
+      }),
+    });
+    setSavingDocId(null);
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      toast.error(payload.error ?? "Could not save document settings.");
       return;
     }
 
-    fileInput.value = "";
-    setCoveredTravellers([]);
-    setExtraViewers("");
+    toast.success("Document settings saved.");
+    setEditingDocId(null);
     await refresh();
   }
 
@@ -99,7 +315,11 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
       method: "DELETE",
     });
     if (response.ok) {
+      toast.success("Document deleted.");
+      if (editingDocId === docId) setEditingDocId(null);
       await refresh();
+    } else {
+      toast.error("Could not delete document.");
     }
   }
 
@@ -109,8 +329,8 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
         Documents
       </h3>
       <p className="mt-1 text-xs text-stone-500">
-        Travelling party members can view each other&apos;s documents. Add extra
-        viewers (e.g. parents) when uploading.
+        Travelling party members can view each other&apos;s documents. Add{" "}
+        {ADDITIONAL_VIEWERS_LABEL.toLowerCase()} (e.g. parents) when uploading.
       </p>
 
       {loading ? (
@@ -121,36 +341,70 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
         <ul className="mt-3 space-y-2">
           {documents.map((doc) => {
             const covered = parseCoveredTravellers(doc);
+            const additional = formatExtraViewersInput(doc.extraViewers);
+            const isEditing = editingDocId === doc.id;
+
             return (
               <li
                 key={doc.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2"
+                className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2"
               >
-                <div className="min-w-0">
-                  <a
-                    href={`/api/items/documents/${doc.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex min-w-0 items-center gap-2 text-sm text-brand-deep hover:underline"
-                  >
-                    <FileText className="h-4 w-4 shrink-0" />
-                    <span className="truncate">
-                      {doc.label} · {doc.fileName}
-                    </span>
-                  </a>
-                  <p className="mt-1 text-xs text-stone-500">
-                    Covers: {covered.join(", ")}
-                  </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <a
+                      href={`/api/items/documents/${doc.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-w-0 items-center gap-2 text-sm text-brand-deep hover:underline"
+                    >
+                      <FileText className="h-4 w-4 shrink-0" />
+                      <span className="truncate">
+                        {doc.label} · {doc.fileName}
+                      </span>
+                    </a>
+                    <p className="mt-1 text-xs text-stone-500">
+                      Linked to: {covered.join(", ")}
+                    </p>
+                    {additional && (
+                      <p className="mt-0.5 text-xs text-stone-500">
+                        {ADDITIONAL_VIEWERS_LABEL}: {additional}
+                      </p>
+                    )}
+                  </div>
+                  {canEdit && (
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditingDocId(isEditing ? null : doc.id)
+                        }
+                        className="rounded-lg border border-stone-200 p-1.5 text-stone-600 hover:bg-white"
+                        aria-label="Edit document settings"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(doc.id)}
+                        className="rounded-lg border border-red-200 p-1.5 text-red-600 hover:bg-red-50"
+                        aria-label="Delete document"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {canEdit && (
-                  <button
-                    type="button"
-                    onClick={() => void handleDelete(doc.id)}
-                    className="shrink-0 rounded-lg border border-red-200 p-1.5 text-red-600 hover:bg-red-50"
-                    aria-label="Delete document"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+
+                {canEdit && isEditing && (
+                  <DocumentEditForm
+                    doc={doc}
+                    travellerOptions={travellerOptions}
+                    busy={savingDocId === doc.id}
+                    onCancel={() => setEditingDocId(null)}
+                    onSave={(covers, viewers) =>
+                      handleSaveDocument(doc.id, covers, viewers)
+                    }
+                  />
                 )}
               </li>
             );
@@ -166,60 +420,89 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
           <p className="text-sm font-medium text-stone-700">Upload document</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="text-sm sm:col-span-2">
-              <p className="mb-2 text-stone-500">Covers travellers</p>
-              {travellerOptions.length === 0 ? (
-                <p className="text-sm text-stone-400">
-                  No travellers listed on this item yet.
-                </p>
-              ) : (
-                <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-stone-200 p-2">
-                  {travellerOptions.map((name) => (
-                    <label
-                      key={name}
-                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={coveredTravellers.includes(name)}
-                        onChange={() => toggleTraveller(name)}
-                      />
-                      <span>{name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
+              <p className="mb-2 text-stone-500">{DOCUMENT_LINKED_TRAVELLERS_LABEL}</p>
+              <TravellerCheckboxList
+                options={travellerOptions}
+                selected={coveredTravellers}
+                onToggle={toggleTraveller}
+              />
             </div>
-            <label className="block text-sm">
+            <label className="block text-sm sm:col-span-2">
               <span className="mb-1 block text-stone-500">Label</span>
               <input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder="ESTA, boarding pass, policy PDF…"
+                placeholder="Boarding pass, travel insurance, visa…"
                 className="w-full rounded-lg border border-stone-200 px-3 py-2"
               />
             </label>
             <label className="block text-sm sm:col-span-2">
               <span className="mb-1 block text-stone-500">
-                Extra viewers (usernames, comma-separated)
+                {ADDITIONAL_VIEWERS_LABEL} (usernames, comma-separated)
               </span>
               <input
                 value={extraViewers}
                 onChange={(e) => setExtraViewers(e.target.value)}
-                placeholder="Enter usernames allowed to view this document, separated by commas"
+                placeholder="e.g. natalie, zulkarnain"
                 className="w-full rounded-lg border border-stone-200 px-3 py-2"
               />
             </label>
-            <label className="block text-sm sm:col-span-2">
+            <div className="text-sm sm:col-span-2">
               <span className="mb-1 block text-stone-500">File (PDF or image)</span>
+              <label
+                htmlFor={`document-file-${item.id}`}
+                className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-left text-sm transition hover:border-brand/30 hover:bg-accent-pearl/30"
+              >
+                <span className="inline-flex min-w-0 items-center gap-2 text-stone-700">
+                  <Upload className="h-4 w-4 shrink-0 text-brand-deep" />
+                  <span className="truncate">
+                    {selectedFileName ?? "Choose PDF or image…"}
+                  </span>
+                </span>
+                {selectedFileName && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                      setSelectedFileName(null);
+                    }}
+                    className="shrink-0 cursor-pointer rounded p-0.5 text-stone-400 hover:text-stone-600"
+                    aria-label="Clear selected file"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </label>
               <input
+                ref={fileInputRef}
+                id={`document-file-${item.id}`}
                 name="file"
                 type="file"
                 accept=".pdf,image/jpeg,image/png,image/webp"
-                className="w-full text-sm"
+                className="sr-only"
                 required
+                onChange={handleFileChange}
               />
-            </label>
+            </div>
           </div>
+
+          {uploadProgress !== null && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-stone-500">
+                <span>{uploading ? "Uploading…" : "Upload complete"}</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-stone-200">
+                <div
+                  className="h-full rounded-full bg-brand-deep transition-[width] duration-200"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           {error && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}

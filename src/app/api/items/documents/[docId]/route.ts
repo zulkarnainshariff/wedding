@@ -5,8 +5,10 @@ import { db } from "@/lib/db";
 import {
   canViewDocument,
   deleteDocumentFile,
+  parseExtraViewers,
   readDocumentFile,
 } from "@/lib/item-documents";
+import { normalizeTravellerName } from "@/lib/travellers";
 import { filterItemsByPermission } from "@/lib/permissions";
 import { itemDocuments, itineraryItems } from "@/lib/schema";
 import { bumpSyncVersion } from "@/lib/sync";
@@ -72,4 +74,74 @@ export async function DELETE(_request: Request, { params }: Params) {
   await db.delete(itemDocuments).where(eq(itemDocuments.id, doc.id));
   await bumpSyncVersion();
   return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(request: Request, { params }: Params) {
+  const user = await requireEditAccess();
+  if (isAuthError(user)) return user;
+
+  const { docId } = await params;
+  const id = Number(docId);
+  if (!Number.isFinite(id)) {
+    return NextResponse.json({ error: "Invalid document id" }, { status: 400 });
+  }
+
+  const [doc] = await db
+    .select()
+    .from(itemDocuments)
+    .where(eq(itemDocuments.id, id))
+    .limit(1);
+
+  if (!doc) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const body = (await request.json()) as {
+    coversTravellers?: unknown;
+    extraViewers?: unknown;
+  };
+
+  const coveredRaw: string[] = Array.isArray(body.coversTravellers)
+    ? body.coversTravellers.filter(
+        (entry): entry is string => typeof entry === "string",
+      )
+    : String(body.coversTravellers ?? "")
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+
+  const coversTravellers = [
+    ...new Set(
+      coveredRaw.map((name) => normalizeTravellerName(name)).filter(Boolean),
+    ),
+  ];
+
+  if (coversTravellers.length === 0) {
+    return NextResponse.json(
+      { error: "At least one traveller is required" },
+      { status: 400 },
+    );
+  }
+
+  const extraViewers = parseExtraViewers(
+    Array.isArray(body.extraViewers)
+      ? body.extraViewers
+      : String(body.extraViewers ?? "")
+          .split(",")
+          .map((entry: string) => entry.trim())
+          .filter(Boolean),
+  );
+
+  const [updated] = await db
+    .update(itemDocuments)
+    .set({
+      travellerName: coversTravellers[0],
+      coversTravellers,
+      extraViewers,
+    })
+    .where(eq(itemDocuments.id, id))
+    .returning();
+
+  await bumpSyncVersion();
+  return NextResponse.json(updated);
 }
