@@ -30,15 +30,22 @@ export function SectionShell({
   toolbar,
   children,
   footer,
+  stickyHeader = false,
 }: {
   title: string;
   toolbar?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  stickyHeader?: boolean;
 }) {
   return (
     <section className="theme-card flex w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-sm">
-      <div className="theme-gradient-header shrink-0 border-b border-border/50 px-6 py-4">
+      <div
+        className={[
+          "theme-gradient-header shrink-0 border-b border-border/50 px-6 py-4",
+          stickyHeader ? "sticky top-0 z-20 bg-surface/95 backdrop-blur-sm" : "",
+        ].join(" ")}
+      >
         <h2 className="font-serif text-xl text-brand-deep">{title}</h2>
         {toolbar ? <div className="mt-4">{toolbar}</div> : null}
       </div>

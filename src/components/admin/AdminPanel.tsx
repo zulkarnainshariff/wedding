@@ -1,13 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { useToast } from "@/components/ui/ToastProvider";
 import { AdminItemDetailsForm } from "./AdminItemDetailsForm";
 import { FlightScheduleTimes } from "./FlightScheduleTimes";
 import { InvitationManagement } from "./InvitationManagement";
 import { TravelInsurancePanel } from "./TravelInsurancePanel";
 import { AppearanceSettingsPanel } from "./AppearanceSettingsPanel";
+import { PublicFeaturesPanel } from "./PublicFeaturesPanel";
+import { GalleryManagementPanel } from "./GalleryManagementPanel";
+import { GuestbookManagementPanel } from "./GuestbookManagementPanel";
+import { LandingPagePanel } from "./LandingPagePanel";
+import { TripDaysPanel } from "./TripDaysPanel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { GuestListClient } from "@/components/guests/GuestListClient";
 import { TaskPermissionsPanel } from "./TaskPermissionsPanel";
@@ -25,6 +31,10 @@ import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { PageShell, SectionShell } from "@/components/layout/PageShell";
 import { CATEGORY_META, CATEGORIES, type Category } from "@/lib/types";
 import type { AppThemeId } from "@/lib/app-theme";
+import type {
+  PublicInvitationEvent,
+  PublicScheduleItem,
+} from "@/lib/invitation-types";
 import type { ItineraryDay, ItineraryItem, PublicScheduleItemRow, WeddingEvent } from "@/lib/schema";
 
 type AdminTab =
@@ -32,17 +42,19 @@ type AdminTab =
   | "items"
   | "users"
   | "invitations"
+  | "landing"
   | "guests"
   | "tasks"
   | "insurance"
   | "appearance"
+  | "public"
+  | "gallery"
+  | "guestbook"
   | "diagnostics";
 
 type EventWithSchedule = WeddingEvent & {
   schedule: PublicScheduleItemRow[];
 };
-
-const EMPTY_DAY_FORM = { dayNumber: "", date: "", title: "", notes: "" };
 
 const TAB_CONTENT_CLASS = "mx-auto flex w-full max-w-5xl flex-col";
 
@@ -61,24 +73,35 @@ export function AdminPanel({
   initialItems,
   initialUsers = [],
   initialEvents = [],
+  initialLandingEvents = [],
   showUserManagement = false,
   showFullAdmin = true,
   showDiagnostics = false,
+  showSuperuserTools = false,
   initialThemeId,
+  initialFeatures = { guestbookEnabled: false, photoGalleryEnabled: false },
+  tripStartDate = null,
+  tripEndDate = null,
 }: {
   initialDays: ItineraryDay[];
   initialItems: ItineraryItem[];
   initialUsers?: ManagedUser[];
   initialEvents?: EventWithSchedule[];
+  initialLandingEvents?: Array<
+    PublicInvitationEvent & { schedule: PublicScheduleItem[] }
+  >;
   showUserManagement?: boolean;
   showFullAdmin?: boolean;
   showDiagnostics?: boolean;
+  showSuperuserTools?: boolean;
   initialThemeId: AppThemeId;
+  initialFeatures?: { guestbookEnabled: boolean; photoGalleryEnabled: boolean };
+  tripStartDate?: string | null;
+  tripEndDate?: string | null;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<AdminTab>(
-    showFullAdmin ? "days" : "insurance",
-  );
+  const toast = useToast();
+  const [tab, setTab] = useState<AdminTab>(showFullAdmin ? "days" : "insurance");
   const [days, setDays] = useState(initialDays);
   const [items, setItems] = useState(initialItems);
   const [itemForm, setItemForm] = useState<ItemFormState>(emptyItemForm());
@@ -91,26 +114,45 @@ export function AdminPanel({
     [initialUsers],
   );
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
-  const [dayForm, setDayForm] = useState(EMPTY_DAY_FORM);
-  const [dayBaseline, setDayBaseline] = useState(EMPTY_DAY_FORM);
-  const [editingDayId, setEditingDayId] = useState<number | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [savingItem, setSavingItem] = useState(false);
   const [pendingDeleteItemId, setPendingDeleteItemId] = useState<number | null>(
     null,
   );
 
-  const dayDirty = useMemo(
-    () => JSON.stringify(dayForm) !== JSON.stringify(dayBaseline),
-    [dayForm, dayBaseline],
-  );
   const itemDirty = useMemo(
     () => JSON.stringify(itemForm) !== JSON.stringify(itemBaseline),
     [itemForm, itemBaseline],
   );
 
-  useUnsavedChangesGuard(dayDirty || itemDirty);
+  useUnsavedChangesGuard(itemDirty);
   const { formatDayOption, formatDateOnly } = useDisplayFormat();
+
+  useEffect(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    if (
+      showFullAdmin &&
+      requestedTab &&
+      [
+        "days",
+        "items",
+        "invitations",
+        "landing",
+        "guests",
+        "tasks",
+        "insurance",
+        "appearance",
+        "public",
+        "gallery",
+        "guestbook",
+        "users",
+        "diagnostics",
+      ].includes(requestedTab)
+    ) {
+      setTab(requestedTab as AdminTab);
+    }
+  }, [showFullAdmin]);
 
   const sortedItems = useMemo(() => sortItems(items), [items]);
 
@@ -119,17 +161,21 @@ export function AdminPanel({
         ["days", "Days"],
         ["items", "Items"],
         ["invitations", "Invitations"],
+        ["landing", "Landing page"],
         ["guests", "Guest lists"],
         ["tasks", "Task access"],
         ["insurance", "Travel insurance"],
         ["appearance", "Appearance"],
+        ["public", "Public features"],
+        ["gallery", "Gallery"],
+        ["guestbook", "Guestbook"],
         ...(showUserManagement ? ([["users", "Users"]] as const) : []),
         ...(showDiagnostics ? ([["diagnostics", "Diagnostics"]] as const) : []),
       ]
     : [["insurance", "Travel insurance"]];
 
   function switchTab(next: AdminTab) {
-    if (dayDirty || itemDirty) {
+    if (itemDirty) {
       const ok = window.confirm(
         "You have unsaved changes. Leave this tab without saving?",
       );
@@ -148,41 +194,6 @@ export function AdminPanel({
     router.refresh();
   }
 
-  async function saveDay() {
-    setBusy(true);
-    setStatus(null);
-    const payload = {
-      dayNumber: Number(dayForm.dayNumber),
-      date: dayForm.date,
-      title: dayForm.title || null,
-      notes: dayForm.notes || null,
-    };
-
-    const res = editingDayId
-      ? await fetch(`/api/days/${editingDayId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-      : await fetch("/api/days", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-    setBusy(false);
-    if (!res.ok) {
-      setStatus("Failed to save day.");
-      return;
-    }
-
-    setDayForm(EMPTY_DAY_FORM);
-    setDayBaseline(EMPTY_DAY_FORM);
-    setEditingDayId(null);
-    setStatus("Day saved.");
-    await refresh();
-  }
-
   async function saveItem() {
     if (!itemForm.title.trim()) {
       setStatus("Title is required.");
@@ -190,64 +201,66 @@ export function AdminPanel({
     }
 
     setBusy(true);
+    setSavingItem(true);
     setStatus(null);
 
-    const day = itemForm.dayId
-      ? days.find((entry) => String(entry.id) === itemForm.dayId)
-      : undefined;
-    const formForSave =
-      day && !itemForm.startDatetime && !itemForm.eventDate
-        ? { ...itemForm, eventDate: day.date }
-        : itemForm;
+    try {
+      const day = itemForm.dayId
+        ? days.find((entry) => String(entry.id) === itemForm.dayId)
+        : undefined;
+      const formForSave =
+        day && !itemForm.startDatetime && !itemForm.eventDate
+          ? { ...itemForm, eventDate: day.date }
+          : itemForm;
 
-    const existingItem = editingItemId
-      ? items.find((entry) => entry.id === editingItemId)
-      : undefined;
-    const payload = buildItemApiPayload(
-      formForSave,
-      existingItem?.details as Record<string, unknown> | undefined,
-    );
+      const existingItem = editingItemId
+        ? items.find((entry) => entry.id === editingItemId)
+        : undefined;
+      const payload = buildItemApiPayload(
+        formForSave,
+        existingItem?.details as Record<string, unknown> | undefined,
+      );
 
-    const res = editingItemId
-      ? await fetch(`/api/items/${editingItemId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-      : await fetch("/api/items", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+      const res = editingItemId
+        ? await fetch(`/api/items/${editingItemId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
 
-    setBusy(false);
-    if (!res.ok) {
-      setStatus("Failed to save item.");
-      return;
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const message = body.error ?? "Failed to save item.";
+        setStatus(message);
+        toast.error(message);
+        return;
+      }
+
+      const saved = (await res.json()) as ItineraryItem;
+      if (editingItemId) {
+        const savedForm = itemToForm(saved);
+        setItemForm(savedForm);
+        setItemBaseline(savedForm);
+        setStatus("Item saved.");
+        toast.success("Item saved.");
+      } else {
+        const cleared = emptyItemForm();
+        setItemForm(cleared);
+        setItemBaseline(cleared);
+        setEditingItemId(null);
+        setStatus("Item saved.");
+        toast.success("Item saved.");
+      }
+      await refresh();
+    } finally {
+      setSavingItem(false);
+      setBusy(false);
     }
-
-    const saved = (await res.json()) as ItineraryItem;
-    if (editingItemId) {
-      const savedForm = itemToForm(saved);
-      setItemForm(savedForm);
-      setItemBaseline(savedForm);
-      setStatus("Item saved.");
-    } else {
-      const cleared = emptyItemForm();
-      setItemForm(cleared);
-      setItemBaseline(cleared);
-      setEditingItemId(null);
-      setStatus("Item saved.");
-    }
-    await refresh();
-  }
-
-  async function deleteDay(id: number) {
-    if (!confirm("Delete this day? Items linked to it will become unassigned.")) return;
-    setBusy(true);
-    await fetch(`/api/days/${id}`, { method: "DELETE" });
-    setBusy(false);
-    await refresh();
   }
 
   async function deleteItem(id: number) {
@@ -285,19 +298,6 @@ export function AdminPanel({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function startEditDay(day: ItineraryDay) {
-    const form = {
-      dayNumber: String(day.dayNumber),
-      date: day.date,
-      title: day.title ?? "",
-      notes: day.notes ?? "",
-    };
-    setTab("days");
-    setEditingDayId(day.id);
-    setDayForm(form);
-    setDayBaseline(form);
-  }
-
   return (
     <>
       <PageShell
@@ -327,7 +327,7 @@ export function AdminPanel({
         <div className={TAB_CONTENT_CLASS}>
           <UserManagement
             initialUsers={initialUsers}
-            allowAdminPromotion={showDiagnostics}
+            allowAdminPromotion={showSuperuserTools}
           />
         </div>
       )}
@@ -358,9 +358,38 @@ export function AdminPanel({
         </div>
       )}
 
+      {tab === "public" && showFullAdmin && (
+        <div className={TAB_CONTENT_CLASS}>
+          <PublicFeaturesPanel
+            key={`${initialFeatures.guestbookEnabled}-${initialFeatures.photoGalleryEnabled}`}
+            initialFeatures={initialFeatures}
+          />
+        </div>
+      )}
+
+      {tab === "gallery" && showFullAdmin && (
+        <div className={TAB_CONTENT_CLASS}>
+          <GalleryManagementPanel
+            events={initialEvents.map((event) => ({
+              id: event.id,
+              name: event.name,
+            }))}
+            photoGalleryEnabled={initialFeatures.photoGalleryEnabled}
+          />
+        </div>
+      )}
+
+      {tab === "guestbook" && showFullAdmin && (
+        <div className={TAB_CONTENT_CLASS}>
+          <GuestbookManagementPanel
+            guestbookEnabled={initialFeatures.guestbookEnabled}
+          />
+        </div>
+      )}
+
       {tab === "diagnostics" && showDiagnostics && (
         <div className={TAB_CONTENT_CLASS}>
-          <SystemDiagnosticsPanel />
+          <SystemDiagnosticsPanel showSuperuserTools={showSuperuserTools} />
         </div>
       )}
 
@@ -370,105 +399,20 @@ export function AdminPanel({
         </div>
       )}
 
+      {tab === "landing" && showFullAdmin && (
+        <div className={TAB_CONTENT_CLASS}>
+          <LandingPagePanel events={initialLandingEvents} />
+        </div>
+      )}
+
       {tab === "days" && showFullAdmin && (
         <div className={TAB_CONTENT_CLASS}>
-          {status && (
-            <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-              {status}
-            </p>
-          )}
-          <SectionShell title={editingDayId ? "Edit day" : "Add day"}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-sm">
-                <span className="mb-1 block text-stone-500">Day number</span>
-                <input
-                  type="number"
-                  value={dayForm.dayNumber}
-                  onChange={(e) => setDayForm({ ...dayForm, dayNumber: e.target.value })}
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                />
-              </label>
-              <label className="block text-sm">
-                <span className="mb-1 block text-stone-500">Date</span>
-                <input
-                  type="date"
-                  value={dayForm.date}
-                  onChange={(e) => setDayForm({ ...dayForm, date: e.target.value })}
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                />
-              </label>
-              <label className="block text-sm sm:col-span-2">
-                <span className="mb-1 block text-stone-500">Title</span>
-                <input
-                  value={dayForm.title}
-                  onChange={(e) => setDayForm({ ...dayForm, title: e.target.value })}
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                />
-              </label>
-              <label className="block text-sm sm:col-span-2">
-                <span className="mb-1 block text-stone-500">Notes</span>
-                <textarea
-                  value={dayForm.notes}
-                  onChange={(e) => setDayForm({ ...dayForm, notes: e.target.value })}
-                  rows={2}
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                />
-              </label>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={saveDay}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
-              >
-                <Save className="h-4 w-4" />
-                Save day
-              </button>
-              {editingDayId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingDayId(null);
-                    setDayForm(EMPTY_DAY_FORM);
-                    setDayBaseline(EMPTY_DAY_FORM);
-                  }}
-                  className="rounded-lg border border-stone-200 px-4 py-2 text-sm"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-
-            <div className="mt-6 divide-y divide-stone-100">
-              {days.map((day) => (
-                <div key={day.id} className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="font-medium text-stone-800">
-                      Day {day.dayNumber} · {day.title || "Untitled"}
-                    </p>
-                    <p className="text-sm text-stone-500">{formatDateOnly(day.date)}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => startEditDay(day)}
-                      className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteDay(day.id)}
-                      className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SectionShell>
+          <TripDaysPanel
+            initialDays={days}
+            initialItems={items}
+            tripStartDate={tripStartDate}
+            tripEndDate={tripEndDate}
+          />
         </div>
       )}
 
@@ -585,12 +529,16 @@ export function AdminPanel({
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
-                disabled={busy || !itemForm.title.trim()}
+                disabled={busy || savingItem || !itemForm.title.trim()}
                 onClick={saveItem}
                 className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
-                <Save className="h-4 w-4" />
-                Save item
+                {savingItem ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                {savingItem ? "Saving…" : "Save item"}
               </button>
               {editingItemId ? (
                 <button

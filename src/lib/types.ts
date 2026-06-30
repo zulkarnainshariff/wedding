@@ -36,6 +36,7 @@ export type FlightSegment = {
   aircraft?: string;
   transit?: string;
   airport?: string;
+  seats?: Record<string, string | null>;
 };
 
 export type FlightDetails = {
@@ -85,6 +86,7 @@ export type PetRelocationDetails = {
   to: string;
   handler: string;
   transportMode: "cargo";
+  participants?: string[];
   dayOfWeek?: string;
   departureTime?: string | null;
   arrivalTime?: string | null;

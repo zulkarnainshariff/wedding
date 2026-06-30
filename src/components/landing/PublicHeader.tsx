@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { LogIn, Map } from "lucide-react";
+import { BookOpen, CalendarDays, Images, LogIn } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoginModal } from "@/components/auth/LoginModal";
 
-export function PublicHeader() {
+export function PublicHeader({
+  guestbookEnabled = false,
+  photoGalleryEnabled = false,
+}: {
+  guestbookEnabled?: boolean;
+  photoGalleryEnabled?: boolean;
+}) {
   const { user, loading } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
 
@@ -17,13 +23,31 @@ export function PublicHeader() {
           Natalie & Zulkarnain
         </p>
         <div className="flex items-center gap-2">
+          {guestbookEnabled && (
+            <Link
+              href="/guestbook"
+              className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-surface/85 px-3 py-2 text-sm font-medium text-brand-deep shadow-sm backdrop-blur-sm transition hover:bg-accent-pearl/50 sm:gap-2 sm:px-4"
+            >
+              <BookOpen className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">Guestbook</span>
+            </Link>
+          )}
+          {photoGalleryEnabled && (
+            <Link
+              href="/gallery"
+              className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-surface/85 px-3 py-2 text-sm font-medium text-brand-deep shadow-sm backdrop-blur-sm transition hover:bg-accent-pearl/50 sm:gap-2 sm:px-4"
+            >
+              <Images className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">Gallery</span>
+            </Link>
+          )}
           {!loading && user ? (
             <Link
               href="/itinerary"
               className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-surface/85 px-4 py-2 text-sm font-medium text-brand-deep shadow-sm backdrop-blur-sm transition hover:bg-accent-pearl/50"
             >
-              <Map className="h-4 w-4" />
-              <span className="hidden sm:inline">View itinerary</span>
+              <CalendarDays className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">Itinerary</span>
             </Link>
           ) : (
             <button

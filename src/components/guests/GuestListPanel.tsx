@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Plus, Save, Trash2 } from "lucide-react";
+import { useToast } from "@/components/ui/ToastProvider";
 import { SectionShell } from "@/components/layout/PageShell";
 import {
   RSVP_STATUSES,
   RSVP_STATUS_LABELS,
+  RSVP_SUMMARY_STAT_LABELS,
   buildRsvpUrl,
   type GuestListAccess,
   type RsvpStatus,
@@ -29,6 +31,7 @@ const EMPTY_GUEST = {
   allowIncludeFamily: false,
   expectedHeadcount: 1,
   rsvpStatus: "not_responded" as RsvpStatus,
+  rsvpAttendingCount: 1,
   adminNotes: "",
   contactEmail: "",
   memberNames: [] as string[],
@@ -44,6 +47,7 @@ export function GuestListPanel({
   canManagePermissions?: boolean;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const accessibleEvents = useMemo(
     () =>
       events.filter((event) =>
@@ -247,6 +251,7 @@ export function GuestListPanel({
       allowIncludeFamily: guest.allowIncludeFamily,
       expectedHeadcount: guest.expectedHeadcount,
       rsvpStatus: guest.rsvpStatus as RsvpStatus,
+      rsvpAttendingCount: guest.rsvpAttendingCount ?? guest.expectedHeadcount,
       adminNotes: guest.adminNotes ?? "",
       contactEmail: guest.contactEmail ?? "",
       memberNames: guest.members.map((member) => member.name),
@@ -256,17 +261,27 @@ export function GuestListPanel({
   async function saveGuest() {
     if (!editingId) return;
     setBusy(true);
+    const payload = {
+      ...editForm,
+      members: editForm.memberNames.filter(Boolean).map((name) => ({ name })),
+      ...(editForm.rsvpStatus === "attending"
+        ? {
+            rsvpAttendingCount:
+              editForm.rsvpAttendingCount || editForm.expectedHeadcount,
+          }
+        : { rsvpAttendingCount: null }),
+    };
     const response = await fetch(`/api/guests/${editingId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...editForm,
-        members: editForm.memberNames.filter(Boolean).map((name) => ({ name })),
-      }),
+      body: JSON.stringify(payload),
     });
     setBusy(false);
     if (!response.ok) {
-      setError("Failed to save guest.");
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      const message = data.error ?? "Failed to save guest.";
+      setError(message);
+      toast.error(message);
       return;
     }
     const updated = await response.json();
@@ -275,6 +290,7 @@ export function GuestListPanel({
     );
     setEditingId(null);
     setStatus("Guest saved.");
+    toast.success("Guest saved.");
   }
 
   async function deleteGuest(id: number) {
@@ -288,6 +304,7 @@ export function GuestListPanel({
   async function copyRsvpLink(token: string) {
     await navigator.clipboard.writeText(buildRsvpUrl(token));
     setStatus("RSVP link copied.");
+    toast.success("RSVP link copied.");
   }
 
   if (!accessibleEvents.length) {
@@ -344,16 +361,27 @@ export function GuestListPanel({
 
       {activeTab === "summary" && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Expected headcount" value={summaryStats.totalExpected} />
-            <StatCard label="Attending headcount" value={summaryStats.attendingHeadcount} />
-            {RSVP_STATUSES.map((rsvpStatus) => (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <StatCard
-                key={rsvpStatus}
-                label={RSVP_STATUS_LABELS[rsvpStatus]}
-                value={summaryStats.statusCounts[rsvpStatus]}
+                label="Guests invited"
+                value={summaryStats.totalExpected}
+                hint="Sum of each invitation's expected headcount"
               />
-            ))}
+              <StatCard
+                label="Guests confirmed attending"
+                value={summaryStats.attendingHeadcount}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {RSVP_STATUSES.map((rsvpStatus) => (
+                <StatCard
+                  key={rsvpStatus}
+                  label={RSVP_SUMMARY_STAT_LABELS[rsvpStatus]}
+                  value={summaryStats.statusCounts[rsvpStatus]}
+                />
+              ))}
+            </div>
           </div>
 
           <div className="mt-8 divide-y divide-stone-100">
@@ -369,7 +397,7 @@ export function GuestListPanel({
                   <p className="text-sm text-stone-500">
                     {RSVP_STATUS_LABELS[guest.rsvpStatus as RsvpStatus]}
                     {guest.rsvpStatus === "attending" && guest.rsvpAttendingCount != null
-                      ? ` · ${guest.rsvpAttendingCount} attending`
+                      ? ` · ${guest.rsvpAttendingCount} guest${guest.rsvpAttendingCount === 1 ? "" : "s"}`
                       : ""}
                   </p>
                 </div>
@@ -406,7 +434,7 @@ export function GuestListPanel({
                       <p className="mt-1 text-sm">
                         RSVP: {RSVP_STATUS_LABELS[guest.rsvpStatus as RsvpStatus]}
                         {guest.rsvpAttendingCount != null
-                          ? ` · ${guest.rsvpAttendingCount} attending`
+                          ? ` · ${guest.rsvpAttendingCount} guest${guest.rsvpAttendingCount === 1 ? "" : "s"}`
                           : ""}
                       </p>
                       {guest.rsvpNotes && (
@@ -632,13 +660,24 @@ export function GuestListPanel({
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: number;
+  hint?: string;
+}) {
   return (
     <div className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
       <p className="text-xs font-medium tracking-wide text-stone-500 uppercase">
         {label}
       </p>
       <p className="mt-1 font-serif text-2xl text-brand-deep">{value}</p>
+      {hint ? (
+        <p className="mt-1 text-xs text-stone-400">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -685,9 +724,17 @@ function GuestForm({
         <span className="mb-1 block text-stone-500">RSVP status</span>
         <select
           value={value.rsvpStatus}
-          onChange={(e) =>
-            onChange({ ...value, rsvpStatus: e.target.value as RsvpStatus })
-          }
+          onChange={(e) => {
+            const rsvpStatus = e.target.value as RsvpStatus;
+            onChange({
+              ...value,
+              rsvpStatus,
+              rsvpAttendingCount:
+                rsvpStatus === "attending"
+                  ? value.rsvpAttendingCount || value.expectedHeadcount
+                  : value.rsvpAttendingCount,
+            });
+          }}
           className="w-full rounded-lg border border-stone-200 px-3 py-2"
         >
           {RSVP_STATUSES.map((status) => (
@@ -697,6 +744,23 @@ function GuestForm({
           ))}
         </select>
       </label>
+      {value.rsvpStatus === "attending" && (
+        <label className="block text-sm">
+          <span className="mb-1 block text-stone-500">Attending count</span>
+          <input
+            type="number"
+            min={1}
+            value={value.rsvpAttendingCount}
+            onChange={(e) =>
+              onChange({
+                ...value,
+                rsvpAttendingCount: Number(e.target.value) || 1,
+              })
+            }
+            className="w-full rounded-lg border border-stone-200 px-3 py-2"
+          />
+        </label>
+      )}
       <label className="flex items-center gap-2 text-sm sm:col-span-2">
         <input
           type="checkbox"

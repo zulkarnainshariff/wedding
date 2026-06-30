@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { Cormorant_Garamond, DM_Sans, Nunito } from "next/font/google";
 import { ActivityTracker } from "@/components/auth/ActivityTracker";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 import { TripTimeProvider } from "@/components/itinerary/TripTimeContext";
 import { OfflineSyncProvider } from "@/components/auth/OfflineSyncProvider";
 import { NavigationGuardProvider } from "@/components/layout/NavigationGuard";
@@ -67,15 +68,17 @@ export default async function RootLayout({
     >
       <body className="min-h-full bg-background font-sans text-foreground antialiased">
         <AuthProvider hasSession={hasSession}>
-          <TripTimeProvider>
-            <OfflineSyncProvider>
-              <NavigationGuardProvider>
-                <ActivityTracker />
-                {children}
-                <ServiceWorkerRegistration />
-              </NavigationGuardProvider>
-            </OfflineSyncProvider>
-          </TripTimeProvider>
+          <ToastProvider>
+            <TripTimeProvider>
+              <OfflineSyncProvider>
+                <NavigationGuardProvider>
+                  <ActivityTracker />
+                  {children}
+                  <ServiceWorkerRegistration />
+                </NavigationGuardProvider>
+              </OfflineSyncProvider>
+            </TripTimeProvider>
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

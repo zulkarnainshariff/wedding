@@ -1,5 +1,9 @@
 import type { AccommodationSuggestion, Category, FlightSegment } from "@/lib/types";
 import {
+  migrateTopLevelSeatsToSegments,
+  usesPerSegmentSeats,
+} from "@/lib/flight-seats";
+import {
   flatMapFromGroups,
   groupsFromDetails,
   normalizeBookingGroupLinks,
@@ -235,15 +239,25 @@ export function parseStructuredDetails(
         structured.simple.operatingAirlineName || airline.operatingAirlineName || "";
     }
     structured.bookingGroups = groupsFromDetails(details);
-    structured.seats = recordsFromObject(
-      details.seats as Record<string, string | null> | undefined,
-    );
     structured.baggage = recordsFromObject(
       details.baggage as Record<string, number | null> | undefined,
     );
     structured.segments = Array.isArray(details.segments)
       ? (details.segments as FlightSegment[])
       : [];
+    const migrated = migrateTopLevelSeatsToSegments({
+      ...(details as Record<string, unknown>),
+      segments: structured.segments,
+      seats: details.seats as Record<string, string | null> | undefined,
+    } as import("@/lib/types").FlightDetails);
+    if (usesPerSegmentSeats(migrated)) {
+      structured.segments = migrated.segments ?? structured.segments;
+      structured.seats = [];
+    } else {
+      structured.seats = recordsFromObject(
+        details.seats as Record<string, string | null> | undefined,
+      );
+    }
     if (
       details.checkInStatus &&
       typeof details.checkInStatus === "object" &&
@@ -287,6 +301,14 @@ export function parseStructuredDetails(
     } else if (typeof details.driver === "string" && details.driver.trim()) {
       structured.participants = [details.driver.trim()];
     }
+  }
+
+  if (category === "pet_relocation") {
+    structured.participants = Array.isArray(details.participants)
+      ? (details.participants as string[]).filter(
+          (entry): entry is string => typeof entry === "string",
+        )
+      : [];
   }
 
   if (category === "travel_insurance") {
@@ -383,10 +405,9 @@ export function buildStructuredDetailsPayload(
       linkedWith: (group.linkedWith ?? []).filter(Boolean),
     }));
     payload.bookingReferences = flatMapFromGroups(structured.bookingGroups);
-    payload.seats = objectFromRecords(structured.seats);
     payload.baggage = objectFromRecords(structured.baggage, true);
     payload.checkInStatus = structured.checkInStatus;
-    payload.segments = structured.segments
+    const filteredSegments = structured.segments
       .filter(
         (segment) =>
           segment.from ||
@@ -402,7 +423,21 @@ export function buildStructuredDetailsPayload(
             segment.marketingFlightNumber,
             segment.operatingFlightNumber,
           ) || segment.flightNumber,
+        seats: segment.seats
+          ? (Object.fromEntries(
+              Object.entries(segment.seats).map(([name, value]) => [
+                name,
+                typeof value === "string" && value.trim() ? value.trim() : null,
+              ]),
+            ) as Record<string, string | null>)
+          : undefined,
       }));
+    payload.segments = filteredSegments;
+    if (filteredSegments.length >= 2) {
+      delete payload.seats;
+    } else {
+      payload.seats = objectFromRecords(structured.seats);
+    }
     delete payload.bookingReference;
   }
 
@@ -426,6 +461,7 @@ export function buildStructuredDetailsPayload(
     payload.transportMode = "cargo";
     payload.species = "cat";
     payload.status = structured.simple.status === "tbc" ? "tbc" : "confirmed";
+    payload.participants = structured.participants;
   }
 
   if (category === "travel_insurance") {

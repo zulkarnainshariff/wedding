@@ -5,7 +5,13 @@ import type { FlightDetails } from "@/lib/types";
 import { formatTravellerLabel } from "@/lib/types";
 import { formatBookingGroupsDisplay } from "@/lib/booking-groups";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
-import { formatSeatsSummary, hasAssignedSeats } from "@/lib/seats";
+import {
+  formatFlightSeatsSummary,
+  hasFlightAssignedSeats,
+  segmentRouteLabel,
+  usesPerSegmentSeats,
+} from "@/lib/flight-seats";
+import { flightSegmentsFromDetails } from "@/lib/flight-segment-timing";
 import { normalizeFlightDetails } from "@/lib/flight-numbers";
 import { resolveAirlineLabel } from "@/lib/airlines";
 import { FlightLiveStatusPanel } from "@/components/itinerary/FlightLiveStatus";
@@ -273,42 +279,86 @@ export function FlightDetailView({
         <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
           Seats
         </h3>
-        {hasAssignedSeats(flight.seats) ? (
-          <div className="mt-3 overflow-hidden rounded-xl border border-stone-200">
-            <table className="w-full text-sm">
-              <thead className="bg-stone-50 text-left text-stone-500">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Traveller</th>
-                  <th className="px-4 py-2 font-medium">Seat</th>
-                  <th className="px-4 py-2 font-medium">Check-in</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(flight.seats!).map(([name, seat]) => (
-                  <tr key={name} className="border-t border-stone-100">
-                    <td className="px-4 py-2 text-stone-800">
-                      {formatTravellerLabel(name)}
-                    </td>
-                    <td className="px-4 py-2 text-stone-600">{seat ?? "—"}</td>
-                    <td className="px-4 py-2 text-stone-600">
-                      {flight.checkInStatus?.[name] ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-700">
-                          <CheckCircle2 className="h-4 w-4" />
-                          Checked in
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
+        {hasFlightAssignedSeats(flight) ? (
+          usesPerSegmentSeats(flight) ? (
+            <div className="mt-3 space-y-3">
+              {flightSegmentsFromDetails(flight).map((segment, index) => (
+                <div
+                  key={`${segmentRouteLabel(segment)}-${index}`}
+                  className="overflow-hidden rounded-xl border border-stone-200"
+                >
+                  <p className="bg-stone-50 px-4 py-2 text-xs font-semibold tracking-wide text-stone-500 uppercase">
+                    {segmentRouteLabel(segment)}
+                  </p>
+                  <table className="w-full text-sm">
+                    <thead className="bg-stone-50/70 text-left text-stone-500">
+                      <tr>
+                        <th className="px-4 py-2 font-medium">Traveller</th>
+                        <th className="px-4 py-2 font-medium">Seat</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {passengers.map((name) => (
+                        <tr key={name} className="border-t border-stone-100">
+                          <td className="px-4 py-2 text-stone-800">
+                            {formatTravellerLabel(name)}
+                          </td>
+                          <td className="px-4 py-2 text-stone-600">
+                            {segment.seats?.[name] ?? "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+              {passengers.some((name) => flight.checkInStatus?.[name]) ? (
+                <p className="text-sm text-stone-600">
+                  Check-in recorded for{" "}
+                  {passengers
+                    .filter((name) => flight.checkInStatus?.[name])
+                    .map((name) => formatTravellerLabel(name))
+                    .join(", ")}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="mt-3 overflow-hidden rounded-xl border border-stone-200">
+              <table className="w-full text-sm">
+                <thead className="bg-stone-50 text-left text-stone-500">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Traveller</th>
+                    <th className="px-4 py-2 font-medium">Seat</th>
+                    <th className="px-4 py-2 font-medium">Check-in</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {Object.entries(flight.seats!).map(([name, seat]) => (
+                    <tr key={name} className="border-t border-stone-100">
+                      <td className="px-4 py-2 text-stone-800">
+                        {formatTravellerLabel(name)}
+                      </td>
+                      <td className="px-4 py-2 text-stone-600">{seat ?? "—"}</td>
+                      <td className="px-4 py-2 text-stone-600">
+                        {flight.checkInStatus?.[name] ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-700">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Checked in
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         ) : (
           <p className="mt-2 text-sm text-stone-500">
-            {formatSeatsSummary(
-              flight.seats,
+            {formatFlightSeatsSummary(
+              flight,
               flight.passengers ?? flight.travellers,
             )}
           </p>

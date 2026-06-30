@@ -6,7 +6,7 @@ import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canManageUsers, canEditItinerary, isSuperuser, normalizePermissions } from "@/lib/permissions";
 import { getDays, getAllItems } from "@/lib/queries";
-import { getAllInvitationEvents, getScheduleItemsForEventAdmin } from "@/lib/public-queries";
+import { getAllInvitationEvents, getInvitationEventsWithSchedules, getScheduleItemsForEventAdmin } from "@/lib/public-queries";
 import { getAppSettings } from "@/lib/app-settings";
 import { users } from "@/lib/schema";
 
@@ -25,10 +25,11 @@ export default async function AdminPage() {
     redirect("/itinerary");
   }
 
-  const [days, items, invitationEvents, appSettings] = await Promise.all([
+  const [days, items, invitationEvents, landingEvents, appSettings] = await Promise.all([
     getDays(),
     getAllItems(),
     getAllInvitationEvents(),
+    getInvitationEventsWithSchedules(),
     getAppSettings(),
   ]);
 
@@ -56,11 +57,19 @@ export default async function AdminPage() {
         initialDays={days}
         initialItems={items}
         initialEvents={initialEvents}
+        initialLandingEvents={landingEvents}
         initialUsers={initialUsers}
         showUserManagement={canManageUsers(sessionUser)}
         showFullAdmin={sessionUser.isAdmin}
-        showDiagnostics={isSuperuser(sessionUser)}
+        showDiagnostics={sessionUser.isAdmin}
+        showSuperuserTools={isSuperuser(sessionUser)}
         initialThemeId={appSettings.themeId}
+        initialFeatures={{
+          guestbookEnabled: Boolean(appSettings.features.guestbookEnabled),
+          photoGalleryEnabled: Boolean(appSettings.features.photoGalleryEnabled),
+        }}
+        tripStartDate={appSettings.features.tripStartDate ?? null}
+        tripEndDate={appSettings.features.tripEndDate ?? null}
       />
     </AppShell>
   );

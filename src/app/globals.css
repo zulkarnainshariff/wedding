@@ -151,6 +151,12 @@ button {
   font: inherit;
 }
 
+button:not(:disabled),
+a[href],
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
 .theme-card {
   border-color: color-mix(in srgb, var(--brand) 22%, white);
   box-shadow: var(--theme-card-shadow);

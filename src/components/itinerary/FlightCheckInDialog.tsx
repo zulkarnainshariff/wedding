@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, X } from "lucide-react";
+import type { SegmentSeatDraft } from "@/lib/flight-seats";
 import { formatTravellerLabel } from "@/lib/types";
 
 export function FlightCheckInDialog({
@@ -11,6 +12,9 @@ export function FlightCheckInDialog({
   passengers,
   seatDraft,
   onSeatDraftChange,
+  segmentSeatDraft,
+  onSegmentSeatDraftChange,
+  segmentLegs,
   checkedIn,
   busy = false,
   onClose,
@@ -22,6 +26,9 @@ export function FlightCheckInDialog({
   passengers: string[];
   seatDraft: Record<string, string>;
   onSeatDraftChange: (next: Record<string, string>) => void;
+  segmentSeatDraft?: SegmentSeatDraft;
+  onSegmentSeatDraftChange?: (next: SegmentSeatDraft) => void;
+  segmentLegs?: Array<{ index: number; label: string }>;
   checkedIn: boolean;
   busy?: boolean;
   onClose: () => void;
@@ -100,27 +107,59 @@ export function FlightCheckInDialog({
             No passengers are listed on this flight yet.
           </p>
         ) : (
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-4">
             <p className="text-sm font-medium text-stone-700">Seat numbers</p>
-            {passengers.map((name) => (
-              <label key={name} className="block text-sm">
-                <span className="mb-1 block text-stone-500">
-                  {formatTravellerLabel(name)}
-                </span>
-                <input
-                  value={seatDraft[name] ?? ""}
-                  onChange={(event) =>
-                    onSeatDraftChange({
-                      ...seatDraft,
-                      [name]: event.target.value.toUpperCase(),
-                    })
-                  }
-                  placeholder="e.g. 24A"
-                  disabled={busy}
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                />
-              </label>
-            ))}
+            {segmentLegs && segmentLegs.length > 0 && onSegmentSeatDraftChange ? (
+              segmentLegs.map((leg) => (
+                <div key={leg.index} className="space-y-3 rounded-xl border border-stone-200 p-3">
+                  <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">
+                    {leg.label}
+                  </p>
+                  {passengers.map((name) => (
+                    <label key={`${leg.index}-${name}`} className="block text-sm">
+                      <span className="mb-1 block text-stone-500">
+                        {formatTravellerLabel(name)}
+                      </span>
+                      <input
+                        value={segmentSeatDraft?.[leg.index]?.[name] ?? ""}
+                        onChange={(event) =>
+                          onSegmentSeatDraftChange({
+                            ...(segmentSeatDraft ?? {}),
+                            [leg.index]: {
+                              ...(segmentSeatDraft?.[leg.index] ?? {}),
+                              [name]: event.target.value.toUpperCase(),
+                            },
+                          })
+                        }
+                        placeholder="e.g. 24A"
+                        disabled={busy}
+                        className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                      />
+                    </label>
+                  ))}
+                </div>
+              ))
+            ) : (
+              passengers.map((name) => (
+                <label key={name} className="block text-sm">
+                  <span className="mb-1 block text-stone-500">
+                    {formatTravellerLabel(name)}
+                  </span>
+                  <input
+                    value={seatDraft[name] ?? ""}
+                    onChange={(event) =>
+                      onSeatDraftChange({
+                        ...seatDraft,
+                        [name]: event.target.value.toUpperCase(),
+                      })
+                    }
+                    placeholder="e.g. 24A"
+                    disabled={busy}
+                    className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                  />
+                </label>
+              ))
+            )}
           </div>
         )}
 

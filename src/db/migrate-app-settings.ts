@@ -19,6 +19,11 @@ async function main() {
     ON CONFLICT (id) DO NOTHING
   `;
 
+  await sql`
+    ALTER TABLE app_settings
+    ADD COLUMN IF NOT EXISTS features jsonb NOT NULL DEFAULT '{}'::jsonb
+  `;
+
   console.log("App settings migration complete.");
   await sql.end();
 }

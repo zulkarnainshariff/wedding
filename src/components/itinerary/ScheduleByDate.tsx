@@ -7,6 +7,7 @@ import { ScheduleToolbar } from "./ScheduleToolbar";
 import { TripProgressIndicator } from "./TripProgressIndicator";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
+import { useDayVisibility } from "@/hooks/useDayVisibility";
 import { PageShell } from "@/components/layout/PageShell";
 import { getDayDisplayTitle, hasRestrictedTravellerView } from "@/lib/day-display";
 import {
@@ -14,14 +15,14 @@ import {
   filterScheduleItemsByParticipants,
 } from "@/lib/schedule-participant-filter";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
-import { filterPastDays, isDayToday } from "@/lib/trip-time";
+import { isDayToday } from "@/lib/trip-time";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
 
 type DayWithItems = ItineraryDay & { items: ItineraryItem[] };
 
 export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
   const { user } = useAuth();
-  const { effectiveDate, hidePast } = useTripTime();
+  const { effectiveDate, hidePast, hideFreeDays, hideUntouchedDays } = useTripTime();
   const restrictedView = hasRestrictedTravellerView(user);
   const { formatDateOnly } = useDisplayFormat();
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
@@ -44,10 +45,7 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
     [days, selectedParticipants],
   );
 
-  const daysWithContent = filteredDays.filter(
-    (day) => day.items.length > 0 || day.title,
-  );
-  const visibleDays = filterPastDays(daysWithContent, effectiveDate, hidePast);
+  const { visibleDays } = useDayVisibility(filteredDays);
   const { itemSummaries } = useTaskIndicators();
 
   return (
@@ -64,13 +62,15 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
         />
       }
     >
-      <TripProgressIndicator days={daysWithContent} />
+      <TripProgressIndicator days={visibleDays} />
 
       {visibleDays.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-10 text-center text-stone-500">
           {hidePast
             ? "No upcoming schedule days to show."
-            : "No schedule items yet."}
+            : hideFreeDays || hideUntouchedDays
+              ? "No schedule days match your Options filters. Turn them off in the toolbar to see more days."
+              : "No schedule days to show. Adjust day visibility or add items from Manage."}
         </div>
       ) : (
         <div className="relative space-y-10">

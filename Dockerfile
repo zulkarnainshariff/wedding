@@ -46,4 +46,4 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 
-CMD ["sh", "-c", "npm run db:push && npm run db:migrate-task-view-permissions && npm run db:migrate-system-logs && npm run db:migrate-app-settings"]
+CMD ["sh", "-c", "npm run db:push && npm run db:migrate-task-view-permissions && npm run db:migrate-system-logs && npm run db:migrate-app-settings && npm run db:migrate-error-logs && npm run db:migrate-public-features && npm run db:migrate-trip-days && npm run db:migrate-guestbook-moderation && npm run db:migrate-pet-relocation-participants"]

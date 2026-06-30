@@ -4,11 +4,11 @@ import { logAuditEvent } from "@/lib/activity-log";
 import { requireEditAccess, isAuthError } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import {
-  buildCheckInStatusFromPassengers,
-  buildSeatMapFromPassengers,
+  applyCheckInSeatUpdates,
   getFlightPassengers,
   isFlightFullyCheckedIn,
 } from "@/lib/flight-check-in";
+import type { SegmentSeatDraft } from "@/lib/flight-seats";
 import { itineraryItems } from "@/lib/schema";
 import { bumpSyncVersion } from "@/lib/sync";
 import { getFlightDetails } from "@/lib/types";
@@ -24,6 +24,7 @@ export async function POST(request: Request, { params }: Params) {
   const body = (await request.json()) as {
     checkedIn?: boolean;
     seats?: Record<string, string>;
+    segmentSeats?: SegmentSeatDraft;
   };
 
   const [existing] = await db
@@ -57,16 +58,20 @@ export async function POST(request: Request, { params }: Params) {
   const shouldCheckIn = body.checkedIn !== false;
   const seatDraft =
     body.seats && typeof body.seats === "object" ? body.seats : {};
+  const segmentSeatDraft =
+    body.segmentSeats && typeof body.segmentSeats === "object"
+      ? body.segmentSeats
+      : {};
+
+  const updatedFlight = applyCheckInSeatUpdates(flightDetails, passengers, {
+    shouldCheckIn,
+    seatDraft,
+    segmentSeatDraft,
+  });
 
   const nextDetails = {
     ...details,
-    seats: shouldCheckIn
-      ? buildSeatMapFromPassengers(flightDetails, seatDraft)
-      : flightDetails.seats,
-    checkInStatus: buildCheckInStatusFromPassengers(
-      passengers,
-      shouldCheckIn,
-    ),
+    ...updatedFlight,
   };
 
   const [item] = await db

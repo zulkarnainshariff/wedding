@@ -14,10 +14,57 @@ export function daySectionId(
   return variant === "timeline" ? `day-${day.dayNumber}` : `schedule-${day.date}`;
 }
 
+export function adminDayRowId(dayId: number): string {
+  return `admin-day-${dayId}`;
+}
+
+export function adminUserRowId(userId: number): string {
+  return `admin-user-${userId}`;
+}
+
+export function adminDayEditSectionId(): string {
+  return "admin-day-edit-section";
+}
+
+export function taskEditSectionId(): string {
+  return "task-edit-section";
+}
+
+export function taskRowId(taskId: number): string {
+  return `task-row-${taskId}`;
+}
+
 export function scrollToDaySection(sectionId: string): void {
+  scrollToElementById(sectionId);
+}
+
+export function scrollToElementById(sectionId: string): void {
   const element = document.getElementById(sectionId);
   if (!element) return;
-  element.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // Use the outermost scrollable ancestor (e.g. PageShell), not inner SectionShell panels.
+  let scrollParent: HTMLElement | null = null;
+  let node: HTMLElement | null = element.parentElement;
+  while (node) {
+    const { overflowY } = getComputedStyle(node);
+    if (overflowY === "auto" || overflowY === "scroll") {
+      scrollParent = node;
+    }
+    node = node.parentElement;
+  }
+
+  if (scrollParent) {
+    const offset = 96;
+    const parentTop = scrollParent.getBoundingClientRect().top;
+    const elementTop = element.getBoundingClientRect().top;
+    scrollParent.scrollTo({
+      behavior: "smooth",
+      top: scrollParent.scrollTop + (elementTop - parentTop) - offset,
+    });
+    return;
+  }
+
+  element.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 export function formatDayJumpPrimary(

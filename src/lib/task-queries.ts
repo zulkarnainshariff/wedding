@@ -67,6 +67,13 @@ export async function canAssignOnAnyEvent(user: SessionUser) {
   return permissions.some((entry) => entry.canAssign || entry.canAssignForOthers);
 }
 
+export async function canAssignOnEvent(user: SessionUser, eventId: number) {
+  if (user.isAdmin) return true;
+  const permissions = await getTaskPermissionsForUser(user);
+  const perm = permissions.find((entry) => entry.eventId === eventId);
+  return Boolean(perm?.canAssign || perm?.canAssignForOthers);
+}
+
 export async function resolveAssignEventId(user: SessionUser) {
   const permissions = await getTaskPermissionsForUser(user);
   const assignable = permissions.find(

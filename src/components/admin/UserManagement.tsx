@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save, Trash2 } from "lucide-react";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { SectionShell } from "@/components/layout/PageShell";
+import { adminUserRowId, scrollToElementById } from "@/lib/day-jump";
 import { CATEGORIES, CATEGORY_META, type Category } from "@/lib/types";
 import type { UserPermissions } from "@/lib/permissions";
 
@@ -26,6 +27,8 @@ const EMPTY_FORM = {
   canEdit: false,
   canViewAllGuestLists: false,
   canEditAllGuestLists: false,
+  isWeddingCoordinator: false,
+  canModerateGuestbook: false,
 };
 
 function formatTravellerAccess(permissions: UserPermissions): string {
@@ -51,6 +54,8 @@ export function UserManagement({
   const [saving, setSaving] = useState(false);
   const [forceUserIds, setForceUserIds] = useState<number[]>([]);
   const [forcePassword, setForcePassword] = useState("");
+  const [scrollToUserId, setScrollToUserId] = useState<number | null>(null);
+  const editSectionRef = useRef<HTMLDivElement>(null);
 
   const lockedUsername = form.username.trim().toLowerCase();
 
@@ -80,8 +85,13 @@ export function UserManagement({
       canEdit: user.permissions.canEdit,
       canViewAllGuestLists: Boolean(user.permissions.canViewAllGuestLists),
       canEditAllGuestLists: Boolean(user.permissions.canEditAllGuestLists),
+      isWeddingCoordinator: Boolean(user.permissions.isWeddingCoordinator),
+      canModerateGuestbook: Boolean(user.permissions.canModerateGuestbook),
     });
     setError(null);
+    requestAnimationFrame(() => {
+      editSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   function resetForm() {
@@ -104,6 +114,8 @@ export function UserManagement({
       canViewAllGuestLists:
         form.isAdmin || form.canViewAllGuestLists || form.canEditAllGuestLists,
       canEditAllGuestLists: form.isAdmin || form.canEditAllGuestLists,
+      isWeddingCoordinator: form.isAdmin || form.isWeddingCoordinator,
+      canModerateGuestbook: form.isAdmin || form.canModerateGuestbook,
     };
 
     try {
@@ -129,8 +141,12 @@ export function UserManagement({
         return;
       }
 
+      const savedUserId = editingId;
       resetForm();
       await refreshUsers();
+      if (savedUserId) {
+        setScrollToUserId(savedUserId);
+      }
       router.refresh();
     } finally {
       setSaving(false);
@@ -208,6 +224,16 @@ export function UserManagement({
     );
   }
 
+  useLayoutEffect(() => {
+    if (scrollToUserId == null) return;
+    const userId = scrollToUserId;
+    const frame = requestAnimationFrame(() => {
+      scrollToElementById(adminUserRowId(userId));
+      setScrollToUserId(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [scrollToUserId, users]);
+
   return (
     <SectionShell title={editingId ? "Edit user" : "Add user"}>
       <p className="text-sm text-stone-500">
@@ -215,6 +241,7 @@ export function UserManagement({
         each user can see.
       </p>
 
+      <div ref={editSectionRef} className="scroll-mt-24">
       <form
         className="mt-4 grid gap-4 sm:grid-cols-2"
         onSubmit={(event) => {
@@ -332,6 +359,37 @@ export function UserManagement({
               <label className="flex items-center gap-2 text-sm text-stone-700">
                 <input
                   type="checkbox"
+                  checked={form.isWeddingCoordinator}
+                  onChange={(e) =>
+                    setForm((current) => ({
+                      ...current,
+                      isWeddingCoordinator: e.target.checked,
+                      canViewAllGuestLists: e.target.checked
+                        ? true
+                        : current.canViewAllGuestLists,
+                    }))
+                  }
+                />
+                Wedding coordinator (guest list visibility & invite alerts)
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-stone-700">
+                <input
+                  type="checkbox"
+                  checked={form.canModerateGuestbook}
+                  onChange={(e) =>
+                    setForm((current) => ({
+                      ...current,
+                      canModerateGuestbook: e.target.checked,
+                    }))
+                  }
+                />
+                Can moderate guestbook (hide or delete messages)
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-stone-700">
+                <input
+                  type="checkbox"
                   checked={form.viewAllCategories}
                   onChange={(e) =>
                     setForm((current) => ({
@@ -444,12 +502,14 @@ export function UserManagement({
           )}
         </div>
       </form>
+      </div>
 
       <div className="mt-6 divide-y divide-stone-100">
         {users.map((user) => (
           <div
             key={user.id}
-            className="flex items-start justify-between gap-4 py-3"
+            id={adminUserRowId(user.id)}
+            className="scroll-mt-24 flex items-start justify-between gap-4 py-3"
           >
             <div>
               <p className="font-medium text-stone-800">{user.username}</p>

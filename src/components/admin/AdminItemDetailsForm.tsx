@@ -20,6 +20,9 @@ import {
   updateBookingGroupLinks,
 } from "@/lib/booking-groups";
 import type { AccommodationSuggestion, Category, FlightSegment } from "@/lib/types";
+import {
+  applySegmentSeatWithPropagation,
+} from "@/lib/flight-seats";
 
 function TimeInput({
   label,
@@ -491,11 +494,50 @@ function LocationFields({
   );
 }
 
+function SegmentSeatsEditor({
+  travellers,
+  segment,
+  onSeatChange,
+}: {
+  travellers: string[];
+  segment: FlightSegment;
+  onSeatChange: (traveller: string, seat: string) => void;
+}) {
+  if (travellers.length === 0) return null;
+
+  return (
+    <div className="sm:col-span-2">
+      <p className="mb-2 text-sm text-stone-500">Seat numbers</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {travellers.map((traveller) => (
+          <label key={traveller} className="block text-sm">
+            <span className="mb-1 block text-stone-500">{traveller}</span>
+            <input
+              type="text"
+              value={segment.seats?.[traveller] ?? ""}
+              placeholder="Seat"
+              onChange={(event) =>
+                onSeatChange(traveller, event.target.value.toUpperCase())
+              }
+              className="w-full rounded-lg border border-stone-200 px-3 py-2"
+            />
+          </label>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-stone-500">
+        Matching aircraft on other segments uses the same seat automatically.
+      </p>
+    </div>
+  );
+}
+
 function FlightSegmentsEditor({
   segments,
+  travellers,
   onChange,
 }: {
   segments: FlightSegment[];
+  travellers: string[];
   onChange: (segments: FlightSegment[]) => void;
 }) {
   return (
@@ -631,6 +673,22 @@ function FlightSegmentsEditor({
                   onChange(next);
                 }}
               />
+              {travellers.length > 0 ? (
+                <SegmentSeatsEditor
+                  travellers={travellers}
+                  segment={segment}
+                  onSeatChange={(traveller, seat) => {
+                    onChange(
+                      applySegmentSeatWithPropagation(
+                        segments,
+                        index,
+                        traveller,
+                        seat,
+                      ),
+                    );
+                  }}
+                />
+              ) : null}
             </div>
           </div>
         ))}
@@ -644,32 +702,55 @@ function SeatCheckInEditor({
   checkInStatus,
   onChange,
   onCheckInChange,
+  showSeats = true,
 }: {
   rows: TravellerRecord[];
   checkInStatus: Record<string, boolean>;
   onChange: (rows: TravellerRecord[]) => void;
   onCheckInChange: (status: Record<string, boolean>) => void;
+  showSeats?: boolean;
 }) {
   return (
     <div className="sm:col-span-2">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-sm text-stone-500">Seat numbers &amp; check-in</p>
-        <button
-          type="button"
-          onClick={() => onChange([...rows, { name: "", value: "" }])}
-          className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2 py-1 text-xs"
-        >
-          <Plus className="h-3 w-3" />
-          Add row
-        </button>
+        <p className="text-sm text-stone-500">
+          {showSeats ? "Seat numbers & check-in" : "Check-in"}
+        </p>
+        {showSeats ? (
+          <button
+            type="button"
+            onClick={() => onChange([...rows, { name: "", value: "" }])}
+            className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2 py-1 text-xs"
+          >
+            <Plus className="h-3 w-3" />
+            Add row
+          </button>
+        ) : null}
       </div>
       <div className="space-y-2">
-        {rows.map((row, index) => (
-          <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+        {(showSeats
+          ? rows
+          : rows.length > 0
+            ? rows
+            : [{ name: "", value: "" }]
+        ).map((row, index) => (
+          <div
+            key={index}
+            className={[
+              "grid gap-2",
+              showSeats
+                ? "sm:grid-cols-[1fr_1fr_auto_auto]"
+                : "sm:grid-cols-[1fr_auto_auto]",
+            ].join(" ")}
+          >
             <select
               value={row.name}
               onChange={(e) => {
                 const next = [...rows];
+                if (!showSeats && next.length === 0) {
+                  onChange([{ name: e.target.value, value: "" }]);
+                  return;
+                }
                 next[index] = { ...row, name: e.target.value };
                 onChange(next);
               }}
@@ -682,17 +763,19 @@ function SeatCheckInEditor({
                 </option>
               ))}
             </select>
-            <input
-              type="text"
-              value={row.value}
-              placeholder="Seat"
-              onChange={(e) => {
-                const next = [...rows];
-                next[index] = { ...row, value: e.target.value };
-                onChange(next);
-              }}
-              className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
-            />
+            {showSeats ? (
+              <input
+                type="text"
+                value={row.value}
+                placeholder="Seat"
+                onChange={(e) => {
+                  const next = [...rows];
+                  next[index] = { ...row, value: e.target.value };
+                  onChange(next);
+                }}
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+              />
+            ) : null}
             <label className="flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm">
               <input
                 type="checkbox"
@@ -707,13 +790,15 @@ function SeatCheckInEditor({
               />
               Checked in
             </label>
-            <button
-              type="button"
-              onClick={() => onChange(rows.filter((_, i) => i !== index))}
-              className="rounded-lg border border-red-200 px-3 py-2 text-red-600"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            {showSeats ? (
+              <button
+                type="button"
+                onClick={() => onChange(rows.filter((_, i) => i !== index))}
+                className="rounded-lg border border-red-200 px-3 py-2 text-red-600"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            ) : null}
           </div>
         ))}
       </div>
@@ -859,7 +944,12 @@ export function AdminItemDetailsForm({
             flightTravellers={structured.travellers}
           />
           <SeatCheckInEditor
-            rows={structured.seats}
+            rows={
+              structured.segments.length >= 2
+                ? structured.travellers.map((name) => ({ name, value: "" }))
+                : structured.seats
+            }
+            showSeats={structured.segments.length < 2}
             checkInStatus={structured.checkInStatus}
             onChange={(seats) => onChange({ ...structured, seats })}
             onCheckInChange={(checkInStatus) =>
@@ -894,6 +984,7 @@ export function AdminItemDetailsForm({
           {structured.segments.length > 0 ? (
             <FlightSegmentsEditor
               segments={structured.segments}
+              travellers={structured.travellers}
               onChange={(segments) => onChange({ ...structured, segments })}
             />
           ) : (
@@ -1067,6 +1158,12 @@ export function AdminItemDetailsForm({
           <TextInput label="From" value={structured.simple.from} onChange={(v) => setSimple("from", v)} />
           <TextInput label="To" value={structured.simple.to} onChange={(v) => setSimple("to", v)} />
           <TextInput label="Handler" value={structured.simple.handler} onChange={(v) => setSimple("handler", v)} />
+          <ParticipantMultiSelect
+            value={structured.participants}
+            onChange={(participants) =>
+              onChange(patchStructured(structured, { participants }))
+            }
+          />
         </>
       )}
 

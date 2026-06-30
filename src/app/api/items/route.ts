@@ -2,6 +2,7 @@ import { asc, eq, isNull, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireAuth, requireEditAccess, isAuthError } from "@/lib/api-auth";
 import { logAuditEvent } from "@/lib/activity-log";
+import { logOperationError } from "@/lib/error-log";
 import { db } from "@/lib/db";
 import { applyItemDatetimeOverrides } from "@/lib/item-schedule-datetime";
 import { enrichFlightTimezoneDetails } from "@/lib/airport-timezone-resolver";
@@ -47,66 +48,82 @@ export async function POST(request: Request) {
   const user = await requireEditAccess();
   if (isAuthError(user)) return user;
 
-  let body = await request.json();
-  if (body.category === "flight" && body.details && typeof body.details === "object") {
-    const incoming = body.details as Record<string, unknown>;
-    const enriched = await enrichFlightTimezoneDetails(body.details);
-    body = {
-      ...body,
-      details: {
-        ...enriched,
-        isPrivate: Boolean(incoming.isPrivate),
-        privateViewers: Array.isArray(incoming.privateViewers)
-          ? incoming.privateViewers
-          : Array.isArray(incoming.extraViewers)
-            ? incoming.extraViewers
-            : [],
-        extraViewers: undefined,
-      },
-    };
-  }
-  body = applyItemDatetimeOverrides(body);
+  try {
+    let body = await request.json();
+    if (body.category === "flight" && body.details && typeof body.details === "object") {
+      const incoming = body.details as Record<string, unknown>;
+      const enriched = await enrichFlightTimezoneDetails(body.details);
+      body = {
+        ...body,
+        details: {
+          ...enriched,
+          isPrivate: Boolean(incoming.isPrivate),
+          privateViewers: Array.isArray(incoming.privateViewers)
+            ? incoming.privateViewers
+            : Array.isArray(incoming.extraViewers)
+              ? incoming.extraViewers
+              : [],
+          extraViewers: undefined,
+        },
+      };
+    }
+    body = applyItemDatetimeOverrides(body);
 
-  if (!body.category || !body.title) {
+    if (!body.category || !body.title) {
+      return NextResponse.json(
+        { error: "category and title are required" },
+        { status: 400 },
+      );
+    }
+
+    const days = await getDays();
+    const scheduled = normalizeItemSchedule(
+      {
+        dayId: body.dayId ?? null,
+        eventDate: body.eventDate ?? null,
+        startDatetime: body.startDatetime ? new Date(body.startDatetime) : null,
+      },
+      days,
+    );
+
+    const [item] = await db
+      .insert(itineraryItems)
+      .values({
+        dayId: scheduled.dayId,
+        parentItemId: body.parentItemId ?? null,
+        category: body.category,
+        title: body.title,
+        summary: body.summary ?? null,
+        eventDate: scheduled.eventDate,
+        startDatetime: body.startDatetime ? new Date(body.startDatetime) : null,
+        endDatetime: body.endDatetime ? new Date(body.endDatetime) : null,
+        sortOrder: body.sortOrder ?? 0,
+        details: body.details ?? {},
+      })
+      .returning();
+
+    await bumpSyncVersion();
+    await logAuditEvent({
+      user,
+      action: "create",
+      resourceType: "item",
+      resourceId: item.id,
+      summary: `Created ${item.category} item "${item.title}"`,
+    });
+    return NextResponse.json(item, { status: 201 });
+  } catch (error) {
+    console.error("POST /api/items failed:", error);
+    await logOperationError({
+      operation: "create",
+      resourceType: "item",
+      summary: "Failed to create itinerary item",
+      error,
+      userId: user.id,
+      username: user.username,
+    });
     return NextResponse.json(
-      { error: "category and title are required" },
-      { status: 400 },
+      { error: error instanceof Error ? error.message : "Failed to save item." },
+      { status: 500 },
     );
   }
-
-  const days = await getDays();
-  const scheduled = normalizeItemSchedule(
-    {
-      dayId: body.dayId ?? null,
-      eventDate: body.eventDate ?? null,
-      startDatetime: body.startDatetime ? new Date(body.startDatetime) : null,
-    },
-    days,
-  );
-
-  const [item] = await db
-    .insert(itineraryItems)
-    .values({
-      dayId: scheduled.dayId,
-      parentItemId: body.parentItemId ?? null,
-      category: body.category,
-      title: body.title,
-      summary: body.summary ?? null,
-      eventDate: scheduled.eventDate,
-      startDatetime: body.startDatetime ? new Date(body.startDatetime) : null,
-      endDatetime: body.endDatetime ? new Date(body.endDatetime) : null,
-      sortOrder: body.sortOrder ?? 0,
-      details: body.details ?? {},
-    })
-    .returning();
-
-  await bumpSyncVersion();
-  await logAuditEvent({
-    user,
-    action: "create",
-    resourceType: "item",
-    resourceId: item.id,
-    summary: `Created ${item.category} item "${item.title}"`,
-  });
-  return NextResponse.json(item, { status: 201 });
 }

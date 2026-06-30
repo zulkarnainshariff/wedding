@@ -14,6 +14,14 @@ export const RSVP_STATUS_LABELS: Record<RsvpStatus, string> = {
   not_confirmed: "Not confirmed",
 };
 
+/** Labels for summary stat cards (invitation counts, not guest headcount). */
+export const RSVP_SUMMARY_STAT_LABELS: Record<RsvpStatus, string> = {
+  attending: "Invitations confirmed",
+  not_attending: "Invitations declined",
+  not_responded: "Awaiting response",
+  not_confirmed: "Not confirmed",
+};
+
 export type GuestListAccess = {
   eventId: number;
   eventSlug: string;

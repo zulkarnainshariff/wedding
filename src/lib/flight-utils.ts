@@ -11,6 +11,7 @@ type RawFlight = {
   date: string;
   day?: string;
   travellers: string[];
+  participants?: string[];
   flightNumber?: string | null;
   from: string;
   to: string;
@@ -150,6 +151,9 @@ export function buildPetRelocationDetails(flight: RawFlight): PetRelocationDetai
     to: flight.to,
     handler: "Pet relocation company",
     transportMode: "cargo",
+    participants: flight.participants
+      ? normalizeTravellerList(flight.participants)
+      : undefined,
     dayOfWeek: flight.day,
     departureTime: flight.departureTime,
     arrivalTime: flight.arrivalTime,
