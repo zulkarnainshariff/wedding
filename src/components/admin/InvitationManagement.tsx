@@ -26,11 +26,19 @@ export function InvitationManagement({
 }) {
   const router = useRouter();
   const [events, setEvents] = useState(initialEvents);
-  const [selectedId, setSelectedId] = useState(initialEvents[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<number | null>(
+    initialEvents[0]?.id ?? null,
+  );
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [newItem, setNewItem] = useState(EMPTY_SCHEDULE_ITEM);
+  const [newEvent, setNewEvent] = useState({
+    name: "",
+    slug: "",
+    eventDate: new Date().toISOString().slice(0, 10),
+    location: "",
+  });
 
   const selected = events.find((event) => event.id === selectedId) ?? null;
   const cardFront = (selected?.cardFront ?? {}) as InvitationCardFront;
@@ -68,6 +76,77 @@ export function InvitationManagement({
           : event,
       ),
     );
+  }
+
+  async function deleteEvent() {
+    if (!selected) return;
+    if (
+      !confirm(
+        `Delete "${selected.name}"? Guest lists, tasks, gallery photos, and guestbook entries for this event will also be removed.`,
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    const response = await fetch(`/api/events/${selected.id}`, {
+      method: "DELETE",
+    });
+    setBusy(false);
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      setError(payload.error ?? "Failed to delete event.");
+      return;
+    }
+
+    const remaining = events.filter((event) => event.id !== selected.id);
+    setEvents(remaining);
+    setSelectedId(remaining[0]?.id ?? null);
+    setStatus("Event deleted.");
+    router.refresh();
+  }
+
+  async function createEvent() {
+    if (!newEvent.name.trim()) {
+      setError("Event name is required.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setStatus(null);
+
+    const response = await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: newEvent.name.trim(),
+        slug: newEvent.slug.trim() || undefined,
+        eventDate: newEvent.eventDate,
+        location: newEvent.location.trim() || null,
+      }),
+    });
+
+    setBusy(false);
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      setError(payload.error ?? "Failed to create event.");
+      return;
+    }
+
+    const created = (await response.json()) as EventWithSchedule;
+    setEvents((current) => [...current, created]);
+    setSelectedId(created.id);
+    setNewEvent({
+      name: "",
+      slug: "",
+      eventDate: new Date().toISOString().slice(0, 10),
+      location: "",
+    });
+    setStatus(`Created ${created.name}.`);
+    router.refresh();
   }
 
   async function saveEvent() {
@@ -177,11 +256,89 @@ export function InvitationManagement({
 
   if (!selected) {
     return (
-      <p className="text-sm text-stone-500">
-        No invitation events yet. Run{" "}
-        <code className="rounded bg-stone-100 px-1">npm run db:seed-invitations</code>{" "}
-        to create the default events.
-      </p>
+      <SectionShell
+        title={events.length > 0 ? "New invitation event" : "Invitation events"}
+      >
+        {events.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setSelectedId(events[0]?.id ?? null)}
+            className="mb-4 text-sm text-brand-deep hover:underline"
+          >
+            ← Back to {events[0]?.name ?? "events"}
+          </button>
+        )}
+        <p className="mb-4 text-sm text-stone-500">
+          Create a celebration for the public landing page. Each event has its
+          own flip card, schedule, guest list, and RSVP settings.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm sm:col-span-2">
+            <span className="mb-1 block text-stone-500">Event name</span>
+            <input
+              value={newEvent.name}
+              onChange={(e) =>
+                setNewEvent((current) => ({ ...current, name: e.target.value }))
+              }
+              placeholder="Philadelphia Wedding"
+              className="w-full rounded-lg border border-stone-200 px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block text-stone-500">URL slug</span>
+            <input
+              value={newEvent.slug}
+              onChange={(e) =>
+                setNewEvent((current) => ({ ...current, slug: e.target.value }))
+              }
+              placeholder="philadelphia"
+              className="w-full rounded-lg border border-stone-200 px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block text-stone-500">Event date</span>
+            <input
+              type="date"
+              value={newEvent.eventDate}
+              onChange={(e) =>
+                setNewEvent((current) => ({
+                  ...current,
+                  eventDate: e.target.value,
+                }))
+              }
+              className="w-full rounded-lg border border-stone-200 px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm sm:col-span-2">
+            <span className="mb-1 block text-stone-500">Location</span>
+            <input
+              value={newEvent.location}
+              onChange={(e) =>
+                setNewEvent((current) => ({
+                  ...current,
+                  location: e.target.value,
+                }))
+              }
+              placeholder="Philadelphia, Pennsylvania"
+              className="w-full rounded-lg border border-stone-200 px-3 py-2"
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void createEvent()}
+          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          <Plus className="h-4 w-4" />
+          Create event
+        </button>
+        {error && (
+          <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+      </SectionShell>
     );
   }
 
@@ -189,7 +346,7 @@ export function InvitationManagement({
     <SectionShell
       title="Invitation cards"
       toolbar={
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {events.map((event) => (
             <button
               key={event.id}
@@ -205,10 +362,33 @@ export function InvitationManagement({
               {event.name}
             </button>
           ))}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setSelectedId(null);
+              setError(null);
+              setStatus(null);
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-dashed border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 hover:border-brand/40 hover:text-brand-deep"
+          >
+            <Plus className="h-4 w-4" />
+            New event
+          </button>
         </div>
       }
     >
-
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void deleteEvent()}
+          className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete event
+        </button>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm sm:col-span-2">
           <span className="mb-1 block text-stone-500">Event name</span>

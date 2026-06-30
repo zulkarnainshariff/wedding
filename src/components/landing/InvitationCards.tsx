@@ -6,13 +6,18 @@ import type {
   PublicScheduleItem,
 } from "@/lib/invitation-types";
 import { FlipInvitationCard } from "./FlipInvitationCard";
+import { PublicFeatureLinks } from "./PublicFeatureLinks";
 
 export function InvitationCards({
   events,
   centered = true,
+  guestbookEnabled = false,
+  photoGalleryEnabled = false,
 }: {
   events: Array<PublicInvitationEvent & { schedule: PublicScheduleItem[] }>;
   centered?: boolean;
+  guestbookEnabled?: boolean;
+  photoGalleryEnabled?: boolean;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -64,6 +69,11 @@ export function InvitationCards({
         event={activeEvent}
         flipped={flipped}
         onFlip={() => setFlipped((current) => !current)}
+      />
+
+      <PublicFeatureLinks
+        guestbookEnabled={guestbookEnabled}
+        photoGalleryEnabled={photoGalleryEnabled}
       />
 
       <p className="mt-8 max-w-sm text-center text-sm text-muted">

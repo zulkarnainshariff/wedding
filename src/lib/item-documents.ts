@@ -20,9 +20,18 @@ export const MAX_DOCUMENT_BYTES = 12 * 1024 * 1024;
 
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
+  "application/x-pdf",
   "image/jpeg",
   "image/png",
   "image/webp",
+]);
+
+const ALLOWED_EXTENSIONS = new Set([
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
 ]);
 
 export function travellerInParty(
@@ -92,6 +101,39 @@ export function sanitizeFileName(fileName: string): string {
 export function isAllowedDocumentMime(mimeType: string | null): boolean {
   if (!mimeType) return false;
   return ALLOWED_MIME_TYPES.has(mimeType);
+}
+
+function extensionOf(fileName: string): string {
+  return path.extname(fileName).toLowerCase();
+}
+
+export function isAllowedDocumentUpload(
+  fileName: string,
+  mimeType: string | null,
+): boolean {
+  if (mimeType && ALLOWED_MIME_TYPES.has(mimeType)) return true;
+  return ALLOWED_EXTENSIONS.has(extensionOf(fileName));
+}
+
+export function resolveDocumentMimeType(
+  fileName: string,
+  mimeType: string | null,
+): string {
+  if (mimeType && ALLOWED_MIME_TYPES.has(mimeType)) return mimeType;
+
+  switch (extensionOf(fileName)) {
+    case ".pdf":
+      return "application/pdf";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".png":
+      return "image/png";
+    case ".webp":
+      return "image/webp";
+    default:
+      return mimeType?.trim() || "application/octet-stream";
+  }
 }
 
 export async function ensureUploadDir(): Promise<void> {

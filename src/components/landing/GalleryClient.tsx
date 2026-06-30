@@ -51,10 +51,7 @@ export function GalleryClient({
   if (!galleryVisible) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
-        <PublicHeader
-          guestbookEnabled={guestbookEnabled}
-          photoGalleryEnabled={photoGalleryEnabled}
-        />
+        <PublicHeader />
         <main className="mx-auto w-full max-w-5xl px-4 py-24 text-center">
           <p className="text-stone-600">The photo gallery is not open right now.</p>
         </main>
@@ -64,10 +61,7 @@ export function GalleryClient({
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <PublicHeader
-        guestbookEnabled={guestbookEnabled}
-        photoGalleryEnabled={photoGalleryEnabled}
-      />
+      <PublicHeader />
       <main className="mx-auto w-full max-w-5xl px-4 py-24">
         <h1 className="font-serif text-3xl text-brand-deep">Photo gallery</h1>
         <p className="mt-2 text-sm text-stone-500">

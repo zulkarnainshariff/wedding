@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Database, Upload } from "lucide-react";
+import { Database, Download, Upload } from "lucide-react";
 import { SectionShell } from "@/components/layout/PageShell";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
@@ -47,6 +47,36 @@ export function DatabaseOperationsPanel() {
   useEffect(() => {
     void loadMeta();
   }, [loadMeta]);
+
+  async function runDumpDownload() {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const response = await fetch("/api/system/dump-download");
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        setStatus(payload.error ?? "Database download failed.");
+        return;
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? todayDumpName;
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+
+      setStatus(`Downloaded ${filename} (${formatBytes(blob.size)}).`);
+      await loadMeta();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function runDumpDeploy() {
     setBusy(true);
@@ -100,6 +130,24 @@ export function DatabaseOperationsPanel() {
 
   return (
     <>
+      <SectionShell title="Download database dump">
+        <p className="mb-4 text-sm text-stone-500">
+          Export all application tables as a SQL file in your browser. Use this
+          to copy production data to your local machine, then restore it from
+          Admin → Diagnostics → Restore from seed file (or{" "}
+          <code className="text-xs">npm run db:dump-seed</code> locally).
+        </p>
+        <button
+          type="button"
+          onClick={() => void runDumpDownload()}
+          disabled={busy}
+          className="inline-flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+        >
+          <Download className="h-4 w-4" />
+          Download {todayDumpName}
+        </button>
+      </SectionShell>
+
       <SectionShell title="Deploy database dump">
         <p className="mb-4 text-sm text-stone-500">
           Dump all application data to a dated SQL file and upload it to the
