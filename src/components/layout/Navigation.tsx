@@ -13,6 +13,7 @@ import {
   Users,
   X,
   CheckSquare,
+  FileText,
 } from "lucide-react";
 import { AppMark } from "@/components/ui/AppMark";
 import { SidebarSyncIconButton } from "@/components/auth/SidebarSyncIconButton";
@@ -34,6 +35,7 @@ type NavCategory =
   | "guests"
   | "invitations"
   | "tasks"
+  | "documents"
   | "flights_hub";
 
 const BASE_NAV_ITEMS: {
@@ -63,6 +65,7 @@ const BASE_NAV_ITEMS: {
     label: CATEGORY_META.travel_insurance.label,
     category: "travel_insurance",
   },
+  { href: "/itinerary/documents", label: "Documents", category: "documents" },
   { href: "/invitation", label: "Invitations", category: "invitations" },
   { href: "/guests", label: "Guest lists", category: "guests" },
   { href: "/tasks", label: "Tasks", category: "tasks" },
@@ -97,6 +100,7 @@ function useNavItems() {
       );
     }
     if (item.category === "tasks") return true;
+    if (item.category === "documents") return true;
     if (item.category === "all") return true;
     if (item.category === "flights_hub") {
       return canView("flight") || canView("pet_relocation");
@@ -132,6 +136,8 @@ function NavLink({
         ? pathname.startsWith("/guests")
           : href === "/tasks"
             ? pathname.startsWith("/tasks")
+            : href === "/itinerary/documents"
+              ? pathname.startsWith("/itinerary/documents")
             : category === "all"
             ? pathname === "/itinerary"
             : category === "flights_hub"
@@ -147,6 +153,8 @@ function NavLink({
         ? Users
         : href === "/tasks"
           ? CheckSquare
+          : href === "/itinerary/documents"
+            ? FileText
           : href === "/admin"
             ? Pencil
             : href === "/settings"
@@ -157,7 +165,8 @@ function NavLink({
                     category !== "all" &&
                     category !== "guests" &&
                     category !== "invitations" &&
-                    category !== "tasks"
+                    category !== "tasks" &&
+                    category !== "documents"
                   ? CATEGORY_ICONS[category as Category]
                   : LayoutGrid;
 
