@@ -2,6 +2,7 @@ import {
   extractItemTravellers,
   travellerMatchesUsername,
 } from "@/lib/item-travellers";
+import { extractItemAdditionalViewers } from "@/lib/item-viewers";
 import type { SessionUser } from "@/lib/permissions";
 import type { ItineraryItem } from "@/lib/schema";
 import { isAdminSession } from "@/lib/role-levels";
@@ -47,11 +48,23 @@ export function userIsPrivateViewer(
   return privateViewers.includes(user.username.toLowerCase());
 }
 
+export function userIsAdditionalViewer(
+  item: ItineraryItem,
+  user: SessionUser,
+): boolean {
+  const viewers = extractItemAdditionalViewers(item.details);
+  return viewers.some((viewer) =>
+    travellerMatchesUsername(viewer, user.username),
+  );
+}
+
 export function canViewPrivateItem(
   item: ItineraryItem,
   user: SessionUser,
 ): boolean {
   if (isAdminSession(user.roleLevel)) return true;
   if (userIsItemParticipant(item, user)) return true;
-  return userIsPrivateViewer(item, user);
+  if (userIsPrivateViewer(item, user)) return true;
+  if (userIsAdditionalViewer(item, user)) return true;
+  return false;
 }

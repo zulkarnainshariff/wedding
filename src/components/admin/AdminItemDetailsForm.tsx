@@ -10,6 +10,10 @@ import {
   type TravellerRecord,
 } from "@/lib/admin-item-details";
 import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
+import {
+  additionalViewerOptions,
+  participantNamesForItemCategory,
+} from "@/lib/item-viewers";
 import { travellerMatchesUsername } from "@/lib/item-travellers";
 import type { BookingGroup } from "@/lib/booking-groups";
 import {
@@ -143,6 +147,7 @@ function patchStructured(
     privateViewers: patch.privateViewers
       ? [...patch.privateViewers]
       : [...structured.privateViewers],
+    viewers: patch.viewers ? [...patch.viewers] : [...structured.viewers],
   };
 }
 
@@ -862,6 +867,14 @@ export function AdminItemDetailsForm({
       ),
     [allSystemUsernames, participantUsernames],
   );
+  const itemAdditionalViewerOptions = useMemo(
+    () =>
+      additionalViewerOptions(
+        participantNamesForItemCategory(structured, category),
+        structured.viewers,
+      ),
+    [structured, category],
+  );
 
   const setSimple = (key: string, value: string) =>
     onChange({
@@ -1233,6 +1246,22 @@ export function AdminItemDetailsForm({
       )}
 
       <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-4 sm:col-span-2">
+        <CheckboxDropdown
+          label="Additional viewers"
+          options={itemAdditionalViewerOptions}
+          value={structured.viewers}
+          onChange={(viewers) =>
+            onChange(patchStructured(structured, { viewers }))
+          }
+          emptyLabel="No additional viewers"
+        />
+        <p className="mt-2 text-xs text-stone-500">
+          Travellers who should see this item but are not listed as participants
+          above — for example someone being picked up at the airport.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-4 sm:col-span-2">
         <label className="flex items-start gap-2 text-sm">
           <input
             type="checkbox"
@@ -1245,7 +1274,7 @@ export function AdminItemDetailsForm({
           <span>
             <span className="font-medium text-stone-800">Private item</span>
             <span className="mt-0.5 block text-xs text-stone-500">
-              Only participants on this item, additional viewers allowed below, and admins can
+              Only participants on this item, additional viewers above, and admins can
               see it — even when someone&apos;s schedule filter is set to
               Everyone.
             </span>

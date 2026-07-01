@@ -31,6 +31,7 @@ import { useLinkedItem } from "@/hooks/useLinkedItem";
 import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/activity-utils";
 import { getItemLocation } from "@/lib/item-location";
+import { extractItemAdditionalViewers } from "@/lib/item-viewers";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import {
   CATEGORY_META,
@@ -127,6 +128,17 @@ function MapLink({
   );
 }
 
+function AdditionalViewersRow({ details }: { details: unknown }) {
+  const viewers = extractItemAdditionalViewers(details);
+  if (viewers.length === 0) return null;
+
+  return (
+    <dl>
+      <DetailRow label="Also visible to" value={viewers.join(", ")} />
+    </dl>
+  );
+}
+
 function ActivityDetail({
   details,
   linkedItem,
@@ -158,12 +170,6 @@ function ActivityDetail({
           label="Participants"
           value={details.participants?.join(", ")}
         />
-        {details.activityType === "sub_item" && details.viewers?.length ? (
-          <DetailRow
-            label="Also visible to"
-            value={details.viewers.join(", ")}
-          />
-        ) : null}
         <DetailRow label="Location" value={details.location?.name} />
         <DetailRow label="Airport" value={details.location?.airportCode} />
       </dl>
@@ -557,6 +563,7 @@ function ItemDetailBody({
       {category === "travel_insurance" && (
         <InsuranceDetail details={item.details as TravelInsuranceDetails} />
       )}
+      <AdditionalViewersRow details={item.details} />
       {!item.parentItemId && <ItemSubItemsSection item={item} />}
       {!item.parentItemId && <ItemDocumentsSection item={item} />}
       <ItemTaskSection item={item} />

@@ -13,6 +13,7 @@ import { airlineInfoFromFlightNumbers } from "@/lib/airlines";
 import { formatFlightNumberDisplay, parseLegacyFlightNumber } from "@/lib/flight-numbers";
 import { buildLocationPayload, getItemLocation } from "@/lib/item-location";
 import { mergeItemPrivacyFields } from "@/lib/admin-item-privacy";
+import { extractItemAdditionalViewers } from "@/lib/item-viewers";
 import { parsePrivateViewers } from "@/lib/item-privacy";
 import { TRAVELLER_NAMES } from "@/lib/travellers";
 import type { UnitsPreference } from "@/lib/user-preferences";
@@ -26,6 +27,7 @@ export type StructuredItemDetails = {
   locationMapUrl: string;
   isPrivate: boolean;
   privateViewers: string[];
+  viewers: string[];
   travellers: string[];
   bookingGroups: BookingGroup[];
   seats: TravellerRecord[];
@@ -123,6 +125,7 @@ export function emptyStructuredDetails(category: Category): StructuredItemDetail
     locationMapUrl: "",
     isPrivate: false,
     privateViewers: [],
+    viewers: [],
     travellers: [],
     bookingGroups: [],
     seats: [],
@@ -177,6 +180,7 @@ export function parseStructuredDetails(
   structured.privateViewers = parsePrivateViewers(
     details.privateViewers ?? details.extraViewers,
   );
+  structured.viewers = extractItemAdditionalViewers(details);
   structured.notes = Array.isArray(details.notes)
     ? (details.notes as string[]).join("\n")
     : String(details.notes ?? "");

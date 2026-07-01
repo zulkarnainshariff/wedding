@@ -10,6 +10,7 @@ import {
   type SubItemFormState,
 } from "@/lib/item-subitems";
 import { travellerOptions } from "@/lib/admin-item-details";
+import { additionalViewerOptions } from "@/lib/item-viewers";
 import type { ItineraryItem } from "@/lib/schema";
 
 const EMPTY_FORM: SubItemFormState = {
@@ -36,8 +37,8 @@ function SubItemFormFields({
     [form.participants],
   );
   const viewerOptions = useMemo(
-    () => travellerOptions(form.viewers),
-    [form.viewers],
+    () => additionalViewerOptions(form.participants, form.viewers),
+    [form.participants, form.viewers],
   );
 
   return (

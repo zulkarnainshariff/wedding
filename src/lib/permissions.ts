@@ -5,10 +5,8 @@ import {
   travellerMatchesUsername,
 } from "./item-travellers";
 import { isItemPrivate, canViewPrivateItem } from "./item-privacy";
-import {
-  isSubItem,
-  subItemPeopleForPermission,
-} from "./item-subitems";
+import { isSubItem } from "./item-subitems";
+import { itemPeopleForPermission } from "./item-viewers";
 import { CATEGORIES, type Category } from "./types";
 
 import type { UserPreferences } from "./user-preferences";
@@ -203,9 +201,7 @@ export function canViewItemTravellers(
   }
 
   const allowed = user.permissions.viewTravellers;
-  const travellers = isSubItem(item)
-    ? subItemPeopleForPermission(item.details)
-    : extractItemTravellers(item.details, item.category);
+  const travellers = itemPeopleForPermission(item);
 
   if (travellers.length === 0) {
     return (
@@ -262,6 +258,19 @@ export function hasFullItemView(
 ): boolean {
   if (!canViewCategory(user, item.category as Category)) return false;
   return canViewItemTravellers(item, user);
+}
+
+/**
+ * Sub-item visibility uses only that sub-item's participants and additional
+ * viewers — not the parent item's viewer list.
+ */
+export function canViewSubItem(
+  subItem: ItineraryItem,
+  user: SessionUser,
+): boolean {
+  if (!isSubItem(subItem)) return false;
+  if (!canViewCategory(user, subItem.category as Category)) return false;
+  return canViewItemTravellers(subItem, user);
 }
 
 export function visibleCategories(user: SessionUser): Category[] | "all" {
