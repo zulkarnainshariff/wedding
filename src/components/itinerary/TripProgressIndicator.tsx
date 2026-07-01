@@ -3,17 +3,23 @@
 import { MapPin } from "lucide-react";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
+import { itemSectionId, scrollToElementById } from "@/lib/day-jump";
+import { findNextItineraryItem } from "@/lib/next-itinerary";
 import { computeTripProgress, formatDaysUntilStart } from "@/lib/trip-time";
-import type { ItineraryDay } from "@/lib/schema";
+import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
+import type { ItineraryItemWithSubItems } from "@/lib/item-subitem-utils";
 
 export function TripProgressIndicator({
   days,
+  items,
 }: {
   days: Pick<ItineraryDay, "date" | "dayNumber" | "title">[];
+  items?: ItineraryItemWithSubItems[];
 }) {
   const { effectiveDate, devMode } = useTripTime();
-  const { formatDateOnly } = useDisplayFormat();
+  const { formatDateOnly, formatDateTime, formatClockTime } = useDisplayFormat();
   const progress = computeTripProgress(days, effectiveDate);
+  const nextItem = items ? findNextItineraryItem(items, effectiveDate) : null;
 
   if (!progress) return null;
 
@@ -25,6 +31,21 @@ export function TripProgressIndicator({
       : progress.status === "complete"
         ? "Trip complete"
         : progress.currentDayTitle || `Day ${progress.currentDayNumber}`;
+
+  const nextItemTime = (() => {
+    if (!nextItem) return null;
+    const details =
+      nextItem.details && typeof nextItem.details === "object"
+        ? (nextItem.details as Record<string, unknown>)
+        : {};
+    if (typeof details.time === "string" && /^\d{2}:\d{2}$/.test(details.time)) {
+      return formatClockTime(details.time);
+    }
+    if (nextItem.startDatetime) {
+      return formatDateTime(nextItem.startDatetime);
+    }
+    return null;
+  })();
 
   return (
     <section className="theme-card mb-8 overflow-hidden rounded-2xl border bg-white">
@@ -98,6 +119,22 @@ export function TripProgressIndicator({
           </span>
           <span>{formatDateOnly(progress.endDate)}</span>
         </div>
+
+        {nextItem ? (
+          <button
+            type="button"
+            onClick={() => scrollToElementById(itemSectionId(nextItem.id))}
+            className="mt-4 w-full rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-left transition hover:border-brand/35 hover:bg-brand/10"
+          >
+            <p className="text-[11px] font-semibold tracking-wide text-brand-deep uppercase">
+              My next itinerary
+            </p>
+            <p className="mt-1 text-sm font-medium text-stone-900">{nextItem.title}</p>
+            {nextItemTime ? (
+              <p className="mt-0.5 text-xs text-stone-500">{nextItemTime}</p>
+            ) : null}
+          </button>
+        ) : null}
       </div>
     </section>
   );

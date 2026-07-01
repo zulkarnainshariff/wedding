@@ -12,6 +12,10 @@ import {
 import { travellerOptions } from "@/lib/admin-item-details";
 import { additionalViewerOptions } from "@/lib/item-viewers";
 import { useAccountUsernames } from "@/hooks/useAccountUsernames";
+import {
+  ViewerLinksFields,
+  updateViewersWithLinks,
+} from "@/components/admin/ViewerLinksFields";
 import type { ItineraryItem } from "@/lib/schema";
 
 const EMPTY_FORM: SubItemFormState = {
@@ -22,6 +26,7 @@ const EMPTY_FORM: SubItemFormState = {
   summary: "",
   participants: [],
   viewers: [],
+  viewerLinks: {},
 };
 
 function SubItemFormFields({
@@ -82,8 +87,22 @@ function SubItemFormFields({
           label="Additional viewers"
           options={viewerOptions}
           value={form.viewers}
-          onChange={(viewers) => setForm((current) => ({ ...current, viewers }))}
+          onChange={(viewers) =>
+            setForm((current) => ({
+              ...current,
+              viewers,
+              viewerLinks: updateViewersWithLinks(viewers, current.viewerLinks),
+            }))
+          }
           emptyLabel="No additional viewers"
+        />
+        <ViewerLinksFields
+          viewers={form.viewers}
+          viewerLinks={form.viewerLinks}
+          participantOptions={form.participants}
+          onChange={(viewerLinks) =>
+            setForm((current) => ({ ...current, viewerLinks }))
+          }
         />
         <p className="mt-1 text-xs text-stone-500">
           People who should see this sub-item but are not listed as participants

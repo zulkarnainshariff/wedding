@@ -9,6 +9,10 @@ import { SubItemRow } from "@/components/itinerary/SubItemDisplay";
 import { travellerOptions } from "@/lib/admin-item-details";
 import { additionalViewerOptions } from "@/lib/item-viewers";
 import { useAccountUsernames } from "@/hooks/useAccountUsernames";
+import {
+  ViewerLinksFields,
+  updateViewersWithLinks,
+} from "@/components/admin/ViewerLinksFields";
 import { getSubItemFormPlaceholders } from "@/lib/sub-item-placeholders";
 import type { ItineraryItem } from "@/lib/schema";
 
@@ -83,6 +87,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   const [summary, setSummary] = useState("");
   const [participants, setParticipants] = useState<string[]>([]);
   const [viewers, setViewers] = useState<string[]>([]);
+  const [viewerLinks, setViewerLinks] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -129,6 +134,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
         summary: summary.trim() || null,
         participants,
         viewers,
+        viewerLinks,
       }),
     });
     setSaving(false);
@@ -142,6 +148,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
     setSummary("");
     setParticipants([]);
     setViewers([]);
+    setViewerLinks({});
     await refresh();
   }
 
@@ -232,8 +239,17 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
                   label="Additional viewers"
                   options={viewerOptions}
                   value={viewers}
-                  onChange={setViewers}
+                  onChange={(nextViewers) => {
+                    setViewers(nextViewers);
+                    setViewerLinks(updateViewersWithLinks(nextViewers, viewerLinks));
+                  }}
                   emptyLabel="No additional viewers"
+                />
+                <ViewerLinksFields
+                  viewers={viewers}
+                  viewerLinks={viewerLinks}
+                  participantOptions={participants}
+                  onChange={setViewerLinks}
                 />
                 <p className="mt-1 text-xs text-stone-500">
                   People who should see this sub-item but are not listed as

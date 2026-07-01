@@ -22,6 +22,7 @@ import {
   subItemToFormState,
   type SubItemFormState,
 } from "@/lib/item-subitems";
+import { parseViewerLinks } from "@/lib/item-viewer-links";
 import {
   getParentItem,
   getSubItemsForParent,
@@ -129,6 +130,10 @@ export async function PUT(request: Request, { params }: Params) {
             (entry: unknown): entry is string => typeof entry === "string",
           )
         : subItemToFormState(existing).viewers,
+      viewerLinks:
+        body.viewerLinks !== undefined
+          ? parseViewerLinks(body.viewerLinks)
+          : subItemToFormState(existing).viewerLinks,
     };
 
     if (!form.title) {
