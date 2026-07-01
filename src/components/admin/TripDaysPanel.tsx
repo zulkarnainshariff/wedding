@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useEffect } from "react";
 import { Save } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { SectionShell } from "@/components/layout/PageShell";
@@ -19,11 +19,13 @@ export function TripDaysPanel({
   initialItems,
   tripStartDate,
   tripEndDate,
+  onDaysChanged,
 }: {
   initialDays: ItineraryDay[];
   initialItems: { dayId: number | null }[];
   tripStartDate: string | null;
   tripEndDate: string | null;
+  onDaysChanged?: () => void | Promise<void>;
 }) {
   const toast = useToast();
   const { formatDateOnlyWithWeekday, formatDateOnly } = useDisplayFormat();
@@ -38,6 +40,10 @@ export function TripDaysPanel({
   const [status, setStatus] = useState<string | null>(null);
   const editSectionRef = useRef<HTMLDivElement>(null);
   const [scrollToDayId, setScrollToDayId] = useState<number | null>(null);
+
+  useEffect(() => {
+    setDays(initialDays);
+  }, [initialDays]);
 
   const itemCounts = useMemo(() => {
     const counts = new Map<number, number>();
@@ -59,6 +65,7 @@ export function TripDaysPanel({
     if (response.ok) {
       setDays(await response.json());
     }
+    await onDaysChanged?.();
   }
 
   async function generateDays() {
@@ -77,8 +84,6 @@ export function TripDaysPanel({
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string;
         created?: number;
-        updated?: number;
-        unhidden?: number;
       };
       if (!response.ok) {
         const message = payload.error ?? "Could not generate days.";
@@ -87,11 +92,34 @@ export function TripDaysPanel({
         return;
       }
       const message =
-        payload.created || payload.unhidden
-          ? `Added ${payload.created ?? 0} missing day(s)${
-              payload.unhidden ? ` and restored ${payload.unhidden} hidden day(s)` : ""
-            } in the trip range.`
-          : "All days in the trip range are already present.";
+        (payload.created ?? 0) > 0
+          ? `Added ${payload.created} missing day(s). Use Renumber days to fix day numbers.`
+          : "All days in that range are already present.";
+      setStatus(message);
+      toast.success(message);
+      await refreshDays();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function renumberDays() {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const response = await fetch("/api/days/renumber", { method: "POST" });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        updated?: number;
+        total?: number;
+      };
+      if (!response.ok) {
+        const message = payload.error ?? "Could not renumber days.";
+        setStatus(message);
+        toast.error(message);
+        return;
+      }
+      const message = `Renumbered ${payload.total ?? 0} day(s) in date order (Day 1 through Day ${payload.total ?? 0}).`;
       setStatus(message);
       toast.success(message);
       await refreshDays();
@@ -254,10 +282,8 @@ export function TripDaysPanel({
 
       <SectionShell title="Trip date range">
         <p className="mb-4 text-sm text-stone-500">
-          Generate one itinerary day for every calendar date from start to end.
-          Missing dates (for example 4 Aug between 3 Aug and 5 Aug) are added
-          automatically. Existing titles, notes, and visibility are kept when
-          you regenerate.
+          Generate creates any missing calendar days between start and end. It does
+          not change day numbers — use Renumber days after adding or removing days.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
@@ -279,15 +305,25 @@ export function TripDaysPanel({
             />
           </label>
         </div>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void generateDays()}
-          className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          <Save className="h-4 w-4" />
-          Generate days
-        </button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void generateDays()}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            Generate days
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void renumberDays()}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 disabled:opacity-50"
+          >
+            Renumber days
+          </button>
+        </div>
       </SectionShell>
 
       <SectionShell title="Batch hide / unhide">
