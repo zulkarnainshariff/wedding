@@ -11,7 +11,7 @@ export function CheckboxDropdown({
   emptyLabel = "Select…",
   className = "",
 }: {
-  label: string;
+  label?: string;
   options: string[];
   value: string[];
   onChange: (value: string[]) => void;
@@ -37,7 +37,7 @@ export function CheckboxDropdown({
 
   return (
     <div className={["text-sm", className].join(" ")}>
-      <p className="mb-2 text-stone-500">{label}</p>
+      {label ? <p className="mb-2 text-stone-500">{label}</p> : null}
       <div className="relative">
         <button
           type="button"
@@ -53,7 +53,7 @@ export function CheckboxDropdown({
           <>
             <button
               type="button"
-              aria-label={`Close ${label}`}
+              aria-label={`Close ${label ?? emptyLabel}`}
               className="fixed inset-0 z-10"
               onClick={() => setOpen(false)}
             />

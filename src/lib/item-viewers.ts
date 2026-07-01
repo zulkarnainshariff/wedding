@@ -1,6 +1,7 @@
 import type { ItineraryItem } from "@/lib/schema";
 import {
   extractItemTravellers,
+  SYSTEM_ACCOUNT_USERNAMES,
   travellerMatchesUsername,
   usernameToTravellerName,
 } from "@/lib/item-travellers";
@@ -12,8 +13,6 @@ import {
 } from "@/lib/item-subitems";
 import { normalizeTravellerName } from "@/lib/travellers";
 import type { Category } from "@/lib/types";
-
-const SYSTEM_ACCOUNT_USERNAMES = new Set(["root", "admin"]);
 
 export function isParticipantPerson(
   person: string,

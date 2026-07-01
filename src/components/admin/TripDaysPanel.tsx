@@ -26,7 +26,7 @@ export function TripDaysPanel({
   tripEndDate: string | null;
 }) {
   const toast = useToast();
-  const { formatDateOnly } = useDisplayFormat();
+  const { formatDateOnlyWithWeekday, formatDateOnly } = useDisplayFormat();
   const [startDate, setStartDate] = useState(tripStartDate ?? "");
   const [endDate, setEndDate] = useState(tripEndDate ?? "");
   const [batchStartDate, setBatchStartDate] = useState(tripStartDate ?? "");
@@ -78,6 +78,7 @@ export function TripDaysPanel({
         error?: string;
         created?: number;
         updated?: number;
+        unhidden?: number;
       };
       if (!response.ok) {
         const message = payload.error ?? "Could not generate days.";
@@ -85,7 +86,12 @@ export function TripDaysPanel({
         toast.error(message);
         return;
       }
-      const message = `Generated ${payload.created ?? 0} new day(s).`;
+      const message =
+        payload.created || payload.unhidden
+          ? `Added ${payload.created ?? 0} missing day(s)${
+              payload.unhidden ? ` and restored ${payload.unhidden} hidden day(s)` : ""
+            } in the trip range.`
+          : "All days in the trip range are already present.";
       setStatus(message);
       toast.success(message);
       await refreshDays();
@@ -248,8 +254,10 @@ export function TripDaysPanel({
 
       <SectionShell title="Trip date range">
         <p className="mb-4 text-sm text-stone-500">
-          Generate one itinerary day for every calendar date in the range. Existing
-          titles, notes, and visibility are kept when you regenerate.
+          Generate one itinerary day for every calendar date from start to end.
+          Missing dates (for example 4 Aug between 3 Aug and 5 Aug) are added
+          automatically. Existing titles, notes, and visibility are kept when
+          you regenerate.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
@@ -418,7 +426,7 @@ export function TripDaysPanel({
                       Day {day.dayNumber} · {day.title || (untouched ? "Blank day" : free ? "Free day" : "Untitled")}
                     </p>
                     <p className="text-sm text-stone-500">
-                      {formatDateOnly(day.date)}
+                      {formatDateOnlyWithWeekday(day.date)}
                       {day.hidden ? " · Hidden" : ""}
                       {untouched ? " · Blank" : free ? " · No items" : ` · ${itemCount} item(s)`}
                     </p>

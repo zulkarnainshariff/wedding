@@ -80,7 +80,7 @@ export async function getDays() {
   return db
     .select()
     .from(itineraryDays)
-    .orderBy(asc(itineraryDays.dayNumber));
+    .orderBy(asc(itineraryDays.date));
 }
 
 export async function getTimeline() {

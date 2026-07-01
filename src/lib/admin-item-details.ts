@@ -16,7 +16,6 @@ import { mergeItemPrivacyFields } from "@/lib/admin-item-privacy";
 import { extractItemAdditionalViewers } from "@/lib/item-viewers";
 import { extractViewerLinks } from "@/lib/item-viewer-links";
 import { parsePrivateViewers } from "@/lib/item-privacy";
-import { TRAVELLER_NAMES } from "@/lib/travellers";
 import type { UnitsPreference } from "@/lib/user-preferences";
 
 export type TravellerRecord = { name: string; value: string };
@@ -286,16 +285,6 @@ export function parseStructuredDetails(
       structured.simple.guests = (details.guests as string[]).join(", ");
     } else if (typeof details.guests === "string" && details.guests.trim()) {
       structured.simple.guests = details.guests;
-      const parts = details.guests
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter(Boolean);
-      const knownGuests = parts.filter((name) =>
-        (TRAVELLER_NAMES as readonly string[]).includes(name),
-      );
-      if (knownGuests.length > 0) {
-        structured.participants = knownGuests;
-      }
     }
     structured.suggestions = Array.isArray(details.suggestions)
       ? (details.suggestions as AccommodationSuggestion[])
@@ -494,8 +483,4 @@ export function buildStructuredDetailsPayload(
 
 export function defaultTravellerRows(names: string[]): TravellerRecord[] {
   return names.map((name) => ({ name, value: "" }));
-}
-
-export function travellerOptions(existing: string[] = []): string[] {
-  return [...new Set([...TRAVELLER_NAMES, ...existing])];
 }
