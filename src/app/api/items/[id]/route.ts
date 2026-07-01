@@ -12,7 +12,18 @@ import {
 } from "@/lib/flight-segment-timing";
 import { getFlightDetails } from "@/lib/types";
 import { normalizeItemSchedule } from "@/lib/item-scheduling";
-import { filterItemsByPermission } from "@/lib/permissions";
+import {
+  filterItemsByPermission,
+} from "@/lib/permissions";
+import {
+  buildSubItemDetails,
+  getParentItem,
+  getSubItemsForParent,
+  isSubItem,
+  resolveSubItemStartDatetime,
+  subItemToFormState,
+  type SubItemFormState,
+} from "@/lib/item-subitems";
 import { itemDocuments, itineraryDays, itineraryItems } from "@/lib/schema";
 import { bumpSyncVersion } from "@/lib/sync";
 
@@ -51,11 +62,18 @@ export async function GET(_request: Request, { params }: Params) {
   }
 
   const filtered = filterItemsByPermission([item], user);
-  if (filtered.length === 0) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (filtered.length > 0) {
+    return NextResponse.json(filtered[0]);
   }
 
-  return NextResponse.json(filtered[0]);
+  if (item.parentItemId == null) {
+    const subitems = await getSubItemsForParent(item.id, user);
+    if (subitems.length > 0) {
+      return NextResponse.json({ ...item, limitedView: true });
+    }
+  }
+
+  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
 
 export async function PUT(request: Request, { params }: Params) {
@@ -63,7 +81,96 @@ export async function PUT(request: Request, { params }: Params) {
   if (isAuthError(user)) return user;
 
   const { id } = await params;
+  const itemId = Number(id);
+
+  const [existing] = await db
+    .select()
+    .from(itineraryItems)
+    .where(eq(itineraryItems.id, itemId))
+    .limit(1);
+
+  if (!existing) {
+    return NextResponse.json({ error: "Item not found" }, { status: 404 });
+  }
+
   let body = await request.json();
+
+  if (isSubItem(existing)) {
+    const parent = existing.parentItemId
+      ? await getParentItem(existing.parentItemId)
+      : null;
+    if (!parent) {
+      return NextResponse.json({ error: "Parent not found" }, { status: 404 });
+    }
+
+    const form: SubItemFormState = {
+      title: typeof body.title === "string" ? body.title.trim() : existing.title,
+      time:
+        typeof body.time === "string"
+          ? body.time.trim()
+          : subItemToFormState(existing).time,
+      locationName:
+        typeof body.locationName === "string" ? body.locationName.trim() : "",
+      locationMapUrl:
+        typeof body.locationMapUrl === "string" ? body.locationMapUrl.trim() : "",
+      summary:
+        typeof body.summary === "string"
+          ? body.summary.trim()
+          : subItemToFormState(existing).summary,
+      participants: Array.isArray(body.participants)
+        ? body.participants.filter(
+            (entry: unknown): entry is string => typeof entry === "string",
+          )
+        : subItemToFormState(existing).participants,
+    };
+
+    if (!form.title) {
+      return NextResponse.json({ error: "title is required" }, { status: 400 });
+    }
+
+    if (
+      !form.locationName &&
+      !form.locationMapUrl &&
+      body.locationName === undefined
+    ) {
+      const prior = subItemToFormState(existing);
+      form.locationName = prior.locationName;
+      form.locationMapUrl = prior.locationMapUrl;
+    }
+
+    const details = buildSubItemDetails(
+      form,
+      existing.details as Record<string, unknown>,
+    );
+    const startDatetime = resolveSubItemStartDatetime(parent, form.time);
+
+    const [item] = await db
+      .update(itineraryItems)
+      .set({
+        parentItemId: existing.parentItemId,
+        dayId: parent.dayId,
+        eventDate: parent.eventDate,
+        category: "activity",
+        title: form.title,
+        summary: form.summary || null,
+        startDatetime,
+        sortOrder: existing.sortOrder,
+        details,
+      })
+      .where(eq(itineraryItems.id, itemId))
+      .returning();
+
+    await bumpSyncVersion();
+    await logAuditEvent({
+      user,
+      action: "update",
+      resourceType: "item",
+      resourceId: item.id,
+      summary: `Updated sub-item "${item.title}"`,
+    });
+    return NextResponse.json(item);
+  }
+
   if (body.category === "flight" && body.details && typeof body.details === "object") {
     const incoming = body.details as Record<string, unknown>;
     let flightDetails = await enrichFlightTimezoneDetails(body.details);
@@ -99,7 +206,10 @@ export async function PUT(request: Request, { params }: Params) {
     .update(itineraryItems)
     .set({
       dayId: scheduled.dayId,
-      parentItemId: body.parentItemId ?? null,
+      parentItemId:
+        body.parentItemId !== undefined
+          ? body.parentItemId
+          : existing.parentItemId,
       category: body.category,
       title: body.title,
       summary: body.summary ?? null,

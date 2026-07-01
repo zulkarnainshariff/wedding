@@ -231,8 +231,11 @@ export function ItemCard({
         ? "Pet Relocation (cargo)"
         : CATEGORY_META[category as Category]?.label ?? item.category;
 
+  const subItems = item.subItems ?? [];
+  const limitedView = Boolean(item.limitedView);
+
   const showFlightDetails =
-    viewMode === "detailed" && category === "flight" && flightDetails;
+    !limitedView && viewMode === "detailed" && category === "flight" && flightDetails;
 
   const flightSchedule =
     category === "flight" ? formatFlightSchedule(item) : null;
@@ -247,7 +250,6 @@ export function ItemCard({
     category === "flight" &&
     (isFlightFullyCheckedIn(flightDetails) ||
       isFlightPartiallyCheckedIn(flightDetails));
-  const subItems = item.subItems ?? [];
   const router = useRouter();
   const autoCompleteRequestedRef = useRef(false);
 
@@ -366,6 +368,11 @@ export function ItemCard({
                     {subItems.length} sub-item{subItems.length === 1 ? "" : "s"}
                   </span>
                 )}
+                {limitedView && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 uppercase">
+                    Limited view
+                  </span>
+                )}
                 {completed && <ItemDoneBadge accent={doneAccent} />}
                 {category === "flight" && <FlightCheckInReminderPill item={item} />}
                 {flightCheckedIn && <FlightCheckInBadge />}
@@ -393,13 +400,13 @@ export function ItemCard({
             </div>
           </div>
 
-          {category === "flight" && flightRoute ? (
+          {category === "flight" && flightRoute && !limitedView ? (
             <p className="mt-1 text-xs font-semibold tracking-wide text-stone-600">
               {flightRoute}
             </p>
           ) : null}
 
-          {flightSummaryExtras.length > 0 ? (
+          {!limitedView && flightSummaryExtras.length > 0 ? (
             <div className="mt-1 space-y-0.5 text-sm text-stone-500">
               {flightSummaryExtras.map((part, index) => (
                 <p key={`${index}-${part}`} className="break-words">
@@ -437,7 +444,7 @@ export function ItemCard({
             <p className="mt-2 text-xs text-stone-400">{displayTime}</p>
           )}
 
-          {category === "flight" && flightSchedule && (
+          {category === "flight" && flightSchedule && !limitedView && (
             <div className="mt-2 space-y-0.5 text-xs text-stone-500">
               {flightSchedule.departure && (
                 <p>

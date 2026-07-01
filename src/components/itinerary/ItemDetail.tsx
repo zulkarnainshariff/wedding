@@ -45,6 +45,7 @@ import {
   type TravelInsuranceDetails,
 } from "@/lib/types";
 import { formatJourneyFlightLabel } from "@/lib/flight-numbers";
+import type { ItineraryItemWithSubItems } from "@/lib/item-subitem-utils";
 import type { ItineraryItem } from "@/lib/schema";
 
 function NotesBlock({
@@ -496,6 +497,7 @@ function ItemDetailBody({
   activityDetails,
   linkedItem,
   canEdit,
+  limitedView = false,
 }: {
   item: ItineraryItem;
   category: string;
@@ -506,7 +508,20 @@ function ItemDetailBody({
   activityDetails: ReturnType<typeof getActivityDetails>;
   linkedItem?: ItineraryItem | null;
   canEdit: boolean;
+  limitedView?: boolean;
 }) {
+  if (limitedView) {
+    return (
+      <>
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Limited view — you can see sub-items you are linked to, but not the
+          full details of this schedule entry.
+        </p>
+        <ItemSubItemsSection item={item} />
+      </>
+    );
+  }
+
   return (
     <>
       {category === "flight" && flightDetails && (
@@ -609,6 +624,7 @@ export function ItemDetailView({
   const sharedLocation = getItemLocation(item.details as Record<string, unknown>);
   const { formatDateTime, formatFlightSchedule } = useDisplayFormat();
   const documentCounts = useDocumentIndicators();
+  const limitedView = Boolean((item as ItineraryItemWithSubItems).limitedView);
 
   const header = (
     <ItemDetailHeader
@@ -639,6 +655,7 @@ export function ItemDetailView({
       activityDetails={activityDetails}
       linkedItem={linkedItem}
       canEdit={canEdit}
+      limitedView={limitedView}
     />
   );
 

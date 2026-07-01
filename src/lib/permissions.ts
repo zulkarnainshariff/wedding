@@ -229,6 +229,35 @@ export function filterItemsByPermission(
   });
 }
 
+export function parentHasVisibleSubitems(
+  parentId: number,
+  visibleSubitems: ItineraryItem[],
+): boolean {
+  return visibleSubitems.some((subitem) => subitem.parentItemId === parentId);
+}
+
+export function filterParentsWithSubitemAccess(
+  parents: ItineraryItem[],
+  visibleSubitems: ItineraryItem[],
+  user: SessionUser,
+): ItineraryItem[] {
+  return parents.filter((parent) => {
+    if (canViewCategory(user, parent.category as Category) &&
+        canViewItemTravellers(parent, user)) {
+      return true;
+    }
+    return parentHasVisibleSubitems(parent.id, visibleSubitems);
+  });
+}
+
+export function hasFullItemView(
+  item: ItineraryItem,
+  user: SessionUser,
+): boolean {
+  if (!canViewCategory(user, item.category as Category)) return false;
+  return canViewItemTravellers(item, user);
+}
+
 export function visibleCategories(user: SessionUser): Category[] | "all" {
   if (isAdminSession(user.roleLevel) || user.permissions.viewCategories === "all") {
     return "all";

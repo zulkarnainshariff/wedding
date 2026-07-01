@@ -1,15 +1,27 @@
-import { asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { asc, eq } from "drizzle-orm";
 import { isAuthError, requireAuth, requireEditAccess } from "@/lib/api-auth";
 import { db } from "@/lib/db";
-import { combineActivityDatetime } from "@/lib/activity-utils";
-import { buildLocationPayload } from "@/lib/item-location";
-import { getSubItemsForParent } from "@/lib/item-subitems";
+import {
+  buildSubItemDetails,
+  getParentItem,
+  getSubItemsForParent,
+  isSubItem,
+  resolveSubItemStartDatetime,
+} from "@/lib/item-subitems";
 import { filterItemsByPermission } from "@/lib/permissions";
 import { itineraryItems } from "@/lib/schema";
 import { bumpSyncVersion } from "@/lib/sync";
 
 type Params = { params: Promise<{ id: string }> };
+
+function parseParticipants(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
 
 export async function GET(_request: Request, { params }: Params) {
   const user = await requireAuth();
@@ -48,12 +60,7 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "title is required" }, { status: 400 });
   }
 
-  const [parent] = await db
-    .select()
-    .from(itineraryItems)
-    .where(eq(itineraryItems.id, parentId))
-    .limit(1);
-
+  const parent = await getParentItem(parentId);
   if (!parent) {
     return NextResponse.json({ error: "Parent not found" }, { status: 404 });
   }
@@ -63,37 +70,24 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const rawTime =
-    typeof body.time === "string"
-      ? body.time.trim()
-      : typeof body.timeLabel === "string"
-        ? body.timeLabel.trim()
-        : "";
-  const clockTime = /^\d{2}:\d{2}$/.test(rawTime) ? rawTime : rawTime || null;
-
-  const location = buildLocationPayload(
-    typeof body.locationName === "string" ? body.locationName.trim() : undefined,
-    typeof body.locationMapUrl === "string" ? body.locationMapUrl.trim() : undefined,
-  );
-
-  const details: Record<string, unknown> = {
-    activityType: "sub_item",
-    slug: `sub-${Date.now()}`,
-    time: clockTime,
-    description: body.summary?.trim() || undefined,
-    ...(location ? { location } : {}),
+  const form = {
+    title: String(body.title).trim(),
+    time:
+      typeof body.time === "string"
+        ? body.time.trim()
+        : typeof body.timeLabel === "string"
+          ? body.timeLabel.trim()
+          : "",
+    locationName:
+      typeof body.locationName === "string" ? body.locationName.trim() : "",
+    locationMapUrl:
+      typeof body.locationMapUrl === "string" ? body.locationMapUrl.trim() : "",
+    summary: typeof body.summary === "string" ? body.summary.trim() : "",
+    participants: parseParticipants(body.participants),
   };
 
-  let startDatetime: Date | null = null;
-  if (body.startDatetime) {
-    startDatetime = new Date(body.startDatetime);
-  } else if (
-    parent.eventDate &&
-    typeof clockTime === "string" &&
-    /^\d{2}:\d{2}$/.test(clockTime)
-  ) {
-    startDatetime = combineActivityDatetime(parent.eventDate, clockTime);
-  }
+  const details = buildSubItemDetails(form);
+  const startDatetime = resolveSubItemStartDatetime(parent, form.time);
 
   const siblings = await db
     .select({ sortOrder: itineraryItems.sortOrder })
@@ -111,8 +105,8 @@ export async function POST(request: Request, { params }: Params) {
       dayId: parent.dayId,
       eventDate: parent.eventDate,
       category: "activity",
-      title: body.title.trim(),
-      summary: body.summary?.trim() || null,
+      title: form.title,
+      summary: form.summary || null,
       startDatetime,
       sortOrder: body.sortOrder ?? nextSort,
       details,
