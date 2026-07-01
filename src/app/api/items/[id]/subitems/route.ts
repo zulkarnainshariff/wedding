@@ -4,11 +4,12 @@ import { isAuthError, requireAuth, requireEditAccess } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import {
   buildSubItemDetails,
-  getParentItem,
-  getSubItemsForParent,
-  isSubItem,
   resolveSubItemStartDatetime,
 } from "@/lib/item-subitems";
+import {
+  getParentItem,
+  getSubItemsForParent,
+} from "@/lib/item-subitems-server";
 import { filterItemsByPermission } from "@/lib/permissions";
 import { itineraryItems } from "@/lib/schema";
 import { bumpSyncVersion } from "@/lib/sync";
