@@ -192,10 +192,12 @@ export function ItemCard({
   item,
   taskSummary,
   documentCount,
+  itemSummaries = {},
 }: {
   item: ItineraryItemWithSubItems;
   taskSummary?: ItemTaskSummary;
   documentCount?: number;
+  itemSummaries?: Record<number, ItemTaskSummary>;
 }) {
   const { openItem, viewMode } = useItineraryUI();
   const {
@@ -573,6 +575,7 @@ export function ItemCard({
 
       <SubItemCascade
         subItems={subItems}
+        itemSummaries={itemSummaries}
         onSubItemClick={(id) => openItem(id)}
       />
     </div>

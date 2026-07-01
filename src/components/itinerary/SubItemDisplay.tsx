@@ -10,11 +10,13 @@ import {
   extractSubItemViewers,
 } from "@/lib/item-subitems";
 import { ViewerLinkedPill } from "@/components/itinerary/ViewerLinkedPill";
+import { ItemTaskIcon } from "@/components/itinerary/ItemTaskIcon";
 import {
   ItemCompleteToggle,
   ItemDoneBadge,
 } from "@/components/itinerary/ItemCompleteToggle";
 import type { ItineraryItem } from "@/lib/schema";
+import type { ItemTaskSummary } from "@/lib/task-queries";
 import { itemSectionId } from "@/lib/day-jump";
 
 function SubItemTime({
@@ -70,10 +72,12 @@ export function SubItemRow({
   subItem,
   compact = false,
   onClick,
+  taskSummary,
 }: {
   subItem: ItineraryItem;
   compact?: boolean;
   onClick?: () => void;
+  taskSummary?: ItemTaskSummary;
 }) {
   const { formatClockTime } = useDisplayFormat();
   const location = getItemLocation(subItem.details as Record<string, unknown>);
@@ -104,6 +108,7 @@ export function SubItemRow({
           {subItem.title}
         </p>
         {completed ? <ItemDoneBadge /> : null}
+        <ItemTaskIcon summary={taskSummary} />
         <ViewerLinkedPill item={subItem} />
       </div>
       {location?.mapLink && (
@@ -181,9 +186,11 @@ export function SubItemRow({
 export function SubItemCascade({
   subItems,
   onSubItemClick,
+  itemSummaries = {},
 }: {
   subItems: ItineraryItem[];
   onSubItemClick?: (id: number) => void;
+  itemSummaries?: Record<number, ItemTaskSummary>;
 }) {
   if (subItems.length === 0) return null;
 
@@ -198,6 +205,7 @@ export function SubItemCascade({
             <SubItemRow
               subItem={subItem}
               compact
+              taskSummary={itemSummaries[subItem.id]}
               onClick={
                 onSubItemClick ? () => onSubItemClick(subItem.id) : undefined
               }

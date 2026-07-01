@@ -46,6 +46,7 @@ export function CategoryList({
               item={item}
               taskSummary={itemSummaries[item.id]}
               documentCount={documentCounts[item.id]}
+              itemSummaries={itemSummaries}
             />
           ))}
         </div>

@@ -7,19 +7,23 @@ import { SubItemAdditionalViewersField } from "@/components/itinerary/SubItemAdd
 import { SubItemParticipantsField } from "@/components/itinerary/SubItemParticipantsField";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SubItemRow } from "@/components/itinerary/SubItemDisplay";
+import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 import { getSubItemFormPlaceholders } from "@/lib/sub-item-placeholders";
 import { parentItemParticipants } from "@/lib/item-subitems";
 import { useAccountUsernames } from "@/hooks/useAccountUsernames";
 import type { ItineraryItem } from "@/lib/schema";
+import type { ItemTaskSummary } from "@/lib/task-queries";
 
 function SubItemDetailRow({
   subItem,
   canEdit,
   onDelete,
+  taskSummary,
 }: {
   subItem: ItineraryItem;
   canEdit: boolean;
   onDelete: (id: number) => void;
+  taskSummary?: ItemTaskSummary;
 }) {
   const [open, setOpen] = useState(false);
   const description =
@@ -50,7 +54,7 @@ function SubItemDetailRow({
           <span className="w-5 shrink-0" />
         )}
         <div className="min-w-0 flex-1">
-          <SubItemRow subItem={subItem} />
+          <SubItemRow subItem={subItem} taskSummary={taskSummary} />
           {description && open && (
             <p className="px-3 pb-3 whitespace-pre-wrap text-sm text-stone-600">
               {description}
@@ -74,6 +78,7 @@ function SubItemDetailRow({
 
 export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   const { canEdit } = useAuth();
+  const { itemSummaries } = useTaskIndicators();
   const [subItems, setSubItems] = useState<ItineraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
@@ -186,6 +191,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
                 subItem={subItem}
                 canEdit={canEdit}
                 onDelete={requestDelete}
+                taskSummary={itemSummaries[subItem.id]}
               />
             ))}
           </div>
