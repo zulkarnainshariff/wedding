@@ -7,6 +7,7 @@ import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SubItemRow } from "@/components/itinerary/SubItemDisplay";
 import { travellerOptions } from "@/lib/admin-item-details";
+import { additionalViewerOptions } from "@/lib/item-viewers";
 import { getSubItemFormPlaceholders } from "@/lib/sub-item-placeholders";
 import type { ItineraryItem } from "@/lib/schema";
 
@@ -90,8 +91,8 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
     [participants],
   );
   const viewerOptions = useMemo(
-    () => travellerOptions(viewers),
-    [viewers],
+    () => additionalViewerOptions(participants, viewers),
+    [participants, viewers],
   );
 
   const refresh = useCallback(async () => {

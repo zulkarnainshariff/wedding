@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { filterItemsByPermission } from "@/lib/permissions";
+import { canViewSubItem } from "@/lib/permissions";
 import type { SessionUser } from "@/lib/permissions";
 import { itineraryItems } from "@/lib/schema";
 
@@ -14,7 +14,7 @@ export async function getSubItemsForParent(
     .where(eq(itineraryItems.parentItemId, parentItemId))
     .orderBy(asc(itineraryItems.sortOrder), asc(itineraryItems.startDatetime));
 
-  return filterItemsByPermission(items, user);
+  return items.filter((item) => canViewSubItem(item, user));
 }
 
 export async function getParentItem(parentItemId: number) {
