@@ -1,5 +1,6 @@
 import { combineActivityDatetime } from "@/lib/activity-utils";
 import { buildLocationPayload } from "@/lib/item-location";
+import { getItemCompletion, withItemCompletion } from "@/lib/item-completion";
 import { extractViewerLinks, normalizeViewerLinksPayload } from "@/lib/item-viewer-links";
 import { normalizeTravellerName } from "@/lib/travellers";
 import type { ItineraryItem } from "@/lib/schema";
@@ -105,7 +106,7 @@ export function buildSubItemDetails(
     ? form.time.trim()
     : null;
 
-  return {
+  const base: Record<string, unknown> = {
     activityType: "sub_item",
     slug:
       typeof existing.slug === "string" && existing.slug.trim()
@@ -118,6 +119,8 @@ export function buildSubItemDetails(
     viewerLinks: normalizeViewerLinksPayload(form.viewerLinks),
     ...(location ? { location } : {}),
   };
+
+  return withItemCompletion(base, getItemCompletion(existing));
 }
 
 export function resolveSubItemStartDatetime(

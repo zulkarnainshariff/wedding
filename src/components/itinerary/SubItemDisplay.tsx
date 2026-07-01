@@ -3,12 +3,17 @@
 import { MapPin } from "lucide-react";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { getItemLocation } from "@/lib/item-location";
+import { isItemCompleted } from "@/lib/item-completion";
 import { getSubItemTimeLabel } from "@/lib/item-subitem-utils";
 import {
   extractSubItemParticipants,
   extractSubItemViewers,
 } from "@/lib/item-subitems";
 import { ViewerLinkedPill } from "@/components/itinerary/ViewerLinkedPill";
+import {
+  ItemCompleteToggle,
+  ItemDoneBadge,
+} from "@/components/itinerary/ItemCompleteToggle";
 import type { ItineraryItem } from "@/lib/schema";
 import { itemSectionId } from "@/lib/day-jump";
 
@@ -74,6 +79,7 @@ export function SubItemRow({
   const location = getItemLocation(subItem.details as Record<string, unknown>);
   const participants = extractSubItemParticipants(subItem.details);
   const viewers = extractSubItemViewers(subItem.details);
+  const completed = isItemCompleted(subItem);
   const description =
     subItem.summary ||
     (typeof subItem.details === "object" &&
@@ -88,12 +94,16 @@ export function SubItemRow({
         <SubItemTime subItem={subItem} formatClockTime={formatClockTime} />
         <p
           className={[
-            "font-medium text-stone-800",
+            "font-medium",
             compact ? "text-sm" : "",
+            completed
+              ? "text-stone-500 line-through decoration-emerald-600/40"
+              : "text-stone-800",
           ].join(" ")}
         >
           {subItem.title}
         </p>
+        {completed ? <ItemDoneBadge /> : null}
         <ViewerLinkedPill item={subItem} />
       </div>
       {location?.mapLink && (
@@ -126,34 +136,44 @@ export function SubItemRow({
 
   if (onClick) {
     return (
-      <button
-        type="button"
-        onClick={onClick}
+      <div
         className={[
-          "flex w-full flex-col gap-1 rounded-lg text-left transition-colors hover:bg-stone-50",
+          "flex items-start gap-2 rounded-lg transition-colors hover:bg-stone-50",
           compact ? "px-2 py-1.5" : "px-3 py-2",
         ].join(" ")}
       >
-        <div className="flex items-start justify-between gap-2">{content}</div>
-        {peopleMeta}
-      </button>
+        <div className="shrink-0 pt-0.5">
+          <ItemCompleteToggle item={subItem} compact />
+        </div>
+        <button
+          type="button"
+          onClick={onClick}
+          className="min-w-0 flex-1 text-left"
+        >
+          <div className="flex items-start justify-between gap-2">{content}</div>
+          {peopleMeta}
+        </button>
+      </div>
     );
   }
 
   return (
     <div
       className={[
-        "flex flex-col gap-1",
+        "flex items-start gap-2",
         compact ? "px-2 py-1.5" : "px-3 py-2",
       ].join(" ")}
     >
-      <div className="flex items-start justify-between gap-2">
-        {content}
+      <div className="shrink-0 pt-0.5">
+        <ItemCompleteToggle item={subItem} compact />
       </div>
-      {peopleMeta}
-      {description && !compact && (
-        <p className="text-sm text-stone-600">{description}</p>
-      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">{content}</div>
+        {peopleMeta}
+        {description && !compact && (
+          <p className="text-sm text-stone-600">{description}</p>
+        )}
+      </div>
     </div>
   );
 }
