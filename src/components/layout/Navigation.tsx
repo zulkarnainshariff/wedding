@@ -26,6 +26,7 @@ import { ExportPdfPanel } from "@/components/itinerary/ExportPdfPanel";
 import { DevModePanel } from "@/components/itinerary/DevModePanel";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { CATEGORY_META, type Category } from "@/lib/types";
+import { TaskIndicatorBadge, useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 
 const USERNAME_DISPLAY_MAX = 14;
 
@@ -120,12 +121,14 @@ function NavLink({
   category,
   onNavigate,
   compact,
+  badgeCount = 0,
 }: {
   href: string;
   label: string;
   category?: NavCategory | "guests" | "invitations" | "tasks";
   onNavigate?: () => void;
   compact?: boolean;
+  badgeCount?: number;
 }) {
   const pathname = usePathname();
   const guard = useNavigationGuard();
@@ -189,13 +192,25 @@ function NavLink({
       ].join(" ")}
       title={compact ? label : undefined}
     >
-      <Icon
-        className={[
-          "h-5 w-5 shrink-0",
-          active ? "text-accent-soft" : "text-muted group-hover:text-brand",
-        ].join(" ")}
-      />
-      {!compact && <span>{label}</span>}
+      <span className="relative shrink-0">
+        <Icon
+          className={[
+            "h-5 w-5",
+            active ? "text-accent-soft" : "text-muted group-hover:text-brand",
+          ].join(" ")}
+        />
+        {compact && badgeCount > 0 ? (
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[9px] font-semibold text-white">
+            {badgeCount > 99 ? "99+" : badgeCount}
+          </span>
+        ) : null}
+      </span>
+      {!compact && (
+        <>
+          <span className="min-w-0 flex-1">{label}</span>
+          <TaskIndicatorBadge count={badgeCount} active={active} />
+        </>
+      )}
     </Link>
   );
 }
@@ -217,6 +232,7 @@ function SignedInRow({ username }: { username: string }) {
 export function Sidebar({ compact = false }: { compact?: boolean }) {
   const { user, logout } = useAuth();
   const navItems = useNavItems();
+  const { openCount: openTaskCount } = useTaskIndicators();
   const [logoutOpen, setLogoutOpen] = useState(false);
 
   async function confirmLogout() {
@@ -260,7 +276,12 @@ export function Sidebar({ compact = false }: { compact?: boolean }) {
           </div>
         ) : (
           navItems.map((item) => (
-            <NavLink key={item.href} {...item} compact={compact} />
+            <NavLink
+              key={item.href}
+              {...item}
+              compact={compact}
+              badgeCount={item.category === "tasks" ? openTaskCount : 0}
+            />
           ))
         )}
       </nav>
@@ -334,6 +355,7 @@ export function MobileDrawer({
 }) {
   const { user, logout } = useAuth();
   const navItems = useNavItems();
+  const { openCount: openTaskCount } = useTaskIndicators();
   const [logoutOpen, setLogoutOpen] = useState(false);
 
   async function confirmLogout() {
@@ -376,7 +398,12 @@ export function MobileDrawer({
             </div>
           ) : (
             navItems.map((item) => (
-              <NavLink key={item.href} {...item} onNavigate={onClose} />
+              <NavLink
+                key={item.href}
+                {...item}
+                onNavigate={onClose}
+                badgeCount={item.category === "tasks" ? openTaskCount : 0}
+              />
             ))
           )}
           <div className="px-3 pt-2">
