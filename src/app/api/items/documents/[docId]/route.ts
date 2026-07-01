@@ -97,9 +97,19 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const body = (await request.json()) as {
+    label?: unknown;
     coversTravellers?: unknown;
     extraViewers?: unknown;
   };
+
+  const label =
+    typeof body.label === "string" ? body.label.trim() : undefined;
+  if (label !== undefined && !label) {
+    return NextResponse.json(
+      { error: "Label cannot be empty" },
+      { status: 400 },
+    );
+  }
 
   const coveredRaw: string[] = Array.isArray(body.coversTravellers)
     ? body.coversTravellers.filter(
@@ -135,6 +145,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const [updated] = await db
     .update(itemDocuments)
     .set({
+      ...(label !== undefined ? { label } : {}),
       travellerName: coversTravellers[0],
       coversTravellers,
       extraViewers,

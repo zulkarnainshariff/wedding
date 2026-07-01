@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ItemCard } from "./ItemCard";
 import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
+import { useDocumentIndicators } from "@/components/itinerary/useDocumentIndicators";
 import { ScheduleToolbar } from "./ScheduleToolbar";
 import { TripProgressIndicator } from "./TripProgressIndicator";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -47,6 +48,7 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
 
   const { visibleDays } = useDayVisibility(filteredDays);
   const { itemSummaries } = useTaskIndicators();
+  const documentCounts = useDocumentIndicators();
 
   return (
     <PageShell
@@ -133,7 +135,11 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
                             isToday ? "bg-brand-deep" : "bg-accent",
                           ].join(" ")}
                         />
-                        <ItemCard item={item} taskSummary={itemSummaries[item.id]} />
+                        <ItemCard
+                          item={item}
+                          taskSummary={itemSummaries[item.id]}
+                          documentCount={documentCounts[item.id]}
+                        />
                       </div>
                     ))}
                   </div>

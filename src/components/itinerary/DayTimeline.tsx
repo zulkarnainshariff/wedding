@@ -3,6 +3,7 @@
 import { ItemCard } from "./ItemCard";
 import { TripProgressIndicator } from "./TripProgressIndicator";
 import { TaskIndicatorBadge, ItemTaskIndicator, useTaskIndicators } from "@/components/tasks/useTaskIndicators";
+import { useDocumentIndicators } from "@/components/itinerary/useDocumentIndicators";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { useDayVisibility } from "@/hooks/useDayVisibility";
@@ -20,6 +21,7 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
   const restrictedView = hasRestrictedTravellerView(user);
   const { visibleDays } = useDayVisibility(days);
   const { dayCounts, itemSummaries } = useTaskIndicators();
+  const documentCounts = useDocumentIndicators();
 
   if (visibleDays.length === 0) {
     return (
@@ -103,6 +105,7 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
                       <ItemCard
                         item={item}
                         taskSummary={itemSummaries[item.id]}
+                        documentCount={documentCounts[item.id]}
                       />
                     </div>
                   ))}

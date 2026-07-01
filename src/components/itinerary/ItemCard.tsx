@@ -29,6 +29,7 @@ import {
 } from "@/lib/types";
 import type { ItineraryItem } from "@/lib/schema";
 import { ItemTaskIndicator } from "@/components/tasks/useTaskIndicators";
+import { ItemDocumentIndicator } from "@/components/itinerary/useDocumentIndicators";
 import type { ItemTaskSummary } from "@/lib/task-queries";
 import { FlightProgressBar } from "@/components/itinerary/FlightProgressBar";
 import {
@@ -189,9 +190,11 @@ function LinkedPill() {
 export function ItemCard({
   item,
   taskSummary,
+  documentCount,
 }: {
   item: ItineraryItemWithSubItems;
   taskSummary?: ItemTaskSummary;
+  documentCount?: number;
 }) {
   const { openItem, viewMode } = useItineraryUI();
   const {
@@ -367,6 +370,7 @@ export function ItemCard({
                 {category === "flight" && <FlightCheckInReminderPill item={item} />}
                 {flightCheckedIn && <FlightCheckInBadge />}
                 <ItemTaskIndicator summary={taskSummary} />
+                <ItemDocumentIndicator count={documentCount} />
               </div>
               <h3
                 className={[
