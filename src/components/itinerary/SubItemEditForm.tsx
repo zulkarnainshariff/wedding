@@ -11,6 +11,7 @@ import {
 } from "@/lib/item-subitems";
 import { travellerOptions } from "@/lib/admin-item-details";
 import { additionalViewerOptions } from "@/lib/item-viewers";
+import { useAccountUsernames } from "@/hooks/useAccountUsernames";
 import type { ItineraryItem } from "@/lib/schema";
 
 const EMPTY_FORM: SubItemFormState = {
@@ -27,18 +28,21 @@ function SubItemFormFields({
   form,
   setForm,
   placeholders,
+  accountUsernames,
 }: {
   form: SubItemFormState;
   setForm: React.Dispatch<React.SetStateAction<SubItemFormState>>;
   placeholders: ReturnType<typeof getSubItemFormPlaceholders>;
+  accountUsernames: string[];
 }) {
   const participantOptions = useMemo(
     () => travellerOptions(form.participants),
     [form.participants],
   );
   const viewerOptions = useMemo(
-    () => additionalViewerOptions(form.participants, form.viewers),
-    [form.participants, form.viewers],
+    () =>
+      additionalViewerOptions(form.participants, form.viewers, accountUsernames),
+    [form.participants, form.viewers, accountUsernames],
   );
 
   return (
@@ -138,6 +142,7 @@ export function SubItemEditForm({
   onDelete?: () => void;
 }) {
   const placeholders = getSubItemFormPlaceholders(parentItem ?? item);
+  const accountUsernames = useAccountUsernames();
   const [form, setForm] = useState<SubItemFormState>(() =>
     isSubItem(item) ? subItemToFormState(item) : EMPTY_FORM,
   );
@@ -180,6 +185,7 @@ export function SubItemEditForm({
         form={form}
         setForm={setForm}
         placeholders={placeholders}
+        accountUsernames={accountUsernames}
       />
       {error && (
         <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">

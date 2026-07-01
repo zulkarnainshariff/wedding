@@ -872,8 +872,9 @@ export function AdminItemDetailsForm({
       additionalViewerOptions(
         participantNamesForItemCategory(structured, category),
         structured.viewers,
+        allSystemUsernames,
       ),
-    [structured, category],
+    [structured, category, allSystemUsernames],
   );
 
   const setSimple = (key: string, value: string) =>

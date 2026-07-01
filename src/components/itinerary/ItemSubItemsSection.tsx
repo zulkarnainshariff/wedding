@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SubItemRow } from "@/components/itinerary/SubItemDisplay";
 import { travellerOptions } from "@/lib/admin-item-details";
 import { additionalViewerOptions } from "@/lib/item-viewers";
+import { useAccountUsernames } from "@/hooks/useAccountUsernames";
 import { getSubItemFormPlaceholders } from "@/lib/sub-item-placeholders";
 import type { ItineraryItem } from "@/lib/schema";
 
@@ -86,13 +87,14 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const placeholders = getSubItemFormPlaceholders(item);
+  const accountUsernames = useAccountUsernames();
   const participantOptions = useMemo(
     () => travellerOptions(participants),
     [participants],
   );
   const viewerOptions = useMemo(
-    () => additionalViewerOptions(participants, viewers),
-    [participants, viewers],
+    () => additionalViewerOptions(participants, viewers, accountUsernames),
+    [participants, viewers, accountUsernames],
   );
 
   const refresh = useCallback(async () => {
