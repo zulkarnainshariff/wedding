@@ -53,6 +53,7 @@ import {
 import { isItemCompleted } from "@/lib/item-completion";
 import type { ItineraryItemWithSubItems } from "@/lib/item-subitem-utils";
 import { SubItemCascade } from "./SubItemDisplay";
+import { ViewerLinkedPill } from "./ViewerLinkedPill";
 import { useItineraryUI } from "./ItineraryUIContext";
 
 function StatusPill({ status }: { status?: "confirmed" | "tbc" }) {
@@ -373,6 +374,7 @@ export function ItemCard({
                     Limited view
                   </span>
                 )}
+                <ViewerLinkedPill item={item} />
                 {completed && <ItemDoneBadge accent={doneAccent} />}
                 {category === "flight" && <FlightCheckInReminderPill item={item} />}
                 {flightCheckedIn && <FlightCheckInBadge />}

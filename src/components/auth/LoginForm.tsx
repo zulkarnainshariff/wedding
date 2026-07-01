@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 
@@ -22,6 +22,12 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setUsername("");
+    setPassword("");
+    setError(null);
+  }, []);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -65,7 +71,7 @@ export function LoginForm({
         </span>
         <input
           type="text"
-          autoComplete="username"
+          autoComplete="off"
           autoFocus={variant === "modal"}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
@@ -81,7 +87,7 @@ export function LoginForm({
         <PasswordInput
           value={password}
           onChange={setPassword}
-          autoComplete="current-password"
+          autoComplete="off"
           required
           className="w-full rounded-xl border border-stone-200 px-4 py-3 pr-11"
         />

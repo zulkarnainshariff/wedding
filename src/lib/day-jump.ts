@@ -34,6 +34,10 @@ export function taskRowId(taskId: number): string {
   return `task-row-${taskId}`;
 }
 
+export function itemSectionId(itemId: number): string {
+  return `item-${itemId}`;
+}
+
 export function scrollToDaySection(sectionId: string): void {
   scrollToElementById(sectionId);
 }

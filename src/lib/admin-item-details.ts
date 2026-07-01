@@ -14,6 +14,7 @@ import { formatFlightNumberDisplay, parseLegacyFlightNumber } from "@/lib/flight
 import { buildLocationPayload, getItemLocation } from "@/lib/item-location";
 import { mergeItemPrivacyFields } from "@/lib/admin-item-privacy";
 import { extractItemAdditionalViewers } from "@/lib/item-viewers";
+import { extractViewerLinks } from "@/lib/item-viewer-links";
 import { parsePrivateViewers } from "@/lib/item-privacy";
 import { TRAVELLER_NAMES } from "@/lib/travellers";
 import type { UnitsPreference } from "@/lib/user-preferences";
@@ -28,6 +29,7 @@ export type StructuredItemDetails = {
   isPrivate: boolean;
   privateViewers: string[];
   viewers: string[];
+  viewerLinks: Record<string, string[]>;
   travellers: string[];
   bookingGroups: BookingGroup[];
   seats: TravellerRecord[];
@@ -126,6 +128,7 @@ export function emptyStructuredDetails(category: Category): StructuredItemDetail
     isPrivate: false,
     privateViewers: [],
     viewers: [],
+    viewerLinks: {},
     travellers: [],
     bookingGroups: [],
     seats: [],
@@ -181,6 +184,7 @@ export function parseStructuredDetails(
     details.privateViewers ?? details.extraViewers,
   );
   structured.viewers = extractItemAdditionalViewers(details);
+  structured.viewerLinks = extractViewerLinks(details);
   structured.notes = Array.isArray(details.notes)
     ? (details.notes as string[]).join("\n")
     : String(details.notes ?? "");

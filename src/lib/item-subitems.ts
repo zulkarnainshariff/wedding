@@ -1,5 +1,6 @@
 import { combineActivityDatetime } from "@/lib/activity-utils";
 import { buildLocationPayload } from "@/lib/item-location";
+import { extractViewerLinks, normalizeViewerLinksPayload } from "@/lib/item-viewer-links";
 import { normalizeTravellerName } from "@/lib/travellers";
 import type { ItineraryItem } from "@/lib/schema";
 
@@ -11,6 +12,7 @@ export type SubItemFormState = {
   summary: string;
   participants: string[];
   viewers: string[];
+  viewerLinks: Record<string, string[]>;
 };
 
 export function extractSubItemParticipants(details: unknown): string[] {
@@ -75,6 +77,7 @@ export function subItemToFormState(item: ItineraryItem): SubItemFormState {
 
   const participants = extractSubItemParticipants(details);
   const viewers = extractSubItemViewers(details);
+  const viewerLinks = extractViewerLinks(details);
 
   return {
     title: item.title,
@@ -84,6 +87,7 @@ export function subItemToFormState(item: ItineraryItem): SubItemFormState {
     summary: description,
     participants,
     viewers,
+    viewerLinks,
   };
 }
 
@@ -111,6 +115,7 @@ export function buildSubItemDetails(
     description: form.summary.trim() || undefined,
     participants: form.participants,
     viewers: form.viewers,
+    viewerLinks: normalizeViewerLinksPayload(form.viewerLinks),
     ...(location ? { location } : {}),
   };
 }

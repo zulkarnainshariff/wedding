@@ -6,6 +6,7 @@ import {
   buildSubItemDetails,
   resolveSubItemStartDatetime,
 } from "@/lib/item-subitems";
+import { parseViewerLinks } from "@/lib/item-viewer-links";
 import {
   getParentItem,
   getSubItemsForParent,
@@ -86,6 +87,7 @@ export async function POST(request: Request, { params }: Params) {
     summary: typeof body.summary === "string" ? body.summary.trim() : "",
     participants: parseTravellerNames(body.participants),
     viewers: parseTravellerNames(body.viewers),
+    viewerLinks: parseViewerLinks(body.viewerLinks),
   };
 
   const details = buildSubItemDetails(form);

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ExternalLink, MapPin, Pencil, Trash2, X } from "lucide-react";
 import { ItemDocumentsSection } from "@/components/itinerary/ItemDocumentsSection";
 import { ItemSubItemsSection } from "@/components/itinerary/ItemSubItemsSection";
+import { ViewerLinkedPill } from "@/components/itinerary/ViewerLinkedPill";
 import { ItemCompleteToggle, type ItemDoneAccent } from "@/components/itinerary/ItemCompleteToggle";
 import { FlightCheckInReminderPill, FlightCheckInToggle } from "@/components/itinerary/FlightCheckInToggle";
 import {
@@ -32,6 +33,7 @@ import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/activity-utils";
 import { getItemLocation } from "@/lib/item-location";
 import { extractItemAdditionalViewers } from "@/lib/item-viewers";
+import { extractViewerLinks, viewerLinkLabel } from "@/lib/item-viewer-links";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import {
   CATEGORY_META,
@@ -130,11 +132,20 @@ function MapLink({
 
 function AdditionalViewersRow({ details }: { details: unknown }) {
   const viewers = extractItemAdditionalViewers(details);
+  const links = extractViewerLinks(details);
   if (viewers.length === 0) return null;
 
   return (
     <dl>
-      <DetailRow label="Also visible to" value={viewers.join(", ")} />
+      {viewers.map((viewer) => {
+        const linked = links[viewer];
+        const value = linked?.length
+          ? `${viewer} (viewing ${viewerLinkLabel(linked)})`
+          : viewer;
+        return (
+          <DetailRow key={viewer} label="Also visible to" value={value} />
+        );
+      })}
     </dl>
   );
 }
@@ -432,6 +443,9 @@ function ItemDetailHeader({
             <h1 className="mt-1 break-words font-serif text-xl text-brand-deep sm:text-3xl">
               {item.title}
             </h1>
+            <div className="mt-2">
+              <ViewerLinkedPill item={item} />
+            </div>
             {documentCount ? (
               <div className="mt-2">
                 <ItemDocumentIndicator count={documentCount} />

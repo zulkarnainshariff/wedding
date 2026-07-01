@@ -11,6 +11,10 @@ import {
 } from "@/lib/admin-item-details";
 import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
 import {
+  ViewerLinksFields,
+  updateViewersWithLinks,
+} from "@/components/admin/ViewerLinksFields";
+import {
   additionalViewerOptions,
   participantNamesForItemCategory,
 } from "@/lib/item-viewers";
@@ -148,6 +152,9 @@ function patchStructured(
       ? [...patch.privateViewers]
       : [...structured.privateViewers],
     viewers: patch.viewers ? [...patch.viewers] : [...structured.viewers],
+    viewerLinks: patch.viewerLinks
+      ? { ...patch.viewerLinks }
+      : { ...structured.viewerLinks },
   };
 }
 
@@ -1251,10 +1258,22 @@ export function AdminItemDetailsForm({
           label="Additional viewers"
           options={itemAdditionalViewerOptions}
           value={structured.viewers}
-          onChange={(viewers) =>
-            onChange(patchStructured(structured, { viewers }))
-          }
+          onChange={(viewers) => {
+            const viewerLinks = updateViewersWithLinks(
+              viewers,
+              structured.viewerLinks,
+            );
+            onChange(patchStructured(structured, { viewers, viewerLinks }));
+          }}
           emptyLabel="No additional viewers"
+        />
+        <ViewerLinksFields
+          viewers={structured.viewers}
+          viewerLinks={structured.viewerLinks}
+          participantOptions={participants}
+          onChange={(viewerLinks) =>
+            onChange(patchStructured(structured, { viewerLinks }))
+          }
         />
         <p className="mt-2 text-xs text-stone-500">
           Travellers who should see this item but are not listed as participants

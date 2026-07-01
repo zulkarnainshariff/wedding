@@ -8,7 +8,9 @@ import {
   extractSubItemParticipants,
   extractSubItemViewers,
 } from "@/lib/item-subitems";
+import { ViewerLinkedPill } from "@/components/itinerary/ViewerLinkedPill";
 import type { ItineraryItem } from "@/lib/schema";
+import { itemSectionId } from "@/lib/day-jump";
 
 function SubItemTime({
   subItem,
@@ -92,6 +94,7 @@ export function SubItemRow({
         >
           {subItem.title}
         </p>
+        <ViewerLinkedPill item={subItem} />
       </div>
       {location?.mapLink && (
         <a
@@ -171,14 +174,15 @@ export function SubItemCascade({
       </p>
       <div className="space-y-0.5 border-l-2 border-accent/40 pl-3">
         {subItems.map((subItem) => (
-          <SubItemRow
-            key={subItem.id}
-            subItem={subItem}
-            compact
-            onClick={
-              onSubItemClick ? () => onSubItemClick(subItem.id) : undefined
-            }
-          />
+          <div key={subItem.id} id={itemSectionId(subItem.id)} className="scroll-mt-24">
+            <SubItemRow
+              subItem={subItem}
+              compact
+              onClick={
+                onSubItemClick ? () => onSubItemClick(subItem.id) : undefined
+              }
+            />
+          </div>
         ))}
       </div>
     </div>

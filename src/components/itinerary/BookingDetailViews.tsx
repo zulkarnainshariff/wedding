@@ -166,7 +166,7 @@ export function CarRentalDetailView({
 
   return (
     <div className="space-y-6">
-      {details.bookingStatus === "suggested" && (
+      {details.bookingStatus !== "confirmed" && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           This car rental is not booked yet. The map link shows a suggested
           pick-up location only.

@@ -6,6 +6,7 @@ import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 import { useDocumentIndicators } from "@/components/itinerary/useDocumentIndicators";
 import { ScheduleToolbar } from "./ScheduleToolbar";
 import { TripProgressIndicator } from "./TripProgressIndicator";
+import { useFlightSortedDays } from "./FlightDaySortToggle";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { useDayVisibility } from "@/hooks/useDayVisibility";
@@ -16,10 +17,12 @@ import {
   filterScheduleItemsByParticipants,
 } from "@/lib/schedule-participant-filter";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
+import { itemSectionId } from "@/lib/day-jump";
 import { isDayToday } from "@/lib/trip-time";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
+import type { ItineraryItemWithSubItems } from "@/lib/item-subitem-utils";
 
-type DayWithItems = ItineraryDay & { items: ItineraryItem[] };
+type DayWithItems = ItineraryDay & { items: ItineraryItemWithSubItems[] };
 
 export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
   const { user } = useAuth();
@@ -47,8 +50,13 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
   );
 
   const { visibleDays } = useDayVisibility(filteredDays);
+  const sortedVisibleDays = useFlightSortedDays(visibleDays);
   const { itemSummaries } = useTaskIndicators();
   const documentCounts = useDocumentIndicators();
+  const progressItems = useMemo(
+    () => sortedVisibleDays.flatMap((day) => day.items),
+    [sortedVisibleDays],
+  );
 
   return (
     <PageShell
@@ -61,10 +69,11 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
           onParticipantsChange={setSelectedParticipants}
           jumpDays={visibleDays}
           jumpVariant="schedule"
+          sortDays={visibleDays}
         />
       }
     >
-      <TripProgressIndicator days={visibleDays} />
+      <TripProgressIndicator days={visibleDays} items={progressItems} />
 
       {visibleDays.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-10 text-center text-stone-500">
@@ -76,7 +85,7 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
         </div>
       ) : (
         <div className="relative space-y-10">
-          {visibleDays.map((day) => {
+          {sortedVisibleDays.map((day) => {
             const isToday = isDayToday(day.date, effectiveDate);
             const dayTitle = getDayDisplayTitle(day, day.items.length, restrictedView);
 
@@ -128,7 +137,7 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
                 ) : (
                   <div className="relative space-y-3 pl-5 before:absolute before:top-2 before:bottom-2 before:left-[7px] before:w-px before:bg-accent/40">
                     {day.items.map((item) => (
-                      <div key={item.id} className="relative">
+                      <div key={item.id} id={itemSectionId(item.id)} className="relative scroll-mt-24">
                         <span
                           className={[
                             "absolute top-6 -left-5 h-2.5 w-2.5 rounded-full border-2 border-white",
