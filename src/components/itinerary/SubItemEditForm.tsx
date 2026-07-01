@@ -19,6 +19,7 @@ const EMPTY_FORM: SubItemFormState = {
   locationMapUrl: "",
   summary: "",
   participants: [],
+  viewers: [],
 };
 
 function SubItemFormFields({
@@ -33,6 +34,10 @@ function SubItemFormFields({
   const participantOptions = useMemo(
     () => travellerOptions(form.participants),
     [form.participants],
+  );
+  const viewerOptions = useMemo(
+    () => travellerOptions(form.viewers),
+    [form.viewers],
   );
 
   return (
@@ -66,6 +71,19 @@ function SubItemFormFields({
           }
           emptyLabel="Select participants…"
         />
+      </div>
+      <div className="text-sm sm:col-span-2">
+        <CheckboxDropdown
+          label="Additional viewers"
+          options={viewerOptions}
+          value={form.viewers}
+          onChange={(viewers) => setForm((current) => ({ ...current, viewers }))}
+          emptyLabel="No additional viewers"
+        />
+        <p className="mt-1 text-xs text-stone-500">
+          People who should see this sub-item but are not listed as participants
+          (for example travellers being picked up).
+        </p>
       </div>
       <label className="block text-sm">
         <span className="mb-1 block text-stone-500">Location name (optional)</span>

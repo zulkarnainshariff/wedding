@@ -124,6 +124,11 @@ export async function PUT(request: Request, { params }: Params) {
             (entry: unknown): entry is string => typeof entry === "string",
           )
         : subItemToFormState(existing).participants,
+      viewers: Array.isArray(body.viewers)
+        ? body.viewers.filter(
+            (entry: unknown): entry is string => typeof entry === "string",
+          )
+        : subItemToFormState(existing).viewers,
     };
 
     if (!form.title) {

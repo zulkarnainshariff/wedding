@@ -158,6 +158,12 @@ function ActivityDetail({
           label="Participants"
           value={details.participants?.join(", ")}
         />
+        {details.activityType === "sub_item" && details.viewers?.length ? (
+          <DetailRow
+            label="Also visible to"
+            value={details.viewers.join(", ")}
+          />
+        ) : null}
         <DetailRow label="Location" value={details.location?.name} />
         <DetailRow label="Airport" value={details.location?.airportCode} />
       </dl>

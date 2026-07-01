@@ -16,7 +16,7 @@ import { bumpSyncVersion } from "@/lib/sync";
 
 type Params = { params: Promise<{ id: string }> };
 
-function parseParticipants(raw: unknown): string[] {
+function parseTravellerNames(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((entry): entry is string => typeof entry === "string")
@@ -84,7 +84,8 @@ export async function POST(request: Request, { params }: Params) {
     locationMapUrl:
       typeof body.locationMapUrl === "string" ? body.locationMapUrl.trim() : "",
     summary: typeof body.summary === "string" ? body.summary.trim() : "",
-    participants: parseParticipants(body.participants),
+    participants: parseTravellerNames(body.participants),
+    viewers: parseTravellerNames(body.viewers),
   };
 
   const details = buildSubItemDetails(form);

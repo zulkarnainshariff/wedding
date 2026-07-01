@@ -150,6 +150,7 @@ export type ActivityDetails = {
   description?: string;
   notes?: string[];
   participants?: string[];
+  viewers?: string[];
   location?: ActivityLocation;
   linkedItemId?: number;
 };

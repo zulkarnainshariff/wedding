@@ -1,5 +1,6 @@
 import { combineActivityDatetime } from "@/lib/activity-utils";
 import { buildLocationPayload } from "@/lib/item-location";
+import { normalizeTravellerName } from "@/lib/travellers";
 import type { ItineraryItem } from "@/lib/schema";
 
 export type SubItemFormState = {
@@ -9,7 +10,37 @@ export type SubItemFormState = {
   locationMapUrl: string;
   summary: string;
   participants: string[];
+  viewers: string[];
 };
+
+export function extractSubItemParticipants(details: unknown): string[] {
+  if (!details || typeof details !== "object") return [];
+  const participants = (details as Record<string, unknown>).participants;
+  if (!Array.isArray(participants)) return [];
+  return participants
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => normalizeTravellerName(entry))
+    .filter(Boolean);
+}
+
+export function extractSubItemViewers(details: unknown): string[] {
+  if (!details || typeof details !== "object") return [];
+  const viewers = (details as Record<string, unknown>).viewers;
+  if (!Array.isArray(viewers)) return [];
+  return viewers
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => normalizeTravellerName(entry))
+    .filter(Boolean);
+}
+
+export function subItemPeopleForPermission(details: unknown): string[] {
+  return [
+    ...new Set([
+      ...extractSubItemParticipants(details),
+      ...extractSubItemViewers(details),
+    ]),
+  ];
+}
 
 export function isSubItem(item: Pick<ItineraryItem, "parentItemId" | "details">): boolean {
   if (item.parentItemId == null) return false;
@@ -42,11 +73,8 @@ export function subItemToFormState(item: ItineraryItem): SubItemFormState {
     item.summary ||
     (typeof details.description === "string" ? details.description : "");
 
-  const participants = Array.isArray(details.participants)
-    ? (details.participants as string[]).filter(
-        (entry): entry is string => typeof entry === "string",
-      )
-    : [];
+  const participants = extractSubItemParticipants(details);
+  const viewers = extractSubItemViewers(details);
 
   return {
     title: item.title,
@@ -55,6 +83,7 @@ export function subItemToFormState(item: ItineraryItem): SubItemFormState {
     locationMapUrl: location?.mapLink ?? "",
     summary: description,
     participants,
+    viewers,
   };
 }
 
@@ -81,6 +110,7 @@ export function buildSubItemDetails(
     time: clockTime,
     description: form.summary.trim() || undefined,
     participants: form.participants,
+    viewers: form.viewers,
     ...(location ? { location } : {}),
   };
 }
