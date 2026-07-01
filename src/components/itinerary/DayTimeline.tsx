@@ -122,6 +122,7 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
                         item={item}
                         taskSummary={itemSummaries[item.id]}
                         documentCount={documentCounts[item.id]}
+                        itemSummaries={itemSummaries}
                       />
                     </div>
                   ))}

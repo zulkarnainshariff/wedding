@@ -68,9 +68,9 @@ export function DayJumpSelector({
               role="listbox"
               aria-label="Jump to day"
               style={menuStyle}
-              className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl"
+              className="overflow-y-auto overscroll-contain rounded-xl border border-stone-200 bg-white shadow-xl"
             >
-              <ul className="max-h-full overflow-y-auto overscroll-contain p-2">
+              <ul className="p-2">
                 {days.map((day) => {
                   const title = formatDayJumpSecondary(day);
                   return (

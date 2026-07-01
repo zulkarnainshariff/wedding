@@ -106,6 +106,7 @@ export function FlightsPanel({
                 item={item}
                 taskSummary={itemSummaries[item.id]}
                 documentCount={documentCounts[item.id]}
+                itemSummaries={itemSummaries}
               />
             ))}
           </div>
