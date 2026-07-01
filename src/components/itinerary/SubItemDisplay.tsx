@@ -4,7 +4,10 @@ import { MapPin } from "lucide-react";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { getItemLocation } from "@/lib/item-location";
 import { getSubItemTimeLabel } from "@/lib/item-subitem-utils";
-import { extractItemTravellers } from "@/lib/item-travellers";
+import {
+  extractSubItemParticipants,
+  extractSubItemViewers,
+} from "@/lib/item-subitems";
 import type { ItineraryItem } from "@/lib/schema";
 
 function SubItemTime({
@@ -28,6 +31,34 @@ function SubItemTime({
   );
 }
 
+function SubItemPeopleMeta({
+  participants,
+  viewers,
+  compact = false,
+}: {
+  participants: string[];
+  viewers: string[];
+  compact?: boolean;
+}) {
+  if (participants.length === 0 && viewers.length === 0) return null;
+
+  return (
+    <div
+      className={[
+        "space-y-0.5 text-stone-500",
+        compact ? "text-[11px]" : "text-xs",
+      ].join(" ")}
+    >
+      {participants.length > 0 && (
+        <p>Participants: {participants.join(", ")}</p>
+      )}
+      {viewers.length > 0 && (
+        <p>Also visible to: {viewers.join(", ")}</p>
+      )}
+    </div>
+  );
+}
+
 export function SubItemRow({
   subItem,
   compact = false,
@@ -39,7 +70,8 @@ export function SubItemRow({
 }) {
   const { formatClockTime } = useDisplayFormat();
   const location = getItemLocation(subItem.details as Record<string, unknown>);
-  const participantNames = extractItemTravellers(subItem.details, subItem.category);
+  const participants = extractSubItemParticipants(subItem.details);
+  const viewers = extractSubItemViewers(subItem.details);
   const description =
     subItem.summary ||
     (typeof subItem.details === "object" &&
@@ -81,17 +113,26 @@ export function SubItemRow({
     </>
   );
 
+  const peopleMeta = (
+    <SubItemPeopleMeta
+      participants={participants}
+      viewers={viewers}
+      compact={compact}
+    />
+  );
+
   if (onClick) {
     return (
       <button
         type="button"
         onClick={onClick}
         className={[
-          "flex w-full items-start justify-between gap-2 rounded-lg text-left transition-colors hover:bg-stone-50",
+          "flex w-full flex-col gap-1 rounded-lg text-left transition-colors hover:bg-stone-50",
           compact ? "px-2 py-1.5" : "px-3 py-2",
         ].join(" ")}
       >
-        {content}
+        <div className="flex items-start justify-between gap-2">{content}</div>
+        {peopleMeta}
       </button>
     );
   }
@@ -106,11 +147,7 @@ export function SubItemRow({
       <div className="flex items-start justify-between gap-2">
         {content}
       </div>
-      {participantNames.length > 0 && (
-        <p className="text-xs text-stone-500">
-          Participants: {participantNames.join(", ")}
-        </p>
-      )}
+      {peopleMeta}
       {description && !compact && (
         <p className="text-sm text-stone-600">{description}</p>
       )}

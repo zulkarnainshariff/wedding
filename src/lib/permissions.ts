@@ -5,6 +5,10 @@ import {
   travellerMatchesUsername,
 } from "./item-travellers";
 import { isItemPrivate, canViewPrivateItem } from "./item-privacy";
+import {
+  isSubItem,
+  subItemPeopleForPermission,
+} from "./item-subitems";
 import { CATEGORIES, type Category } from "./types";
 
 import type { UserPreferences } from "./user-preferences";
@@ -199,7 +203,9 @@ export function canViewItemTravellers(
   }
 
   const allowed = user.permissions.viewTravellers;
-  const travellers = extractItemTravellers(item.details, item.category);
+  const travellers = isSubItem(item)
+    ? subItemPeopleForPermission(item.details)
+    : extractItemTravellers(item.details, item.category);
 
   if (travellers.length === 0) {
     return (

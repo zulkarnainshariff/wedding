@@ -80,6 +80,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   const [locationMapUrl, setLocationMapUrl] = useState("");
   const [summary, setSummary] = useState("");
   const [participants, setParticipants] = useState<string[]>([]);
+  const [viewers, setViewers] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -87,6 +88,10 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   const participantOptions = useMemo(
     () => travellerOptions(participants),
     [participants],
+  );
+  const viewerOptions = useMemo(
+    () => travellerOptions(viewers),
+    [viewers],
   );
 
   const refresh = useCallback(async () => {
@@ -120,6 +125,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
         locationMapUrl: locationMapUrl.trim() || null,
         summary: summary.trim() || null,
         participants,
+        viewers,
       }),
     });
     setSaving(false);
@@ -132,6 +138,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
     setLocationMapUrl("");
     setSummary("");
     setParticipants([]);
+    setViewers([]);
     await refresh();
   }
 
@@ -216,6 +223,19 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
                   onChange={setParticipants}
                   emptyLabel="Select participants…"
                 />
+              </div>
+              <div className="text-sm sm:col-span-2">
+                <CheckboxDropdown
+                  label="Additional viewers"
+                  options={viewerOptions}
+                  value={viewers}
+                  onChange={setViewers}
+                  emptyLabel="No additional viewers"
+                />
+                <p className="mt-1 text-xs text-stone-500">
+                  People who should see this sub-item but are not listed as
+                  participants (for example travellers being picked up).
+                </p>
               </div>
               <label className="block text-sm">
                 <span className="mb-1 block text-stone-500">Location name (optional)</span>
