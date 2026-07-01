@@ -1,18 +1,31 @@
 import type { ItineraryItem } from "@/lib/schema";
-import { extractItemTravellers, travellerMatchesUsername } from "@/lib/item-travellers";
+import {
+  extractItemTravellers,
+  travellerMatchesUsername,
+  usernameToTravellerName,
+} from "@/lib/item-travellers";
 import {
   extractSubItemParticipants,
   extractSubItemViewers,
   isSubItem,
   subItemPeopleForPermission,
 } from "@/lib/item-subitems";
-import { normalizeTravellerName, TRAVELLER_NAMES } from "@/lib/travellers";
+import { normalizeTravellerName } from "@/lib/travellers";
 import type { Category } from "@/lib/types";
 
-/** Traveller names eligible as additional viewers (excludes "Everyone"). */
-export const ADDITIONAL_VIEWER_NAMES: string[] = TRAVELLER_NAMES.filter(
-  (name) => name !== "Everyone",
-);
+const SYSTEM_ACCOUNT_USERNAMES = new Set(["root", "admin"]);
+
+export function isParticipantPerson(
+  person: string,
+  participants: string[],
+): boolean {
+  const personKey = normalizeTravellerName(person).toLowerCase();
+  return participants.some((participant) => {
+    const participantKey = normalizeTravellerName(participant).toLowerCase();
+    if (participantKey === personKey) return true;
+    return travellerMatchesUsername(participant, person.toLowerCase());
+  });
+}
 
 export function extractItemAdditionalViewers(details: unknown): string[] {
   if (!details || typeof details !== "object") return [];
@@ -27,20 +40,23 @@ export function extractItemAdditionalViewers(details: unknown): string[] {
 export function additionalViewerOptions(
   participants: string[],
   selected: string[] = [],
+  accountUsernames: string[] = [],
 ): string[] {
-  const participantKeys = new Set(
-    participants.map((name) => normalizeTravellerName(name).toLowerCase()),
-  );
+  const eligibleAccounts = accountUsernames
+    .map((username) => username.trim().toLowerCase())
+    .filter(Boolean)
+    .filter((username) => !SYSTEM_ACCOUNT_USERNAMES.has(username))
+    .filter((username) => !isParticipantPerson(username, participants));
 
-  const options = ADDITIONAL_VIEWER_NAMES.filter(
-    (name) => !participantKeys.has(normalizeTravellerName(name).toLowerCase()),
-  );
+  const options = [
+    ...new Set(eligibleAccounts.map((username) => usernameToTravellerName(username))),
+  ];
 
   for (const name of selected) {
     const normalized = normalizeTravellerName(name);
     if (!normalized) continue;
-    const key = normalized.toLowerCase();
-    if (!participantKeys.has(key) && !options.includes(normalized)) {
+    if (isParticipantPerson(normalized, participants)) continue;
+    if (!options.includes(normalized)) {
       options.push(normalized);
     }
   }
