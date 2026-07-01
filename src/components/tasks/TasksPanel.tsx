@@ -18,8 +18,8 @@ import type { Task, TaskNote, TaskReminder } from "@/lib/schema";
 type TaskRow = Task & {
   assignee: string;
   assigner: string;
-  eventName: string;
-  eventSlug: string;
+  eventName: string | null;
+  eventSlug: string | null;
   itemTitle: string | null;
   noteCount: number;
   hasNotes: boolean;
@@ -29,7 +29,7 @@ type TaskRow = Task & {
 type TaskDetails = {
   task: Task;
   assignee: string;
-  eventName: string;
+  eventName: string | null;
   notes: { note: TaskNote; author: string }[];
   reminders: TaskReminder[];
   subtasks: Task[];
@@ -99,7 +99,6 @@ export function TasksPanel() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createForm, setCreateForm] = useState({
     title: "",
-    eventId: "",
     assigneeUserId: "",
     dueAt: "",
     assignerNotes: "",
@@ -304,6 +303,11 @@ export function TasksPanel() {
     if (!user) return false;
     if (user.isAdmin) return true;
     if (task.createdByUserId === user.id) return true;
+    if (task.eventId == null) {
+      return assignableEvents.some(
+        (entry) => entry.canAssign || entry.canAssignForOthers,
+      );
+    }
     return assignableEvents.some(
       (entry) =>
         entry.eventId === task.eventId &&
@@ -557,7 +561,8 @@ export function TasksPanel() {
 
   function taskContextLabel(task: TaskRow) {
     if (task.itemTitle) return task.itemTitle;
-    return task.eventName;
+    if (task.eventName) return task.eventName;
+    return "General task";
   }
 
   function assigneeLabel(task: TaskRow) {
@@ -573,8 +578,8 @@ export function TasksPanel() {
   }
 
   async function createTask() {
-    if (!createForm.title.trim() || !createForm.eventId) {
-      showError("Title and event are required.");
+    if (!createForm.title.trim()) {
+      showError("Title is required.");
       return;
     }
     setBusy(true);
@@ -584,7 +589,6 @@ export function TasksPanel() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: createForm.title.trim(),
-        eventId: Number(createForm.eventId),
         assigneeUserId: createForm.assigneeUserId
           ? Number(createForm.assigneeUserId)
           : user?.id,
@@ -603,7 +607,6 @@ export function TasksPanel() {
     }
     setCreateForm({
       title: "",
-      eventId: createForm.eventId,
       assigneeUserId: "",
       dueAt: "",
       assignerNotes: "",
@@ -1052,20 +1055,6 @@ export function TasksPanel() {
                 className="rounded-lg border border-stone-200 px-3 py-2 text-sm sm:col-span-2"
               />
               <select
-                value={createForm.eventId}
-                onChange={(e) =>
-                  setCreateForm((current) => ({ ...current, eventId: e.target.value }))
-                }
-                className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
-              >
-                <option value="">Select event</option>
-                {assignableEvents.map((event) => (
-                  <option key={event.eventId} value={event.eventId}>
-                    {event.eventName}
-                  </option>
-                ))}
-              </select>
-              <select
                 value={createForm.assigneeUserId}
                 onChange={(e) =>
                   setCreateForm((current) => ({
@@ -1137,15 +1126,7 @@ export function TasksPanel() {
           ) : (
             <button
               type="button"
-              onClick={() => {
-                setShowCreateForm(true);
-                if (!createForm.eventId && assignableEvents[0]) {
-                  setCreateForm((current) => ({
-                    ...current,
-                    eventId: String(assignableEvents[0].eventId),
-                  }));
-                }
-              }}
+              onClick={() => setShowCreateForm(true)}
               className="inline-flex items-center gap-1 text-sm font-medium text-brand-deep"
             >
               <Plus className="h-4 w-4" />

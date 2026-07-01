@@ -28,7 +28,7 @@ const assigneeUser = alias(users, "assignee_user");
 const assignerUser = alias(users, "assigner_user");
 
 type TaskVisibilityTarget = {
-  eventId: number;
+  eventId: number | null;
   assigneeUserId: number;
   createdByUserId: number;
 };
@@ -46,6 +46,14 @@ export function canViewTaskWithPermissions(
   if (task.assigneeUserId === user.id) return true;
   if (task.createdByUserId === user.id) return true;
   if (user.isAdmin) return true;
+
+  if (task.eventId == null) {
+    return permissions.some(
+      (entry) =>
+        entry.canViewOthersTasks ||
+        entry.viewableUserIds.includes(task.assigneeUserId),
+    );
+  }
 
   const perm = permissions.find((entry) => entry.eventId === task.eventId);
   if (!perm) return false;
@@ -131,8 +139,9 @@ export async function getTaskPermissionsForUser(
     );
 }
 
-export async function canAssignTasks(user: SessionUser, eventId: number) {
+export async function canAssignTasks(user: SessionUser, eventId: number | null) {
   if (user.isAdmin) return true;
+  if (eventId == null) return canAssignOnAnyEvent(user);
   const [row] = await db
     .select()
     .from(taskPermissions)
@@ -218,7 +227,7 @@ export async function getVisibleTasks(user: SessionUser) {
     .from(tasks)
     .innerJoin(assigneeUser, eq(tasks.assigneeUserId, assigneeUser.id))
     .innerJoin(assignerUser, eq(tasks.createdByUserId, assignerUser.id))
-    .innerJoin(weddingEvents, eq(tasks.eventId, weddingEvents.id))
+    .leftJoin(weddingEvents, eq(tasks.eventId, weddingEvents.id))
     .leftJoin(itineraryItems, eq(tasks.itemId, itineraryItems.id))
     .orderBy(asc(tasks.dueAt), asc(tasks.id));
 
@@ -246,7 +255,7 @@ export async function getTaskWithDetails(taskId: number) {
     .from(tasks)
     .innerJoin(assigneeUser, eq(tasks.assigneeUserId, assigneeUser.id))
     .innerJoin(assignerUser, eq(tasks.createdByUserId, assignerUser.id))
-    .innerJoin(weddingEvents, eq(tasks.eventId, weddingEvents.id))
+    .leftJoin(weddingEvents, eq(tasks.eventId, weddingEvents.id))
     .where(eq(tasks.id, taskId))
     .limit(1);
 
@@ -294,8 +303,11 @@ export async function getTaskIndicators(user: SessionUser) {
     visible.map(({ task }) => task.id),
   );
 
+  let openCount = 0;
+
   for (const { task, assignee } of visible) {
     if (task.status === "completed") continue;
+    openCount += 1;
     if (task.dayId) dayCounts[task.dayId] = (dayCounts[task.dayId] ?? 0) + 1;
     if (!task.itemId) continue;
 
@@ -356,7 +368,7 @@ export async function getTaskIndicators(user: SessionUser) {
     };
   }
 
-  return { dayCounts, itemCounts, itemSummaries: formattedSummaries };
+  return { dayCounts, itemCounts, itemSummaries: formattedSummaries, openCount };
 }
 
 export async function getMaxDueDate(dayId?: number | null, itemId?: number | null) {

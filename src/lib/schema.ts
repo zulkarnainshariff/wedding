@@ -211,9 +211,9 @@ export const taskPermissions = pgTable("task_permissions", {
 
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
-  eventId: integer("event_id")
-    .notNull()
-    .references(() => weddingEvents.id, { onDelete: "cascade" }),
+  eventId: integer("event_id").references(() => weddingEvents.id, {
+    onDelete: "cascade",
+  }),
   dayId: integer("day_id").references(() => itineraryDays.id, {
     onDelete: "set null",
   }),

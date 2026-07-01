@@ -9,6 +9,7 @@ type TaskIndicators = {
   dayCounts: Record<number, number>;
   itemCounts: Record<number, number>;
   itemSummaries: Record<number, ItemTaskSummary>;
+  openCount: number;
 };
 
 export function useTaskIndicators() {
@@ -16,6 +17,7 @@ export function useTaskIndicators() {
     dayCounts: {},
     itemCounts: {},
     itemSummaries: {},
+    openCount: 0,
   });
 
   const refresh = () => {
@@ -27,6 +29,7 @@ export function useTaskIndicators() {
             dayCounts: data.dayCounts ?? {},
             itemCounts: data.itemCounts ?? {},
             itemSummaries: data.itemSummaries ?? {},
+            openCount: data.openCount ?? 0,
           });
         }
       })
@@ -49,14 +52,24 @@ export function useTaskIndicators() {
   return indicators;
 }
 
-export function TaskIndicatorBadge({ count }: { count: number }) {
+export function TaskIndicatorBadge({
+  count,
+  active = false,
+}: {
+  count: number;
+  active?: boolean;
+}) {
   if (!count) return null;
+  const label = count > 99 ? "99+" : String(count);
   return (
     <span
-      className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800"
+      className={[
+        "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold",
+        active ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800",
+      ].join(" ")}
       title={`${count} open task${count === 1 ? "" : "s"}`}
     >
-      {count}
+      {label}
     </span>
   );
 }

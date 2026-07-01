@@ -10,7 +10,6 @@ import {
   getMaxDueDate,
   getTaskPermissionsForUser,
   getVisibleTasks,
-  resolveAssignEventId,
 } from "@/lib/task-queries";
 import { db } from "@/lib/db";
 import { itineraryItems, taskReminders, tasks, weddingEvents } from "@/lib/schema";
@@ -67,21 +66,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Itinerary item not found." }, { status: 404 });
       }
 
-      eventId = await resolveAssignEventId(user);
-      if (!eventId) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-
       dayId = dayId ?? item.dayId ?? null;
       linkedItemId = itemId;
-    } else {
-      if (!eventIdFromBody) {
-        return NextResponse.json(
-          { error: "eventId is required for standalone tasks." },
-          { status: 400 },
-        );
-      }
+    }
 
+    if (eventIdFromBody) {
       const [event] = await db
         .select()
         .from(weddingEvents)
@@ -101,10 +90,15 @@ export async function POST(request: Request) {
 
     const assigneeUserId = Number(body.assigneeUserId) || user.id;
     if (assigneeUserId !== user.id && !user.isAdmin) {
-      const perm = (await getTaskPermissionsForUser(user)).find(
-        (entry) => entry.eventId === eventId,
-      );
-      if (!perm?.canAssignForOthers) {
+      const permissions = await getTaskPermissionsForUser(user);
+      const canAssignOthers = eventId
+        ? permissions.some(
+            (entry) =>
+              entry.eventId === eventId &&
+              (entry.canAssign || entry.canAssignForOthers),
+          )
+        : permissions.some((entry) => entry.canAssignForOthers);
+      if (!canAssignOthers) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }
@@ -118,7 +112,7 @@ export async function POST(request: Request) {
     const [created] = await db
       .insert(tasks)
       .values({
-        eventId: eventId!,
+        eventId,
         dayId,
         itemId: linkedItemId,
         parentTaskId: body.parentTaskId ?? null,
