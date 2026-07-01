@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileText, Pencil, Trash2, Upload, X } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
+import { IconTooltip } from "@/components/ui/IconTooltip";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
   ADDITIONAL_VIEWERS_LABEL,
@@ -391,9 +392,14 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                       className="inline-flex max-w-full items-center gap-2 text-sm text-brand-deep hover:underline"
                     >
                       <FileText className="h-4 w-4 shrink-0" />
-                      <span className="truncate">
-                        {doc.label} · {doc.fileName}
-                      </span>
+                      <IconTooltip
+                        label={`${doc.label} · ${doc.fileName}`}
+                        className="min-w-0"
+                      >
+                        <span className="block truncate">
+                          {doc.label} · {doc.fileName}
+                        </span>
+                      </IconTooltip>
                     </a>
                     <p className="mt-1 text-xs text-stone-500">
                       Linked to: {covered.join(", ")}
