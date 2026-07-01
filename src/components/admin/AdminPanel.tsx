@@ -20,6 +20,7 @@ import { TaskPermissionsPanel } from "./TaskPermissionsPanel";
 import { SystemDiagnosticsPanel } from "./SystemDiagnosticsPanel";
 import { UserManagement, type ManagedUser } from "./UserManagement";
 import {
+  applyAccommodationStructuredToForm,
   buildItemApiPayload,
   emptyItemForm,
   itemToForm,
@@ -484,7 +485,7 @@ export function AdminPanel({
 
               {itemForm.category === "flight" ? (
                 <FlightScheduleTimes itemForm={itemForm} setItemForm={setItemForm} />
-              ) : (
+              ) : itemForm.category !== "accommodation" ? (
                 <>
                   <label className="block text-sm">
                     <span className="mb-1 block text-stone-500">Start</span>
@@ -510,7 +511,7 @@ export function AdminPanel({
                     />
                   </label>
                 </>
-              )}
+              ) : null}
             </div>
 
             <h3 className="mt-6 text-sm font-semibold tracking-wide text-stone-600 uppercase">
@@ -521,8 +522,13 @@ export function AdminPanel({
               structured={itemForm.structured}
               allItems={items}
               systemUsernames={systemUsernames}
+              eventDate={itemForm.eventDate}
+              startDatetime={itemForm.startDatetime}
+              endDatetime={itemForm.endDatetime}
               onChange={(structured) =>
-                setItemForm((current) => ({ ...current, structured }))
+                setItemForm((current) =>
+                  applyAccommodationStructuredToForm(current, structured),
+                )
               }
             />
 

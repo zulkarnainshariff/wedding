@@ -6,6 +6,7 @@ import { Save, Trash2, X } from "lucide-react";
 import { AdminItemDetailsForm } from "@/components/admin/AdminItemDetailsForm";
 import { FlightScheduleTimes } from "@/components/admin/FlightScheduleTimes";
 import {
+  applyAccommodationStructuredToForm,
   buildItemApiPayload,
   emptyItemForm,
   itemToForm,
@@ -90,7 +91,7 @@ function ItemEditFormFields({
 
         {form.category === "flight" ? (
           <FlightScheduleTimes itemForm={form} setItemForm={setForm} />
-        ) : (
+        ) : form.category !== "accommodation" ? (
           <>
             <label className="block text-sm">
               <span className="mb-1 block text-stone-500">Start</span>
@@ -116,7 +117,7 @@ function ItemEditFormFields({
               />
             </label>
           </>
-        )}
+        ) : null}
       </div>
 
       <h3 className="mt-6 text-sm font-semibold tracking-wide text-stone-600 uppercase">
@@ -126,7 +127,11 @@ function ItemEditFormFields({
         category={form.category}
         structured={form.structured}
         allItems={allItems}
-        onChange={(structured) => setForm({ ...form, structured })}
+        onChange={(structured) =>
+          setForm((current) =>
+            applyAccommodationStructuredToForm(current, structured),
+          )
+        }
       />
     </>
   );

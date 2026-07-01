@@ -64,6 +64,7 @@ const EMPTY_SIMPLE: Record<Category, Record<string, string>> = {
     departureTerminal: "",
     departureGate: "",
     totalFlightTime: "",
+    scheduleSortBy: "arrival",
   },
   pet_relocation: {
     petName: "Seymour",
@@ -415,6 +416,8 @@ export function buildStructuredDetailsPayload(
     payload.bookingReferences = flatMapFromGroups(structured.bookingGroups);
     payload.baggage = objectFromRecords(structured.baggage, true);
     payload.checkInStatus = structured.checkInStatus;
+    payload.scheduleSortBy =
+      structured.simple.scheduleSortBy === "departure" ? "departure" : "arrival";
     const filteredSegments = structured.segments
       .filter(
         (segment) =>

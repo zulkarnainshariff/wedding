@@ -1,4 +1,5 @@
 import { applyFlightDatetimeOverrides, resolveFlightSchedule } from "@/lib/flight-datetime";
+import { getFlightItemSortTime } from "@/lib/flight-schedule-sort";
 import {
   getAccommodationDetails,
   getActivityDetails,
@@ -200,6 +201,10 @@ export function getItemSortTime(item: {
   endDatetime?: Date | string | null;
   details?: unknown;
 }): number {
+  if (item.category === "flight") {
+    return getFlightItemSortTime(item);
+  }
+
   const schedule = resolveItemSchedule(item);
   const instant = schedule.startDatetime ?? schedule.endDatetime;
   return instant ? instant.getTime() : Number.MAX_SAFE_INTEGER;

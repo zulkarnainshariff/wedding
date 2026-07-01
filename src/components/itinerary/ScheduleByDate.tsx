@@ -6,7 +6,7 @@ import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 import { useDocumentIndicators } from "@/components/itinerary/useDocumentIndicators";
 import { ScheduleToolbar } from "./ScheduleToolbar";
 import { TripProgressIndicator } from "./TripProgressIndicator";
-import { useFlightSortedDays } from "./FlightDaySortToggle";
+import { sortDayItems } from "@/lib/day-item-sort";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { useDayVisibility } from "@/hooks/useDayVisibility";
@@ -50,7 +50,14 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
   );
 
   const { visibleDays } = useDayVisibility(filteredDays);
-  const sortedVisibleDays = useFlightSortedDays(visibleDays);
+  const sortedVisibleDays = useMemo(
+    () =>
+      visibleDays.map((day) => ({
+        ...day,
+        items: sortDayItems(day.items),
+      })),
+    [visibleDays],
+  );
   const { itemSummaries } = useTaskIndicators();
   const documentCounts = useDocumentIndicators();
   const progressItems = useMemo(
@@ -69,7 +76,6 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
           onParticipantsChange={setSelectedParticipants}
           jumpDays={visibleDays}
           jumpVariant="schedule"
-          sortDays={visibleDays}
         />
       }
     >
