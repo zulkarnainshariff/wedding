@@ -28,7 +28,7 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
   const { user } = useAuth();
   const { effectiveDate, hidePast, hideFreeDays, hideUntouchedDays } = useTripTime();
   const restrictedView = hasRestrictedTravellerView(user);
-  const { formatDateOnly } = useDisplayFormat();
+  const { formatDateOnlyWithWeekday } = useDisplayFormat();
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
   const allItems = useMemo(
@@ -131,7 +131,7 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
                       )}
                     </div>
                     <p className="text-sm font-medium text-accent">
-                      {formatDateOnly(day.date)}
+                      {formatDateOnlyWithWeekday(day.date)}
                     </p>
                   </div>
                 </div>

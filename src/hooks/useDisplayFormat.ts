@@ -6,6 +6,7 @@ import {
   formatBaggageWithPrefs,
   formatClockTimeWithPrefs,
   formatDateOnlyWithPrefs,
+  formatDateOnlyWithWeekdayWithPrefs,
   formatDateRangeCompactWithPrefs,
   formatDateTimeWithPrefs,
   formatDayOptionLabel,
@@ -32,6 +33,8 @@ export function useDisplayFormat() {
       ) => formatInstantWithPrefs(iso, timeZone, preferences, options),
       formatDateOnly: (value: string | Date | null | undefined) =>
         formatDateOnlyWithPrefs(value, preferences),
+      formatDateOnlyWithWeekday: (value: string | Date | null | undefined) =>
+        formatDateOnlyWithWeekdayWithPrefs(value, preferences),
       formatDayOption: (
         day: Pick<
           { dayNumber: number; title?: string | null; date: string },

@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
+import { SubItemAdditionalViewersField } from "@/components/itinerary/SubItemAdditionalViewersField";
+import { SubItemParticipantsField } from "@/components/itinerary/SubItemParticipantsField";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SubItemRow } from "@/components/itinerary/SubItemDisplay";
-import { travellerOptions } from "@/lib/admin-item-details";
-import { additionalViewerOptions } from "@/lib/item-viewers";
-import { useAccountUsernames } from "@/hooks/useAccountUsernames";
-import { AdditionalViewersDropdown } from "@/components/admin/AdditionalViewersDropdown";
 import { getSubItemFormPlaceholders } from "@/lib/sub-item-placeholders";
+import { parentItemParticipants } from "@/lib/item-subitems";
+import { useAccountUsernames } from "@/hooks/useAccountUsernames";
 import type { ItineraryItem } from "@/lib/schema";
 
 function SubItemDetailRow({
@@ -90,13 +89,9 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   const [deleting, setDeleting] = useState(false);
   const placeholders = getSubItemFormPlaceholders(item);
   const accountUsernames = useAccountUsernames();
-  const participantOptions = useMemo(
-    () => travellerOptions(participants),
-    [participants],
-  );
-  const viewerOptions = useMemo(
-    () => additionalViewerOptions(participants, viewers, accountUsernames),
-    [participants, viewers, accountUsernames],
+  const parentParticipants = useMemo(
+    () => parentItemParticipants(item),
+    [item],
   );
 
   const refresh = useCallback(async () => {
@@ -222,33 +217,22 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
                   className="w-full rounded-lg border border-stone-200 px-3 py-2"
                 />
               </label>
-              <div className="text-sm sm:col-span-2">
-                <CheckboxDropdown
-                  label="Participants"
-                  options={participantOptions}
-                  value={participants}
-                  onChange={setParticipants}
-                  emptyLabel="Select participants…"
-                />
-              </div>
-              <div className="text-sm sm:col-span-2">
-                <AdditionalViewersDropdown
-                  label="Additional viewers"
-                  options={viewerOptions}
-                  viewers={viewers}
-                  viewerLinks={viewerLinks}
-                  participantOptions={participants}
-                  onChange={({ viewers: nextViewers, viewerLinks: nextLinks }) => {
-                    setViewers(nextViewers);
-                    setViewerLinks(nextLinks);
-                  }}
-                  emptyLabel="No additional viewers"
-                />
-                <p className="mt-1 text-xs text-stone-500">
-                  People who should see this sub-item but are not listed as
-                  participants (for example travellers being picked up).
-                </p>
-              </div>
+              <SubItemParticipantsField
+                participants={participants}
+                onChange={setParticipants}
+                parentParticipants={parentParticipants}
+              />
+              <SubItemAdditionalViewersField
+                parentItem={item}
+                participants={participants}
+                viewers={viewers}
+                viewerLinks={viewerLinks}
+                onChange={({ viewers: nextViewers, viewerLinks: nextLinks }) => {
+                  setViewers(nextViewers);
+                  setViewerLinks(nextLinks);
+                }}
+                accountUsernames={accountUsernames}
+              />
               <label className="block text-sm">
                 <span className="mb-1 block text-stone-500">Location name (optional)</span>
                 <input

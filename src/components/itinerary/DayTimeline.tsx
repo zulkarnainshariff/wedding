@@ -21,7 +21,7 @@ type DayWithItems = ItineraryDay & { items: ItineraryItemWithSubItems[] };
 export function DayTimeline({ days }: { days: DayWithItems[] }) {
   const { user } = useAuth();
   const { effectiveDate, hidePast, hideFreeDays, hideUntouchedDays } = useTripTime();
-  const { formatDateOnly } = useDisplayFormat();
+  const { formatDateOnlyWithWeekday } = useDisplayFormat();
   const restrictedView = hasRestrictedTravellerView(user);
   const { visibleDays } = useDayVisibility(days);
   const sortedVisibleDays = useMemo(
@@ -96,7 +96,7 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
                     )}
                     <TaskIndicatorBadge count={dayCounts[day.id] ?? 0} />
                   </div>
-                  <p className="text-sm text-stone-500">{formatDateOnly(day.date)}</p>
+                  <p className="text-sm text-stone-500">{formatDateOnlyWithWeekday(day.date)}</p>
                 </div>
               </div>
 

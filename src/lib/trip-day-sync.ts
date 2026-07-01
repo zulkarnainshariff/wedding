@@ -20,7 +20,7 @@ export function eachDateInRange(startDate: string, endDate: string): string[] {
 export async function syncItineraryDaysForRange(
   startDate: string,
   endDate: string,
-): Promise<{ created: number; updated: number }> {
+): Promise<{ created: number; updated: number; unhidden: number }> {
   const dates = eachDateInRange(startDate, endDate);
   if (dates.length === 0) {
     throw new Error("End date must be on or after start date.");
@@ -54,7 +54,13 @@ export async function syncItineraryDaysForRange(
     .filter((day) => day.date >= startDate && day.date <= endDate)
     .sort((a, b) => a.date.localeCompare(b.date));
 
+  const outOfRange = existing.filter(
+    (day) => day.date < startDate || day.date > endDate,
+  );
+
   let updated = 0;
+  let unhidden = 0;
+
   await db.transaction(async (tx) => {
     for (const day of existing) {
       await tx
@@ -66,23 +72,34 @@ export async function syncItineraryDaysForRange(
     for (let index = 0; index < inRange.length; index += 1) {
       const day = inRange[index];
       const dayNumber = index + 1;
-      if (day.dayNumber !== dayNumber) updated += 1;
+      const shouldUnhide = day.hidden;
+      if (day.dayNumber !== dayNumber || shouldUnhide) {
+        updated += 1;
+      }
+      if (shouldUnhide) {
+        unhidden += 1;
+      }
       await tx
         .update(itineraryDays)
-        .set({ dayNumber })
+        .set({
+          dayNumber,
+          hidden: false,
+        })
         .where(eq(itineraryDays.id, day.id));
     }
 
-    const staleIds = existing
-      .filter((day) => day.date < startDate || day.date > endDate)
-      .map((day) => day.id);
-    if (staleIds.length > 0) {
+    let trailingDayNumber = inRange.length;
+    for (const day of outOfRange.sort((a, b) => a.date.localeCompare(b.date))) {
+      trailingDayNumber += 1;
       await tx
         .update(itineraryDays)
-        .set({ hidden: true })
-        .where(inArray(itineraryDays.id, staleIds));
+        .set({
+          dayNumber: trailingDayNumber,
+          hidden: true,
+        })
+        .where(eq(itineraryDays.id, day.id));
     }
   });
 
-  return { created, updated };
+  return { created, updated, unhidden };
 }

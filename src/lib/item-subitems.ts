@@ -1,7 +1,13 @@
 import { combineActivityDatetime } from "@/lib/activity-utils";
 import { buildLocationPayload } from "@/lib/item-location";
 import { getItemCompletion, withItemCompletion } from "@/lib/item-completion";
-import { extractViewerLinks, normalizeViewerLinksPayload } from "@/lib/item-viewer-links";
+import {
+  extractViewerLinks,
+  normalizeViewerLinksPayload,
+  type ViewerLinks,
+} from "@/lib/item-viewer-links";
+import { extractItemAdditionalViewers } from "@/lib/item-viewers";
+import { extractItemTravellers } from "@/lib/item-travellers";
 import { normalizeTravellerName } from "@/lib/travellers";
 import type { ItineraryItem } from "@/lib/schema";
 
@@ -131,4 +137,78 @@ export function resolveSubItemStartDatetime(
   if (!/^\d{2}:\d{2}$/.test(clockTime)) return null;
   if (!parent.eventDate) return null;
   return combineActivityDatetime(parent.eventDate, clockTime);
+}
+
+export function parentItemParticipants(parent: ItineraryItem): string[] {
+  return extractItemTravellers(parent.details, parent.category);
+}
+
+export function participantsMatchParent(
+  participants: string[],
+  parentParticipants: string[],
+): boolean {
+  if (parentParticipants.length === 0) return false;
+  if (participants.length !== parentParticipants.length) return false;
+  return parentParticipants.every((name) => participants.includes(name));
+}
+
+export function parentItemAdditionalViewers(parent: ItineraryItem): {
+  viewers: string[];
+  viewerLinks: ViewerLinks;
+} {
+  return {
+    viewers: extractItemAdditionalViewers(parent.details),
+    viewerLinks: extractViewerLinks(parent.details),
+  };
+}
+
+function cloneViewerLinks(links: ViewerLinks): ViewerLinks {
+  return Object.fromEntries(
+    Object.entries(links).map(([viewer, linked]) => [viewer, [...linked]]),
+  );
+}
+
+export function additionalViewersMatchParent(
+  viewers: string[],
+  viewerLinks: ViewerLinks,
+  parentViewers: string[],
+  parentViewerLinks: ViewerLinks,
+): boolean {
+  if (parentViewers.length === 0) return false;
+  if (viewers.length !== parentViewers.length) return false;
+
+  const sortedViewers = [...viewers].sort((a, b) => a.localeCompare(b));
+  const sortedParentViewers = [...parentViewers].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  if (!sortedViewers.every((name, index) => name === sortedParentViewers[index])) {
+    return false;
+  }
+
+  for (const viewer of parentViewers) {
+    const key = normalizeTravellerName(viewer);
+    const linked = [...(viewerLinks[key] ?? [])].sort((a, b) => a.localeCompare(b));
+    const parentLinked = [...(parentViewerLinks[key] ?? [])].sort((a, b) =>
+      a.localeCompare(b),
+    );
+    if (
+      linked.length !== parentLinked.length ||
+      !linked.every((name, index) => name === parentLinked[index])
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function copyParentAdditionalViewers(parent: ItineraryItem): {
+  viewers: string[];
+  viewerLinks: ViewerLinks;
+} {
+  const { viewers, viewerLinks } = parentItemAdditionalViewers(parent);
+  return {
+    viewers: [...viewers],
+    viewerLinks: cloneViewerLinks(viewerLinks),
+  };
 }

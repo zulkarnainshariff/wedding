@@ -2,17 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Save, Trash2, X } from "lucide-react";
-import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
+import { SubItemAdditionalViewersField } from "@/components/itinerary/SubItemAdditionalViewersField";
+import { SubItemParticipantsField } from "@/components/itinerary/SubItemParticipantsField";
 import { getSubItemFormPlaceholders } from "@/lib/sub-item-placeholders";
 import {
   isSubItem,
+  parentItemParticipants,
   subItemToFormState,
   type SubItemFormState,
 } from "@/lib/item-subitems";
-import { travellerOptions } from "@/lib/admin-item-details";
-import { additionalViewerOptions } from "@/lib/item-viewers";
 import { useAccountUsernames } from "@/hooks/useAccountUsernames";
-import { AdditionalViewersDropdown } from "@/components/admin/AdditionalViewersDropdown";
 import type { ItineraryItem } from "@/lib/schema";
 
 const EMPTY_FORM: SubItemFormState = {
@@ -31,22 +30,16 @@ function SubItemFormFields({
   setForm,
   placeholders,
   accountUsernames,
+  parentParticipants,
+  parentItem,
 }: {
   form: SubItemFormState;
   setForm: React.Dispatch<React.SetStateAction<SubItemFormState>>;
   placeholders: ReturnType<typeof getSubItemFormPlaceholders>;
   accountUsernames: string[];
+  parentParticipants: string[];
+  parentItem: ItineraryItem | null | undefined;
 }) {
-  const participantOptions = useMemo(
-    () => travellerOptions(form.participants),
-    [form.participants],
-  );
-  const viewerOptions = useMemo(
-    () =>
-      additionalViewerOptions(form.participants, form.viewers, accountUsernames),
-    [form.participants, form.viewers, accountUsernames],
-  );
-
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="block text-sm sm:col-span-2">
@@ -68,34 +61,23 @@ function SubItemFormFields({
           className="w-full rounded-lg border border-stone-200 px-3 py-2"
         />
       </label>
-      <div className="text-sm sm:col-span-2">
-        <CheckboxDropdown
-          label="Participants"
-          options={participantOptions}
-          value={form.participants}
-          onChange={(participants) =>
-            setForm((current) => ({ ...current, participants }))
-          }
-          emptyLabel="Select participants…"
-        />
-      </div>
-      <div className="text-sm sm:col-span-2">
-        <AdditionalViewersDropdown
-          label="Additional viewers"
-          options={viewerOptions}
-          viewers={form.viewers}
-          viewerLinks={form.viewerLinks}
-          participantOptions={form.participants}
-          onChange={({ viewers, viewerLinks }) =>
-            setForm((current) => ({ ...current, viewers, viewerLinks }))
-          }
-          emptyLabel="No additional viewers"
-        />
-        <p className="mt-1 text-xs text-stone-500">
-          People who should see this sub-item but are not listed as participants
-          (for example travellers being picked up).
-        </p>
-      </div>
+      <SubItemParticipantsField
+        participants={form.participants}
+        onChange={(participants) =>
+          setForm((current) => ({ ...current, participants }))
+        }
+        parentParticipants={parentParticipants}
+      />
+      <SubItemAdditionalViewersField
+        parentItem={parentItem}
+        participants={form.participants}
+        viewers={form.viewers}
+        viewerLinks={form.viewerLinks}
+        onChange={({ viewers, viewerLinks }) =>
+          setForm((current) => ({ ...current, viewers, viewerLinks }))
+        }
+        accountUsernames={accountUsernames}
+      />
       <label className="block text-sm">
         <span className="mb-1 block text-stone-500">Location name (optional)</span>
         <input
@@ -149,6 +131,10 @@ export function SubItemEditForm({
 }) {
   const placeholders = getSubItemFormPlaceholders(parentItem ?? item);
   const accountUsernames = useAccountUsernames();
+  const parentParticipants = useMemo(
+    () => (parentItem ? parentItemParticipants(parentItem) : []),
+    [parentItem],
+  );
   const [form, setForm] = useState<SubItemFormState>(() =>
     isSubItem(item) ? subItemToFormState(item) : EMPTY_FORM,
   );
@@ -192,6 +178,8 @@ export function SubItemEditForm({
         setForm={setForm}
         placeholders={placeholders}
         accountUsernames={accountUsernames}
+        parentParticipants={parentParticipants}
+        parentItem={parentItem}
       />
       {error && (
         <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">

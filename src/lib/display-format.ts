@@ -35,13 +35,42 @@ export function formatDateOnlyWithPrefs(
   return preferences.dateFormat === "mdy" ? `${m}-${day}-${y}` : `${day}-${m}-${y}`;
 }
 
+function weekdayLabel(value: string | Date): string {
+  let datePart: string;
+  if (typeof value === "string") {
+    datePart = value.trim().split("T")[0];
+  } else {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    datePart = `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+  }
+  const parsed = parseCalendarDate(datePart);
+  if (!parsed) return "";
+  const weekday = new Date(
+    `${parsed.y}-${parsed.m}-${parsed.d}T12:00:00`,
+  ).toLocaleDateString("en-US", { weekday: "long" });
+  return weekday;
+}
+
+export function formatDateOnlyWithWeekdayWithPrefs(
+  value: string | Date | null | undefined,
+  preferences: UserPreferences = DEFAULT_USER_PREFERENCES,
+): string {
+  if (!value) return "—";
+  const dateLabel = formatDateOnlyWithPrefs(value, preferences);
+  const weekday = weekdayLabel(value);
+  return weekday ? `${dateLabel} - ${weekday}` : dateLabel;
+}
+
 export function formatDayOptionLabel(
   day: Pick<{ dayNumber: number; title?: string | null; date: string }, "dayNumber" | "title" | "date">,
   preferences: UserPreferences = DEFAULT_USER_PREFERENCES,
 ): string {
   const title = day.title?.trim();
-  const dateLabel = formatDateOnlyWithPrefs(day.date, preferences);
-  return `Day ${day.dayNumber} — ${title || dateLabel}`;
+  const dateLabel = formatDateOnlyWithWeekdayWithPrefs(day.date, preferences);
+  if (title) {
+    return `Day ${day.dayNumber} — ${dateLabel} — ${title}`;
+  }
+  return `Day ${day.dayNumber} — ${dateLabel}`;
 }
 
 export function formatDateRangeCompactWithPrefs(

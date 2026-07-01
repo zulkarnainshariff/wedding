@@ -35,7 +35,7 @@ export async function GET() {
   const days = await db
     .select()
     .from(itineraryDays)
-    .orderBy(asc(itineraryDays.dayNumber));
+    .orderBy(asc(itineraryDays.date));
   return NextResponse.json(days);
 }
 

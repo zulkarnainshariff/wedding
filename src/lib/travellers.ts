@@ -1,30 +1,9 @@
-export const TRAVELLER_ALIASES: Record<string, string> = {
-  Papa: "Zulkarnain",
-  Nenek: "Zaiton",
-  Angah: "Asmah",
-  Nat: "Natalie",
-};
-
-export const TRAVELLER_NAMES = [
-  "Zaiton",
-  "Zulkarnain",
-  "Natalie",
-  "Nadya",
-  "Nadra",
-  "Umar",
-  "Asmah",
-  "Kamal",
-  "Shireen",
-  "Zulfikar",
-  "Everyone",
-] as const;
-
 export function normalizeTravellerName(name: string): string {
-  return TRAVELLER_ALIASES[name] ?? name;
+  return name.trim();
 }
 
 export function normalizeTravellerList(names: string[]): string[] {
-  return names.map(normalizeTravellerName);
+  return names.map(normalizeTravellerName).filter(Boolean);
 }
 
 export function normalizeTravellerRecord<T>(
@@ -38,15 +17,8 @@ export function normalizeTravellerRecord<T>(
   );
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 export function normalizeGuestText(text: string): string {
-  return Object.entries(TRAVELLER_ALIASES).reduce((result, [from, to]) => {
-    const regex = new RegExp(`\\b${escapeRegExp(from)}\\b`, "g");
-    return result.replace(regex, to);
-  }, text);
+  return text.trim();
 }
 
 export function normalizeNotes(notes?: string[]): string[] | undefined {

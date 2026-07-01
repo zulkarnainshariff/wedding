@@ -5,10 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { ItineraryItem } from "@/lib/schema";
 import {
   defaultTravellerRows,
-  travellerOptions,
   type StructuredItemDetails,
   type TravellerRecord,
 } from "@/lib/admin-item-details";
+import { travellerOptionsFromAccounts } from "@/lib/item-travellers";
 import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
 import { AdditionalViewersDropdown } from "@/components/admin/AdditionalViewersDropdown";
 import {
@@ -85,12 +85,14 @@ function ParticipantMultiSelect({
   label = "Participants",
   value,
   onChange,
+  accountUsernames,
 }: {
   label?: string;
   value: string[];
   onChange: (value: string[]) => void;
+  accountUsernames: string[];
 }) {
-  const options = travellerOptions(value);
+  const options = travellerOptionsFromAccounts(accountUsernames, value);
 
   return (
     <CheckboxDropdown
@@ -179,6 +181,7 @@ function TravellerRecordsEditor({
   valueLabel,
   inputType = "text",
   nameOptions,
+  accountUsernames,
 }: {
   label: string;
   rows: TravellerRecord[];
@@ -186,8 +189,10 @@ function TravellerRecordsEditor({
   valueLabel: string;
   inputType?: "text" | "number";
   nameOptions?: string[];
+  accountUsernames: string[];
 }) {
-  const travellerNameOptions = travellerOptions(
+  const travellerNameOptions = travellerOptionsFromAccounts(
+    accountUsernames,
     nameOptions ?? rows.map((row) => row.name),
   );
   return (
@@ -724,6 +729,7 @@ function SeatCheckInEditor({
   onCheckInChange,
   showSeats = true,
   nameOptions,
+  accountUsernames,
 }: {
   rows: TravellerRecord[];
   checkInStatus: Record<string, boolean>;
@@ -731,8 +737,10 @@ function SeatCheckInEditor({
   onCheckInChange: (status: Record<string, boolean>) => void;
   showSeats?: boolean;
   nameOptions?: string[];
+  accountUsernames: string[];
 }) {
-  const travellerNameOptions = travellerOptions(
+  const travellerNameOptions = travellerOptionsFromAccounts(
+    accountUsernames,
     nameOptions ?? rows.map((row) => row.name),
   );
   return (
@@ -983,6 +991,7 @@ export function AdminItemDetailsForm({
             onChange={(participants) =>
               onChange(patchStructured(structured, { participants }))
             }
+            accountUsernames={allSystemUsernames}
           />
           <label className="block text-sm sm:col-span-2">
             <span className="mb-1 block text-stone-500">Linked booking</span>
@@ -1042,6 +1051,7 @@ export function AdminItemDetailsForm({
             onChange={(travellers) =>
               onChange(updateFlightTravellers(structured, travellers))
             }
+            accountUsernames={allSystemUsernames}
           />
           <BookingGroupsEditor
             groups={structured.bookingGroups}
@@ -1057,6 +1067,7 @@ export function AdminItemDetailsForm({
             showSeats={structured.segments.length < 2}
             checkInStatus={structured.checkInStatus}
             nameOptions={structured.travellers}
+            accountUsernames={allSystemUsernames}
             onChange={(seats) => onChange({ ...structured, seats })}
             onCheckInChange={(checkInStatus) =>
               onChange({ ...structured, checkInStatus })
@@ -1083,6 +1094,7 @@ export function AdminItemDetailsForm({
               label=""
               rows={structured.baggage}
               nameOptions={structured.travellers}
+              accountUsernames={allSystemUsernames}
               onChange={(baggage) => onChange({ ...structured, baggage })}
               valueLabel={structured.baggageUnit === "imperial" ? "lb" : "kg"}
               inputType="number"
@@ -1157,6 +1169,7 @@ export function AdminItemDetailsForm({
             onChange={(participants) =>
               onChange(patchStructured(structured, { participants }))
             }
+            accountUsernames={allSystemUsernames}
           />
           <TextInput
             label="Guests note (optional)"
@@ -1237,6 +1250,7 @@ export function AdminItemDetailsForm({
             onChange={(participants) =>
               onChange(patchStructured(structured, { participants }))
             }
+            accountUsernames={allSystemUsernames}
           />
           <TextInput label="Company" value={structured.simple.company} onChange={(v) => setSimple("company", v)} />
           <label className="block text-sm">
@@ -1270,6 +1284,7 @@ export function AdminItemDetailsForm({
             onChange={(participants) =>
               onChange(patchStructured(structured, { participants }))
             }
+            accountUsernames={allSystemUsernames}
           />
         </>
       )}
@@ -1299,6 +1314,7 @@ export function AdminItemDetailsForm({
             onChange={(travellers) =>
               onChange(patchStructured(structured, { travellers }))
             }
+            accountUsernames={allSystemUsernames}
           />
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
             <input

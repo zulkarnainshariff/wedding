@@ -86,6 +86,34 @@ export function extractItemTravellers(
 
 export function itemIncludesEveryone(travellers: string[]): boolean {
   return travellers.some(
-    (name) => name === "Everyone" || name.toLowerCase() === "all",
+    (name) => name === EVERYONE_TRAVELLER || name.toLowerCase() === "all",
   );
+}
+
+export const EVERYONE_TRAVELLER = "Everyone";
+
+export const SYSTEM_ACCOUNT_USERNAMES = new Set(["root", "admin"]);
+
+export function travellerOptionsFromAccounts(
+  accountUsernames: string[],
+  existing: string[] = [],
+): string[] {
+  const fromAccounts = accountUsernames
+    .map((username) => username.trim().toLowerCase())
+    .filter(
+      (username) => username && !SYSTEM_ACCOUNT_USERNAMES.has(username),
+    )
+    .map((username) => usernameToTravellerName(username));
+
+  const options = new Set<string>([
+    ...fromAccounts,
+    ...existing.map((name) => normalizeTravellerName(name)).filter(Boolean),
+    EVERYONE_TRAVELLER,
+  ]);
+
+  return [...options].sort((left, right) => {
+    if (left === EVERYONE_TRAVELLER) return 1;
+    if (right === EVERYONE_TRAVELLER) return -1;
+    return left.localeCompare(right);
+  });
 }
