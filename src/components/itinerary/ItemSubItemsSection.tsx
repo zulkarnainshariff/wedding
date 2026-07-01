@@ -9,10 +9,7 @@ import { SubItemRow } from "@/components/itinerary/SubItemDisplay";
 import { travellerOptions } from "@/lib/admin-item-details";
 import { additionalViewerOptions } from "@/lib/item-viewers";
 import { useAccountUsernames } from "@/hooks/useAccountUsernames";
-import {
-  ViewerLinksFields,
-  updateViewersWithLinks,
-} from "@/components/admin/ViewerLinksFields";
+import { AdditionalViewersDropdown } from "@/components/admin/AdditionalViewersDropdown";
 import { getSubItemFormPlaceholders } from "@/lib/sub-item-placeholders";
 import type { ItineraryItem } from "@/lib/schema";
 
@@ -235,21 +232,17 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
                 />
               </div>
               <div className="text-sm sm:col-span-2">
-                <CheckboxDropdown
+                <AdditionalViewersDropdown
                   label="Additional viewers"
                   options={viewerOptions}
-                  value={viewers}
-                  onChange={(nextViewers) => {
-                    setViewers(nextViewers);
-                    setViewerLinks(updateViewersWithLinks(nextViewers, viewerLinks));
-                  }}
-                  emptyLabel="No additional viewers"
-                />
-                <ViewerLinksFields
                   viewers={viewers}
                   viewerLinks={viewerLinks}
                   participantOptions={participants}
-                  onChange={setViewerLinks}
+                  onChange={({ viewers: nextViewers, viewerLinks: nextLinks }) => {
+                    setViewers(nextViewers);
+                    setViewerLinks(nextLinks);
+                  }}
+                  emptyLabel="No additional viewers"
                 />
                 <p className="mt-1 text-xs text-stone-500">
                   People who should see this sub-item but are not listed as
