@@ -1,38 +1,15 @@
-import { resolveFlightScheduleForItem } from "@/lib/flight-segment-timing";
+import { getItemSortTime } from "@/lib/item-schedule-datetime";
 import type { ItineraryItem } from "@/lib/schema";
 
-export type FlightDaySortMode = "arrival" | "departure";
-
-export function dayHasFlight(items: ItineraryItem[]): boolean {
-  return items.some((item) => item.category === "flight");
+export function getItemScheduleSortTime(item: ItineraryItem): number | null {
+  const time = getItemSortTime(item);
+  return time === Number.MAX_SAFE_INTEGER ? null : time;
 }
 
-export function getItemScheduleSortTime(
-  item: ItineraryItem,
-  mode: FlightDaySortMode,
-): number | null {
-  if (item.category === "flight") {
-    const schedule = resolveFlightScheduleForItem(item);
-    const instant =
-      mode === "arrival" ? schedule.endDatetime : schedule.startDatetime;
-    return instant?.getTime() ?? null;
-  }
-
-  if (!item.startDatetime) return null;
-  return new Date(item.startDatetime).getTime();
-}
-
-export function sortDayItems(
-  items: ItineraryItem[],
-  mode: FlightDaySortMode,
-): ItineraryItem[] {
-  if (!dayHasFlight(items)) {
-    return items;
-  }
-
+export function sortDayItems(items: ItineraryItem[]): ItineraryItem[] {
   return [...items].sort((left, right) => {
-    const leftTime = getItemScheduleSortTime(left, mode);
-    const rightTime = getItemScheduleSortTime(right, mode);
+    const leftTime = getItemScheduleSortTime(left);
+    const rightTime = getItemScheduleSortTime(right);
 
     if (leftTime == null && rightTime == null) {
       return left.sortOrder - right.sortOrder;

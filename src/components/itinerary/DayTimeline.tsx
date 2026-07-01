@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { ItemCard } from "./ItemCard";
 import { TripProgressIndicator } from "./TripProgressIndicator";
-import { useFlightSortedDays } from "./FlightDaySortToggle";
+import { sortDayItems } from "@/lib/day-item-sort";
 import { TaskIndicatorBadge, ItemTaskIndicator, useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 import { useDocumentIndicators } from "@/components/itinerary/useDocumentIndicators";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -24,7 +24,14 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
   const { formatDateOnly } = useDisplayFormat();
   const restrictedView = hasRestrictedTravellerView(user);
   const { visibleDays } = useDayVisibility(days);
-  const sortedVisibleDays = useFlightSortedDays(visibleDays);
+  const sortedVisibleDays = useMemo(
+    () =>
+      visibleDays.map((day) => ({
+        ...day,
+        items: sortDayItems(day.items),
+      })),
+    [visibleDays],
+  );
   const { dayCounts, itemSummaries } = useTaskIndicators();
   const documentCounts = useDocumentIndicators();
   const progressItems = useMemo(

@@ -28,6 +28,12 @@ import type { AccommodationSuggestion, Category, FlightSegment } from "@/lib/typ
 import {
   applySegmentSeatWithPropagation,
 } from "@/lib/flight-seats";
+import {
+  getEffectiveFlightScheduleSortBy,
+  isFlightArrivalOnEventDay,
+  normalizeFlightScheduleSortBy,
+  type FlightScheduleSortBy,
+} from "@/lib/flight-schedule-sort";
 
 function TimeInput({
   label,
@@ -831,12 +837,18 @@ export function AdminItemDetailsForm({
   allItems,
   onChange,
   systemUsernames = [],
+  eventDate = null,
+  startDatetime = null,
+  endDatetime = null,
 }: {
   category: Category;
   structured: StructuredItemDetails;
   allItems: ItineraryItem[];
   onChange: (next: StructuredItemDetails) => void;
   systemUsernames?: string[];
+  eventDate?: string | null;
+  startDatetime?: string | null;
+  endDatetime?: Date | string | null;
 }) {
   const [loadedUsernames, setLoadedUsernames] = useState<string[]>([]);
 
@@ -880,6 +892,51 @@ export function AdminItemDetailsForm({
       ),
     [structured, category, allSystemUsernames],
   );
+
+  const flightSortPreviewItem = useMemo(
+    () =>
+      ({
+        category: "flight" as const,
+        eventDate,
+        startDatetime,
+        endDatetime,
+        details: {
+          ...structured.simple,
+          segments: structured.segments,
+        },
+      }),
+    [structured.simple, structured.segments, eventDate, startDatetime, endDatetime],
+  );
+
+  const flightCanSortByArrival = useMemo(
+    () => isFlightArrivalOnEventDay(flightSortPreviewItem),
+    [flightSortPreviewItem],
+  );
+
+  const flightScheduleSortBy = useMemo(
+    () => getEffectiveFlightScheduleSortBy(flightSortPreviewItem),
+    [flightSortPreviewItem],
+  );
+
+  useEffect(() => {
+    if (category !== "flight" || flightCanSortByArrival) return;
+    if (structured.simple.scheduleSortBy === "departure") return;
+    onChange({
+      ...structured,
+      simple: { ...structured.simple, scheduleSortBy: "departure" },
+    });
+  }, [category, flightCanSortByArrival, structured, onChange]);
+
+  function setFlightScheduleSortBy(next: FlightScheduleSortBy) {
+    const normalized = normalizeFlightScheduleSortBy(
+      flightSortPreviewItem,
+      next,
+    );
+    onChange({
+      ...structured,
+      simple: { ...structured.simple, scheduleSortBy: normalized },
+    });
+  }
 
   const setSimple = (key: string, value: string) =>
     onChange({
@@ -959,6 +1016,26 @@ export function AdminItemDetailsForm({
               <option value="confirmed">Confirmed</option>
               <option value="tbc">To be confirmed</option>
             </select>
+          </label>
+          <label className="block text-sm sm:col-span-2">
+            <span className="mb-1 block text-stone-500">Day timeline sort</span>
+            <select
+              value={flightScheduleSortBy}
+              onChange={(e) =>
+                setFlightScheduleSortBy(e.target.value as FlightScheduleSortBy)
+              }
+              className="w-full rounded-lg border border-stone-200 px-3 py-2"
+            >
+              <option value="arrival" disabled={!flightCanSortByArrival}>
+                Arrival time
+              </option>
+              <option value="departure">Departure time</option>
+            </select>
+            <p className="mt-1 text-xs text-stone-500">
+              {flightCanSortByArrival
+                ? "Choose whether this flight is ordered by departure or arrival when mixed with other plans on the same day."
+                : "Arrival is on a different day than this item, so only departure time can be used for sorting."}
+            </p>
           </label>
           <ParticipantMultiSelect
             value={structured.travellers}

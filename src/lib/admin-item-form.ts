@@ -200,15 +200,42 @@ function syncStructuredTimes(
 
   if (category === "accommodation") {
     if (startDatetime) {
+      const [date] = startDatetime.split("T");
+      if (date && !nextSimple.checkInDate) nextSimple.checkInDate = date;
+      if (date) nextEventDate = date;
+    }
+    if (endDatetime) {
+      const [date] = endDatetime.split("T");
+      if (date && !nextSimple.checkOutDate) nextSimple.checkOutDate = date;
+    }
+
+    const checkInDate = nextSimple.checkInDate || nextEventDate;
+    if (checkInDate && nextSimple.checkInTime) {
+      startIso = isoFromDateAndClock(checkInDate, nextSimple.checkInTime);
+      nextSimple.checkInDate = checkInDate;
+      nextEventDate = checkInDate;
+    } else if (startDatetime) {
       const [date, time] = startDatetime.split("T");
       if (date) nextSimple.checkInDate = date;
       if (time) nextSimple.checkInTime = time.slice(0, 5);
       if (date) nextEventDate = date;
+      if (date && time) {
+        startIso = isoFromDateAndClock(date, time.slice(0, 5));
+      }
     }
-    if (endDatetime) {
+
+    if (nextSimple.checkOutDate && nextSimple.checkOutTime) {
+      endIso = isoFromDateAndClock(
+        nextSimple.checkOutDate,
+        nextSimple.checkOutTime,
+      );
+    } else if (endDatetime) {
       const [date, time] = endDatetime.split("T");
       if (date) nextSimple.checkOutDate = date;
       if (time) nextSimple.checkOutTime = time.slice(0, 5);
+      if (date && time) {
+        endIso = isoFromDateAndClock(date, time.slice(0, 5));
+      }
     }
   }
 
@@ -256,10 +283,56 @@ export function emptyItemForm(category: Category = "flight"): ItemFormState {
   };
 }
 
+export function applyAccommodationStructuredToForm(
+  form: ItemFormState,
+  structured: StructuredItemDetails,
+): ItemFormState {
+  if (form.category !== "accommodation") {
+    return { ...form, structured };
+  }
+
+  const { checkInDate, checkInTime, checkOutDate, checkOutTime } =
+    structured.simple;
+  const startDatetime =
+    checkInDate && checkInTime ? `${checkInDate}T${checkInTime}` : form.startDatetime;
+  const endDatetime =
+    checkOutDate && checkOutTime
+      ? `${checkOutDate}T${checkOutTime}`
+      : form.endDatetime;
+
+  return {
+    ...form,
+    structured,
+    eventDate: checkInDate || form.eventDate,
+    startDatetime,
+    endDatetime,
+  };
+}
+
 export function itemToForm(item: ItineraryItem): ItemFormState {
   const category = item.category as Category;
+  const structured = parseStructuredDetails(
+    category,
+    item.details as Record<string, unknown>,
+  );
   const flightTimes =
     category === "flight" ? flightFormDatetimes(item) : null;
+
+  let startDatetime =
+    flightTimes?.startDatetime || toDatetimeLocal(item.startDatetime);
+  let endDatetime =
+    flightTimes?.endDatetime || toDatetimeLocal(item.endDatetime);
+
+  if (category === "accommodation") {
+    const { checkInDate, checkInTime, checkOutDate, checkOutTime } =
+      structured.simple;
+    if (checkInDate && checkInTime) {
+      startDatetime = `${checkInDate}T${checkInTime}`;
+    }
+    if (checkOutDate && checkOutTime) {
+      endDatetime = `${checkOutDate}T${checkOutTime}`;
+    }
+  }
 
   return {
     id: item.id,
@@ -267,11 +340,14 @@ export function itemToForm(item: ItineraryItem): ItemFormState {
     category,
     title: item.title,
     summary: item.summary ?? "",
-    eventDate: item.eventDate ?? "",
-    startDatetime: flightTimes?.startDatetime || toDatetimeLocal(item.startDatetime),
-    endDatetime: flightTimes?.endDatetime || toDatetimeLocal(item.endDatetime),
+    eventDate:
+      category === "accommodation" && structured.simple.checkInDate
+        ? structured.simple.checkInDate
+        : (item.eventDate ?? ""),
+    startDatetime,
+    endDatetime,
     sortOrder: String(item.sortOrder ?? 0),
-    structured: parseStructuredDetails(category, item.details as Record<string, unknown>),
+    structured,
   };
 }
 

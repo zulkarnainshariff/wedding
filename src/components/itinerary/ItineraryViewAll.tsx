@@ -16,7 +16,7 @@ export function ItineraryViewAll({ days }: { days: DayWithItems[] }) {
       eyebrow="Full itinerary"
       title="View All"
       toolbar={
-        <ScheduleToolbar jumpDays={visibleDays} jumpVariant="timeline" sortDays={days} />
+        <ScheduleToolbar jumpDays={visibleDays} jumpVariant="timeline" />
       }
     >
       <DayTimeline days={days} />
