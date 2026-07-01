@@ -5,6 +5,7 @@ import { ItemCard } from "@/components/itinerary/ItemCard";
 import { CategoryList } from "@/components/itinerary/CategoryList";
 import { ScheduleToolbar } from "@/components/itinerary/ScheduleToolbar";
 import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
+import { useDocumentIndicators } from "@/components/itinerary/useDocumentIndicators";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { PageShell } from "@/components/layout/PageShell";
 import { filterPastItems } from "@/lib/trip-time";
@@ -86,6 +87,7 @@ export function FlightsPanel({
 
   const { effectiveDate, hidePast } = useTripTime();
   const { itemSummaries } = useTaskIndicators();
+  const documentCounts = useDocumentIndicators();
   const visibleItems = filterPastItems(items, effectiveDate, hidePast);
 
   if (tab === "all") {
@@ -103,6 +105,7 @@ export function FlightsPanel({
                 key={item.id}
                 item={item}
                 taskSummary={itemSummaries[item.id]}
+                documentCount={documentCounts[item.id]}
               />
             ))}
           </div>

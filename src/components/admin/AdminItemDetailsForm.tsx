@@ -163,13 +163,18 @@ function TravellerRecordsEditor({
   onChange,
   valueLabel,
   inputType = "text",
+  nameOptions,
 }: {
   label: string;
   rows: TravellerRecord[];
   onChange: (rows: TravellerRecord[]) => void;
   valueLabel: string;
   inputType?: "text" | "number";
+  nameOptions?: string[];
 }) {
+  const travellerNameOptions = travellerOptions(
+    nameOptions ?? rows.map((row) => row.name),
+  );
   return (
     <div className="sm:col-span-2">
       <div className="mb-2 flex items-center justify-between">
@@ -196,7 +201,7 @@ function TravellerRecordsEditor({
               className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
             >
               <option value="">Select traveller</option>
-              {travellerOptions(rows.map((r) => r.name)).map((name) => (
+              {travellerNameOptions.map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
@@ -703,13 +708,18 @@ function SeatCheckInEditor({
   onChange,
   onCheckInChange,
   showSeats = true,
+  nameOptions,
 }: {
   rows: TravellerRecord[];
   checkInStatus: Record<string, boolean>;
   onChange: (rows: TravellerRecord[]) => void;
   onCheckInChange: (status: Record<string, boolean>) => void;
   showSeats?: boolean;
+  nameOptions?: string[];
 }) {
+  const travellerNameOptions = travellerOptions(
+    nameOptions ?? rows.map((row) => row.name),
+  );
   return (
     <div className="sm:col-span-2">
       <div className="mb-2 flex items-center justify-between">
@@ -757,7 +767,7 @@ function SeatCheckInEditor({
               className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
             >
               <option value="">Select traveller</option>
-              {travellerOptions(rows.map((r) => r.name)).map((name) => (
+              {travellerNameOptions.map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
@@ -951,6 +961,7 @@ export function AdminItemDetailsForm({
             }
             showSeats={structured.segments.length < 2}
             checkInStatus={structured.checkInStatus}
+            nameOptions={structured.travellers}
             onChange={(seats) => onChange({ ...structured, seats })}
             onCheckInChange={(checkInStatus) =>
               onChange({ ...structured, checkInStatus })
@@ -976,6 +987,7 @@ export function AdminItemDetailsForm({
             <TravellerRecordsEditor
               label=""
               rows={structured.baggage}
+              nameOptions={structured.travellers}
               onChange={(baggage) => onChange({ ...structured, baggage })}
               valueLabel={structured.baggageUnit === "imperial" ? "lb" : "kg"}
               inputType="number"

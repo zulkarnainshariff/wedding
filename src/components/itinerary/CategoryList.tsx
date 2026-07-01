@@ -2,6 +2,7 @@
 
 import { ItemCard } from "./ItemCard";
 import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
+import { useDocumentIndicators } from "@/components/itinerary/useDocumentIndicators";
 import { ScheduleToolbar } from "./ScheduleToolbar";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { PageShell } from "@/components/layout/PageShell";
@@ -25,6 +26,7 @@ export function CategoryList({
     category === "accommodation" ||
     category === "activity";
   const { itemSummaries } = useTaskIndicators();
+  const documentCounts = useDocumentIndicators();
 
   const visibleItems = filterPastItems(items, effectiveDate, hidePast);
 
@@ -39,7 +41,12 @@ export function CategoryList({
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
           {visibleItems.map((item) => (
-            <ItemCard key={item.id} item={item} taskSummary={itemSummaries[item.id]} />
+            <ItemCard
+              key={item.id}
+              item={item}
+              taskSummary={itemSummaries[item.id]}
+              documentCount={documentCounts[item.id]}
+            />
           ))}
         </div>
       )}

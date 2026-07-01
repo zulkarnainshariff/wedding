@@ -15,6 +15,10 @@ import {
 } from "@/lib/flight-progress";
 import { ItemTaskSection } from "@/components/tasks/ItemTaskSection";
 import {
+  ItemDocumentIndicator,
+  useDocumentIndicators,
+} from "@/components/itinerary/useDocumentIndicators";
+import {
   FlightDetailView,
   PetRelocationDetailView,
 } from "@/components/itinerary/FlightViews";
@@ -259,6 +263,7 @@ function ItemDetailHeader({
   sharedLocation,
   formatDateTime,
   formatFlightSchedule,
+  documentCount,
   modal = false,
   onEdit,
   onDelete,
@@ -275,6 +280,7 @@ function ItemDetailHeader({
     departure: string | null;
     arrival: string | null;
   };
+  documentCount?: number;
   modal?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -413,6 +419,11 @@ function ItemDetailHeader({
             <h1 className="mt-1 break-words font-serif text-xl text-brand-deep sm:text-3xl">
               {item.title}
             </h1>
+            {documentCount ? (
+              <div className="mt-2">
+                <ItemDocumentIndicator count={documentCount} />
+              </div>
+            ) : null}
             {category === "flight" && flightNumberLabel && (
               <p className="mt-1 text-sm font-medium text-sky-800">
                 {flightNumberLabel}
@@ -597,6 +608,7 @@ export function ItemDetailView({
   const { linkedItem } = useLinkedItem(activityDetails?.linkedItemId);
   const sharedLocation = getItemLocation(item.details as Record<string, unknown>);
   const { formatDateTime, formatFlightSchedule } = useDisplayFormat();
+  const documentCounts = useDocumentIndicators();
 
   const header = (
     <ItemDetailHeader
@@ -608,6 +620,7 @@ export function ItemDetailView({
       sharedLocation={sharedLocation}
       formatDateTime={formatDateTime}
       formatFlightSchedule={formatFlightSchedule}
+      documentCount={documentCounts[item.id]}
       modal={modal}
       onEdit={onEdit}
       onDelete={modal ? undefined : onDelete}

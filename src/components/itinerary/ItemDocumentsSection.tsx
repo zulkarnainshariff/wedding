@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileText, Pencil, Trash2, Upload, X } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
   ADDITIONAL_VIEWERS_LABEL,
   DOCUMENT_LINKED_TRAVELLERS_LABEL,
   extractTravellerOptions,
-  formatExtraViewersInput,
   parseCoveredTravellers,
-  parseExtraViewersInput,
+  parseExtraViewers,
 } from "@/lib/item-document-utils";
 import type { ItemDocument, ItineraryItem } from "@/lib/schema";
 
@@ -87,21 +87,28 @@ function TravellerCheckboxList({
 function DocumentEditForm({
   doc,
   travellerOptions,
+  viewerOptions,
   busy,
   onCancel,
   onSave,
 }: {
   doc: ItemDocument;
   travellerOptions: string[];
+  viewerOptions: string[];
   busy: boolean;
   onCancel: () => void;
-  onSave: (coversTravellers: string[], extraViewers: string) => Promise<void>;
+  onSave: (
+    label: string,
+    coversTravellers: string[],
+    extraViewers: string[],
+  ) => Promise<void>;
 }) {
+  const [label, setLabel] = useState(doc.label);
   const [coveredTravellers, setCoveredTravellers] = useState(() =>
     parseCoveredTravellers(doc),
   );
   const [extraViewers, setExtraViewers] = useState(() =>
-    formatExtraViewersInput(doc.extraViewers),
+    parseExtraViewers(doc.extraViewers),
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -114,16 +121,30 @@ function DocumentEditForm({
   }
 
   async function handleSave() {
+    const trimmedLabel = label.trim();
+    if (!trimmedLabel) {
+      setError("Enter a document label.");
+      return;
+    }
     if (coveredTravellers.length === 0) {
       setError("Select at least one traveller.");
       return;
     }
     setError(null);
-    await onSave(coveredTravellers, extraViewers);
+    await onSave(trimmedLabel, coveredTravellers, extraViewers);
   }
 
   return (
     <div className="mt-3 space-y-3 rounded-lg border border-brand/20 bg-white p-3">
+      <label className="block text-sm">
+        <span className="mb-1 block text-stone-500">Label</span>
+        <input
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="Boarding pass, travel insurance, visa…"
+          className="w-full rounded-lg border border-stone-200 px-3 py-2"
+        />
+      </label>
       <div className="text-sm">
         <p className="mb-2 text-stone-500">{DOCUMENT_LINKED_TRAVELLERS_LABEL}</p>
         <TravellerCheckboxList
@@ -132,17 +153,13 @@ function DocumentEditForm({
           onToggle={toggleTraveller}
         />
       </div>
-      <label className="block text-sm">
-        <span className="mb-1 block text-stone-500">
-          {ADDITIONAL_VIEWERS_LABEL} (usernames, comma-separated)
-        </span>
-        <input
-          value={extraViewers}
-          onChange={(e) => setExtraViewers(e.target.value)}
-          placeholder="e.g. natalie, zulkarnain"
-          className="w-full rounded-lg border border-stone-200 px-3 py-2"
-        />
-      </label>
+      <CheckboxDropdown
+        label={ADDITIONAL_VIEWERS_LABEL}
+        options={viewerOptions}
+        value={extraViewers}
+        onChange={setExtraViewers}
+        emptyLabel="No additional viewers"
+      />
       {error && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
       )}
@@ -180,14 +197,28 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
   const [error, setError] = useState<string | null>(null);
   const [coveredTravellers, setCoveredTravellers] = useState<string[]>([]);
   const [label, setLabel] = useState("");
-  const [extraViewers, setExtraViewers] = useState("");
+  const [extraViewers, setExtraViewers] = useState<string[]>([]);
   const [editingDocId, setEditingDocId] = useState<number | null>(null);
   const [savingDocId, setSavingDocId] = useState<number | null>(null);
+  const [viewerOptions, setViewerOptions] = useState<string[]>([]);
 
   const travellerOptions = useMemo(
     () => extractTravellerOptions(item),
     [item],
   );
+
+  useEffect(() => {
+    void fetch("/api/users/brief")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((rows: { username: string }[]) => {
+        setViewerOptions(
+          rows
+            .map((row) => row.username)
+            .sort((a, b) => a.localeCompare(b)),
+        );
+      })
+      .catch(() => undefined);
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -239,7 +270,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
       "label",
       label.trim() || defaultLabelFromFileName(file.name),
     );
-    body.append("extraViewers", extraViewers);
+    body.append("extraViewers", extraViewers.join(","));
 
     try {
       const response = await uploadFormDataWithProgress(
@@ -266,7 +297,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
       setSelectedFileName(null);
       setCoveredTravellers([]);
       setLabel("");
-      setExtraViewers("");
+      setExtraViewers([]);
       setUploadProgress(100);
       toast.success(`Uploaded ${file.name}`);
       await refresh();
@@ -282,14 +313,16 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
 
   async function handleSaveDocument(
     docId: number,
+    docLabel: string,
     covers: string[],
-    viewers: string,
+    viewers: string[],
   ) {
     setSavingDocId(docId);
     const response = await fetch(`/api/items/documents/${docId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        label: docLabel,
         coversTravellers: covers,
         extraViewers: viewers,
       }),
@@ -341,7 +374,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
         <ul className="mt-3 space-y-2">
           {documents.map((doc) => {
             const covered = parseCoveredTravellers(doc);
-            const additional = formatExtraViewersInput(doc.extraViewers);
+            const additional = parseExtraViewers(doc.extraViewers);
             const isEditing = editingDocId === doc.id;
 
             return (
@@ -349,13 +382,13 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                 key={doc.id}
                 className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-3">
                   <div className="min-w-0">
                     <a
                       href={`/api/items/documents/${doc.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-w-0 items-center gap-2 text-sm text-brand-deep hover:underline"
+                      className="inline-flex max-w-full items-center gap-2 text-sm text-brand-deep hover:underline"
                     >
                       <FileText className="h-4 w-4 shrink-0" />
                       <span className="truncate">
@@ -365,14 +398,14 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                     <p className="mt-1 text-xs text-stone-500">
                       Linked to: {covered.join(", ")}
                     </p>
-                    {additional && (
+                    {additional.length > 0 && (
                       <p className="mt-0.5 text-xs text-stone-500">
-                        {ADDITIONAL_VIEWERS_LABEL}: {additional}
+                        {ADDITIONAL_VIEWERS_LABEL}: {additional.join(", ")}
                       </p>
                     )}
                   </div>
                   {canEdit && (
-                    <div className="flex shrink-0 gap-1">
+                    <div className="flex shrink-0 gap-1 self-end sm:self-start">
                       <button
                         type="button"
                         onClick={() =>
@@ -397,12 +430,14 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
 
                 {canEdit && isEditing && (
                   <DocumentEditForm
+                    key={doc.id}
                     doc={doc}
                     travellerOptions={travellerOptions}
+                    viewerOptions={viewerOptions}
                     busy={savingDocId === doc.id}
                     onCancel={() => setEditingDocId(null)}
-                    onSave={(covers, viewers) =>
-                      handleSaveDocument(doc.id, covers, viewers)
+                    onSave={(docLabel, covers, viewers) =>
+                      handleSaveDocument(doc.id, docLabel, covers, viewers)
                     }
                   />
                 )}
@@ -436,17 +471,15 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                 className="w-full rounded-lg border border-stone-200 px-3 py-2"
               />
             </label>
-            <label className="block text-sm sm:col-span-2">
-              <span className="mb-1 block text-stone-500">
-                {ADDITIONAL_VIEWERS_LABEL} (usernames, comma-separated)
-              </span>
-              <input
+            <div className="sm:col-span-2">
+              <CheckboxDropdown
+                label={ADDITIONAL_VIEWERS_LABEL}
+                options={viewerOptions}
                 value={extraViewers}
-                onChange={(e) => setExtraViewers(e.target.value)}
-                placeholder="e.g. natalie, zulkarnain"
-                className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                onChange={setExtraViewers}
+                emptyLabel="No additional viewers"
               />
-            </label>
+            </div>
             <div className="text-sm sm:col-span-2">
               <span className="mb-1 block text-stone-500">File (PDF or image)</span>
               <label
