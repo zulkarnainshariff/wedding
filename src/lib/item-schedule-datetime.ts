@@ -127,11 +127,10 @@ export function resolveItemSchedule(
     }
   }
 
-  if (input.category === "activity") {
-    const details = getActivityDetails(input.details);
-    if (details?.time && eventDate) {
-      derivedStart = wallClockToDate(eventDate, details.time);
-    }
+  const activityDetails =
+    input.category === "activity" ? getActivityDetails(input.details) : null;
+  if (activityDetails?.time && eventDate) {
+    derivedStart = wallClockToDate(eventDate, activityDetails.time);
   }
 
   if (input.category === "pet_relocation") {
@@ -142,12 +141,15 @@ export function resolveItemSchedule(
     }
   }
 
-  const startDatetime = pickInstant(
-    fallbackStart && !Number.isNaN(fallbackStart.getTime())
-      ? fallbackStart
-      : null,
-    derivedStart,
-  );
+  const startDatetime =
+    input.category === "activity" && activityDetails?.time && eventDate
+      ? derivedStart
+      : pickInstant(
+          fallbackStart && !Number.isNaN(fallbackStart.getTime())
+            ? fallbackStart
+            : null,
+          derivedStart,
+        );
   const endDatetime = pickInstant(
     fallbackEnd && !Number.isNaN(fallbackEnd.getTime()) ? fallbackEnd : null,
     derivedEnd,

@@ -86,3 +86,14 @@ export async function syncItineraryDaysForRange(
 
   return { created };
 }
+
+/** Clear hidden on every itinerary day (recovery after a bad generate/sync). */
+export async function unhideAllItineraryDays(): Promise<{ updated: number }> {
+  const updated = await db
+    .update(itineraryDays)
+    .set({ hidden: false })
+    .where(eq(itineraryDays.hidden, true))
+    .returning({ id: itineraryDays.id });
+
+  return { updated: updated.length };
+}

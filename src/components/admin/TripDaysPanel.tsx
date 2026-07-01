@@ -128,6 +128,37 @@ export function TripDaysPanel({
     }
   }
 
+  async function unhideAllDays() {
+    if (
+      !confirm(
+        "Show every itinerary day again? This clears the Hidden flag on all days. Your items and day titles are not deleted.",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setStatus(null);
+    try {
+      const response = await fetch("/api/days/unhide-all", { method: "POST" });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        updated?: number;
+      };
+      if (!response.ok) {
+        const message = payload.error ?? "Could not unhide days.";
+        setStatus(message);
+        toast.error(message);
+        return;
+      }
+      const message = `Unhid ${payload.updated ?? 0} day(s). Click Renumber days if day numbers look wrong.`;
+      setStatus(message);
+      toast.success(message);
+      await refreshDays();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const editingDay = useMemo(
     () => days.find((entry) => entry.id === editingDayId) ?? null,
     [days, editingDayId],
@@ -324,6 +355,22 @@ export function TripDaysPanel({
             Renumber days
           </button>
         </div>
+      </SectionShell>
+
+      <SectionShell title="Recover hidden days">
+        <p className="mb-4 text-sm text-stone-500">
+          If itinerary content disappeared after generating days with a narrow date
+          range, the days were likely hidden — not deleted. Unhide all days, then
+          renumber. Items and day titles stay in the database.
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void unhideAllDays()}
+          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 disabled:opacity-50"
+        >
+          Unhide all days
+        </button>
       </SectionShell>
 
       <SectionShell title="Batch hide / unhide">

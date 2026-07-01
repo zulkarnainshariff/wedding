@@ -240,12 +240,17 @@ function syncStructuredTimes(
   }
 
   if (category === "activity") {
-    if (startDatetime) {
+    const activityDate = nextEventDate;
+    if (activityDate && nextSimple.time) {
+      startIso = isoFromDateAndClock(activityDate, nextSimple.time);
+      nextEventDate = activityDate;
+    } else if (startDatetime) {
       const [date, time] = startDatetime.split("T");
       if (date) nextEventDate = date;
       if (time) nextSimple.time = time.slice(0, 5);
-    } else if (nextEventDate && nextSimple.time) {
-      startIso = isoFromDateAndClock(nextEventDate, nextSimple.time);
+      if (date && time) {
+        startIso = isoFromDateAndClock(date, time.slice(0, 5));
+      }
     }
   }
 
@@ -309,6 +314,40 @@ export function applyAccommodationStructuredToForm(
   };
 }
 
+export function applyActivityStructuredToForm(
+  form: ItemFormState,
+  structured: StructuredItemDetails,
+): ItemFormState {
+  if (form.category !== "activity") {
+    return { ...form, structured };
+  }
+
+  const eventDate = form.eventDate || null;
+  const time = structured.simple.time;
+  const startDatetime =
+    eventDate && time ? `${eventDate}T${time}` : form.startDatetime;
+
+  return {
+    ...form,
+    structured,
+    startDatetime,
+    endDatetime: "",
+  };
+}
+
+export function applyStructuredDetailsToForm(
+  form: ItemFormState,
+  structured: StructuredItemDetails,
+): ItemFormState {
+  if (form.category === "accommodation") {
+    return applyAccommodationStructuredToForm(form, structured);
+  }
+  if (form.category === "activity") {
+    return applyActivityStructuredToForm(form, structured);
+  }
+  return { ...form, structured };
+}
+
 export function itemToForm(item: ItineraryItem): ItemFormState {
   const category = item.category as Category;
   const structured = parseStructuredDetails(
@@ -331,6 +370,14 @@ export function itemToForm(item: ItineraryItem): ItemFormState {
     }
     if (checkOutDate && checkOutTime) {
       endDatetime = `${checkOutDate}T${checkOutTime}`;
+    }
+  }
+
+  if (category === "activity") {
+    const { time } = structured.simple;
+    const date = item.eventDate ?? "";
+    if (date && time) {
+      startDatetime = `${date}T${time}`;
     }
   }
 
