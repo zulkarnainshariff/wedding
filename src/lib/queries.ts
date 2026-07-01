@@ -3,7 +3,11 @@ import { getSessionUser } from "./auth";
 import { db } from "./db";
 import { enrichItemsWithSubItems } from "./item-subitem-utils";
 import { buildDaysWithItems, type DayWithItems } from "./item-scheduling";
-import { filterItemsByPermission } from "./permissions";
+import {
+  filterItemsByPermission,
+  filterParentsWithSubitemAccess,
+  hasFullItemView,
+} from "./permissions";
 import type { SessionUser } from "./permissions";
 import { itineraryDays, itineraryItems } from "./schema";
 import { prepareDayItems, prepareScheduleDayItems } from "./timeline-utils";
@@ -48,7 +52,12 @@ async function attachSubItemsToDays(
 
   return days.map((day) => ({
     ...day,
-    items: enrichItemsWithSubItems(day.items, children),
+    items: enrichItemsWithSubItems(day.items, children).map((item) => ({
+      ...item,
+      limitedView:
+        !hasFullItemView(item, user) &&
+        (item.subItems?.length ?? 0) > 0,
+    })),
   }));
 }
 
@@ -58,7 +67,13 @@ async function attachSubItemsToItems(
 ): Promise<ItineraryItem[]> {
   const parentIds = items.map((item) => item.id);
   const children = await fetchSubItemsForParents(parentIds, user);
-  return enrichItemsWithSubItems(items, children);
+  const visibleParents = filterParentsWithSubitemAccess(items, children, user);
+
+  return enrichItemsWithSubItems(visibleParents, children).map((item) => ({
+    ...item,
+    limitedView:
+      !hasFullItemView(item, user) && (item.subItems?.length ?? 0) > 0,
+  }));
 }
 
 export async function getDays() {
@@ -71,14 +86,16 @@ export async function getDays() {
 export async function getTimeline() {
   const user = await getAuthorizedUser();
   const days = await getDays();
-  const items = filterItemsByPermission(
-    await db
-      .select()
-      .from(itineraryItems)
-      .where(isNull(itineraryItems.parentItemId))
-      .orderBy(asc(itineraryItems.startDatetime), asc(itineraryItems.sortOrder)),
+  const allParents = await db
+    .select()
+    .from(itineraryItems)
+    .where(isNull(itineraryItems.parentItemId))
+    .orderBy(asc(itineraryItems.startDatetime), asc(itineraryItems.sortOrder));
+  const children = await fetchSubItemsForParents(
+    allParents.map((item) => item.id),
     user,
   );
+  const items = filterParentsWithSubitemAccess(allParents, children, user);
 
   const timeline = buildDaysWithItems(days, items, prepareDayItems);
   return attachSubItemsToDays(timeline, user);
@@ -87,17 +104,23 @@ export async function getTimeline() {
 export async function getScheduleByDate() {
   const user = await getAuthorizedUser();
   const days = await getDays();
-  const scheduleItems = filterItemsByPermission(
-    await db
-      .select()
-      .from(itineraryItems)
-      .where(
-        and(
-          inArray(itineraryItems.category, [...DAILY_SCHEDULE_CATEGORIES]),
-          isNull(itineraryItems.parentItemId),
-        ),
-      )
-      .orderBy(asc(itineraryItems.startDatetime), asc(itineraryItems.sortOrder)),
+  const scheduleParents = await db
+    .select()
+    .from(itineraryItems)
+    .where(
+      and(
+        inArray(itineraryItems.category, [...DAILY_SCHEDULE_CATEGORIES]),
+        isNull(itineraryItems.parentItemId),
+      ),
+    )
+    .orderBy(asc(itineraryItems.startDatetime), asc(itineraryItems.sortOrder));
+  const children = await fetchSubItemsForParents(
+    scheduleParents.map((item) => item.id),
+    user,
+  );
+  const scheduleItems = filterParentsWithSubitemAccess(
+    scheduleParents,
+    children,
     user,
   );
 
@@ -107,7 +130,7 @@ export async function getScheduleByDate() {
 
 export async function getItemsByCategory(category: Category) {
   const user = await getAuthorizedUser();
-  const items = await db
+  const categoryParents = await db
     .select()
     .from(itineraryItems)
     .where(
@@ -117,19 +140,29 @@ export async function getItemsByCategory(category: Category) {
       ),
     )
     .orderBy(asc(itineraryItems.startDatetime), asc(itineraryItems.sortOrder));
+  const children = await fetchSubItemsForParents(
+    categoryParents.map((item) => item.id),
+    user,
+  );
+  const items = filterParentsWithSubitemAccess(categoryParents, children, user);
 
-  return attachSubItemsToItems(filterItemsByPermission(items, user), user);
+  return attachSubItemsToItems(items, user);
 }
 
 export async function getAllItems() {
   const user = await getAuthorizedUser();
-  const items = await db
+  const allParents = await db
     .select()
     .from(itineraryItems)
     .where(isNull(itineraryItems.parentItemId))
     .orderBy(asc(itineraryItems.startDatetime), asc(itineraryItems.sortOrder));
+  const children = await fetchSubItemsForParents(
+    allParents.map((item) => item.id),
+    user,
+  );
+  const items = filterParentsWithSubitemAccess(allParents, children, user);
 
-  return attachSubItemsToItems(filterItemsByPermission(items, user), user);
+  return attachSubItemsToItems(items, user);
 }
 
 export async function getItemById(id: number) {
@@ -143,7 +176,18 @@ export async function getItemById(id: number) {
   if (!item) return null;
 
   const filtered = filterItemsByPermission([item], user);
-  return filtered[0] ?? null;
+  if (filtered.length > 0) {
+    return filtered[0];
+  }
+
+  if (item.parentItemId == null) {
+    const subitems = await fetchSubItemsForParents([item.id], user);
+    if (subitems.length > 0) {
+      return { ...item, limitedView: true as const };
+    }
+  }
+
+  return null;
 }
 
 export async function getDayById(id: number) {

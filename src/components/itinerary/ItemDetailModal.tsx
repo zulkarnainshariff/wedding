@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { ItemDetailView } from "@/components/itinerary/ItemDetail";
 import { ItemEditView } from "@/components/itinerary/ItemEditView";
+import { SubItemEditForm } from "@/components/itinerary/SubItemEditForm";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useItineraryUI } from "@/components/itinerary/ItineraryUIContext";
+import { isSubItem } from "@/lib/item-subitems";
+import type { ItineraryItem } from "@/lib/schema";
 import { useRouter } from "next/navigation";
 
 export function ItemDetailModal() {
@@ -23,11 +26,24 @@ export function ItemDetailModal() {
   const [editing, setEditing] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [parentItem, setParentItem] = useState<ItineraryItem | null>(null);
 
   useEffect(() => {
     setEditing(false);
     setDeleteConfirmOpen(false);
   }, [selectedItemId]);
+
+  useEffect(() => {
+    if (!selectedItem?.parentItemId) {
+      setParentItem(null);
+      return;
+    }
+
+    void fetch(`/api/items/${selectedItem.parentItemId}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((item: ItineraryItem | null) => setParentItem(item))
+      .catch(() => setParentItem(null));
+  }, [selectedItem?.parentItemId]);
 
   if (!selectedItemId || isClosingItem) return null;
 
@@ -85,7 +101,21 @@ export function ItemDetailModal() {
             </div>
           )}
 
-          {selectedItem && editing && canEdit && (
+          {selectedItem && editing && canEdit && isSubItem(selectedItem) && (
+            <SubItemEditForm
+              item={selectedItem}
+              parentItem={parentItem}
+              modal
+              onCancel={() => setEditing(false)}
+              onSaved={() => {
+                setEditing(false);
+                void refreshSelectedItem({ silent: true });
+              }}
+              onDelete={requestDelete}
+            />
+          )}
+
+          {selectedItem && editing && canEdit && !isSubItem(selectedItem) && (
             <ItemEditView
               item={selectedItem}
               modal

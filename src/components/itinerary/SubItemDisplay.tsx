@@ -4,6 +4,7 @@ import { MapPin } from "lucide-react";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { getItemLocation } from "@/lib/item-location";
 import { getSubItemTimeLabel } from "@/lib/item-subitem-utils";
+import { extractItemTravellers } from "@/lib/item-travellers";
 import type { ItineraryItem } from "@/lib/schema";
 
 function SubItemTime({
@@ -38,6 +39,7 @@ export function SubItemRow({
 }) {
   const { formatClockTime } = useDisplayFormat();
   const location = getItemLocation(subItem.details as Record<string, unknown>);
+  const participantNames = extractItemTravellers(subItem.details, subItem.category);
   const description =
     subItem.summary ||
     (typeof subItem.details === "object" &&
@@ -104,6 +106,11 @@ export function SubItemRow({
       <div className="flex items-start justify-between gap-2">
         {content}
       </div>
+      {participantNames.length > 0 && (
+        <p className="text-xs text-stone-500">
+          Participants: {participantNames.join(", ")}
+        </p>
+      )}
       {description && !compact && (
         <p className="text-sm text-stone-600">{description}</p>
       )}

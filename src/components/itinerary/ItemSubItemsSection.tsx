@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SubItemRow } from "@/components/itinerary/SubItemDisplay";
+import { travellerOptions } from "@/lib/admin-item-details";
 import { getSubItemFormPlaceholders } from "@/lib/sub-item-placeholders";
 import type { ItineraryItem } from "@/lib/schema";
 
@@ -77,10 +79,15 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   const [locationName, setLocationName] = useState("");
   const [locationMapUrl, setLocationMapUrl] = useState("");
   const [summary, setSummary] = useState("");
+  const [participants, setParticipants] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const placeholders = getSubItemFormPlaceholders(item);
+  const participantOptions = useMemo(
+    () => travellerOptions(participants),
+    [participants],
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -112,6 +119,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
         locationName: locationName.trim() || null,
         locationMapUrl: locationMapUrl.trim() || null,
         summary: summary.trim() || null,
+        participants,
       }),
     });
     setSaving(false);
@@ -123,6 +131,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
     setLocationName("");
     setLocationMapUrl("");
     setSummary("");
+    setParticipants([]);
     await refresh();
   }
 
@@ -199,6 +208,15 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
                   className="w-full rounded-lg border border-stone-200 px-3 py-2"
                 />
               </label>
+              <div className="text-sm sm:col-span-2">
+                <CheckboxDropdown
+                  label="Participants"
+                  options={participantOptions}
+                  value={participants}
+                  onChange={setParticipants}
+                  emptyLabel="Select participants…"
+                />
+              </div>
               <label className="block text-sm">
                 <span className="mb-1 block text-stone-500">Location name (optional)</span>
                 <input

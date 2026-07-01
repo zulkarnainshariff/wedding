@@ -2,6 +2,8 @@ import type { ItineraryItem } from "@/lib/schema";
 
 export type ItineraryItemWithSubItems = ItineraryItem & {
   subItems?: ItineraryItem[];
+  /** Parent item is shown because the user can view a sub-item, not the full parent. */
+  limitedView?: boolean;
 };
 
 function sortSubItems(items: ItineraryItem[]): ItineraryItem[] {
