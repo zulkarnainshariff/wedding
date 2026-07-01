@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Save, Trash2, X } from "lucide-react";
 import { AdminItemDetailsForm } from "@/components/admin/AdminItemDetailsForm";
@@ -28,6 +28,13 @@ function ItemEditFormFields({
   allItems: ItineraryItem[];
 }) {
   const { formatDayOption } = useDisplayFormat();
+  const assignableDays = useMemo(
+    () =>
+      [...days]
+        .filter((day) => !day.hidden)
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [days],
+  );
 
   return (
     <>
@@ -62,7 +69,7 @@ function ItemEditFormFields({
             className="w-full rounded-lg border border-stone-200 px-3 py-2"
           >
             <option value="">Unassigned</option>
-            {days.map((day) => (
+            {assignableDays.map((day) => (
               <option key={day.id} value={day.id}>
                 {formatDayOption(day)}
               </option>

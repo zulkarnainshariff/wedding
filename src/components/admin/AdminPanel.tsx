@@ -104,6 +104,13 @@ export function AdminPanel({
   const toast = useToast();
   const [tab, setTab] = useState<AdminTab>(showFullAdmin ? "days" : "insurance");
   const [days, setDays] = useState(initialDays);
+  const assignableDays = useMemo(
+    () =>
+      [...days]
+        .filter((day) => !day.hidden)
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [days],
+  );
   const [items, setItems] = useState(initialItems);
   const [itemForm, setItemForm] = useState<ItemFormState>(emptyItemForm());
   const [itemBaseline, setItemBaseline] = useState<ItemFormState>(emptyItemForm());
@@ -183,6 +190,13 @@ export function AdminPanel({
       if (!ok) return;
     }
     setTab(next);
+  }
+
+  async function refreshDays() {
+    const daysRes = await fetch("/api/days");
+    if (daysRes.ok) {
+      setDays(await daysRes.json());
+    }
   }
 
   async function refresh() {
@@ -413,6 +427,7 @@ export function AdminPanel({
             initialItems={items}
             tripStartDate={tripStartDate}
             tripEndDate={tripEndDate}
+            onDaysChanged={refreshDays}
           />
         </div>
       )}
@@ -456,7 +471,7 @@ export function AdminPanel({
                   className="w-full rounded-lg border border-stone-200 px-3 py-2"
                 >
                   <option value="">Unassigned</option>
-                  {days.map((day) => (
+                  {assignableDays.map((day) => (
                     <option key={day.id} value={day.id}>
                       {formatDayOption(day)}
                     </option>
