@@ -1,11 +1,6 @@
-import { asc, eq } from "drizzle-orm";
-import { db } from "@/lib/db";
 import { combineActivityDatetime } from "@/lib/activity-utils";
 import { buildLocationPayload } from "@/lib/item-location";
-import { filterItemsByPermission } from "@/lib/permissions";
-import { itineraryItems } from "@/lib/schema";
 import type { ItineraryItem } from "@/lib/schema";
-import type { SessionUser } from "@/lib/permissions";
 
 export type SubItemFormState = {
   title: string;
@@ -98,26 +93,4 @@ export function resolveSubItemStartDatetime(
   if (!/^\d{2}:\d{2}$/.test(clockTime)) return null;
   if (!parent.eventDate) return null;
   return combineActivityDatetime(parent.eventDate, clockTime);
-}
-
-export async function getSubItemsForParent(
-  parentItemId: number,
-  user: SessionUser,
-) {
-  const items = await db
-    .select()
-    .from(itineraryItems)
-    .where(eq(itineraryItems.parentItemId, parentItemId))
-    .orderBy(asc(itineraryItems.sortOrder), asc(itineraryItems.startDatetime));
-
-  return filterItemsByPermission(items, user);
-}
-
-export async function getParentItem(parentItemId: number) {
-  const [parent] = await db
-    .select()
-    .from(itineraryItems)
-    .where(eq(itineraryItems.id, parentItemId))
-    .limit(1);
-  return parent ?? null;
 }

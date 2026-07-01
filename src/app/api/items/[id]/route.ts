@@ -17,13 +17,15 @@ import {
 } from "@/lib/permissions";
 import {
   buildSubItemDetails,
-  getParentItem,
-  getSubItemsForParent,
   isSubItem,
   resolveSubItemStartDatetime,
   subItemToFormState,
   type SubItemFormState,
 } from "@/lib/item-subitems";
+import {
+  getParentItem,
+  getSubItemsForParent,
+} from "@/lib/item-subitems-server";
 import { itemDocuments, itineraryDays, itineraryItems } from "@/lib/schema";
 import { bumpSyncVersion } from "@/lib/sync";
 
