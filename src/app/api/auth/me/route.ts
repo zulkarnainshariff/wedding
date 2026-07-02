@@ -36,9 +36,11 @@ export async function GET() {
     user: {
       id: user.id,
       username: user.username,
+      roleLevel: user.roleLevel,
       isAdmin: user.isAdmin,
       permissions: user.permissions,
       preferences: user.preferences,
+      guardianForUsernames: user.guardianForUsernames ?? [],
       canAccessDiagnostics: isSuperuser(user),
       guestListAccess,
       taskPermissions,

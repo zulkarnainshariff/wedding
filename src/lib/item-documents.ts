@@ -11,6 +11,7 @@ import {
 } from "@/lib/item-document-utils";
 import type { ItemDocument, ItineraryItem } from "@/lib/schema";
 import type { SessionUser } from "@/lib/permissions";
+import { userIsGuardianOfTravellers } from "@/lib/user-guardian-access";
 import { normalizeTravellerName } from "@/lib/travellers";
 
 export { parseExtraViewers, parseCoveredTravellers } from "@/lib/item-document-utils";
@@ -74,6 +75,10 @@ export function canViewDocument(
       travellerMatchesUsername(name, user.username),
     )
   ) {
+    return true;
+  }
+
+  if (userIsGuardianOfTravellers(user, coveredTravellers)) {
     return true;
   }
 

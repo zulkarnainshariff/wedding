@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useDiscardConfirm } from "@/hooks/useDiscardConfirm";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { SubItemAdditionalViewersField } from "@/components/itinerary/SubItemAdditionalViewersField";
 import { SubItemParticipantsField } from "@/components/itinerary/SubItemParticipantsField";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SubItemRow } from "@/components/itinerary/SubItemDisplay";
 import { sortSubItems } from "@/lib/item-subitem-utils";
 import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
@@ -14,6 +15,28 @@ import { parentItemParticipants } from "@/lib/item-subitems";
 import { useAccountUsernames } from "@/hooks/useAccountUsernames";
 import type { ItineraryItem } from "@/lib/schema";
 import type { ItemTaskSummary } from "@/lib/task-queries";
+
+function isSubItemAddFormDirty(input: {
+  title: string;
+  time: string;
+  locationName: string;
+  locationMapUrl: string;
+  summary: string;
+  participants: string[];
+  viewers: string[];
+  viewerLinks: Record<string, string[]>;
+}): boolean {
+  return Boolean(
+    input.title.trim() ||
+      input.time ||
+      input.locationName.trim() ||
+      input.locationMapUrl.trim() ||
+      input.summary.trim() ||
+      input.participants.length > 0 ||
+      input.viewers.length > 0 ||
+      Object.keys(input.viewerLinks).length > 0,
+  );
+}
 
 function SubItemDetailRow({
   subItem,
@@ -99,6 +122,49 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   const parentParticipants = useMemo(
     () => parentItemParticipants(item),
     [item],
+  );
+
+  const resetAddForm = useCallback(() => {
+    setTitle("");
+    setTime("");
+    setLocationName("");
+    setLocationMapUrl("");
+    setSummary("");
+    setParticipants([]);
+    setViewers([]);
+    setViewerLinks({});
+    setAddOpen(false);
+  }, []);
+
+  const {
+    discardConfirmOpen,
+    requestDismiss,
+    confirmDiscard,
+    cancelDiscard,
+  } = useDiscardConfirm(resetAddForm);
+
+  const isAddFormDirty = useMemo(
+    () =>
+      isSubItemAddFormDirty({
+        title,
+        time,
+        locationName,
+        locationMapUrl,
+        summary,
+        participants,
+        viewers,
+        viewerLinks,
+      }),
+    [
+      title,
+      time,
+      locationName,
+      locationMapUrl,
+      summary,
+      participants,
+      viewers,
+      viewerLinks,
+    ],
   );
 
   const refresh = useCallback(async () => {
@@ -223,7 +289,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
                   <p className="text-sm font-medium text-stone-700">Add sub-item</p>
                   <button
                     type="button"
-                    onClick={() => setAddOpen(false)}
+                    onClick={() => requestDismiss(isAddFormDirty)}
                     className="rounded-full border border-stone-200 p-1.5 text-stone-500 hover:bg-stone-50"
                     aria-label="Cancel"
                   >
@@ -310,6 +376,16 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
           </>
         )}
       </div>
+
+      <ConfirmDialog
+        open={discardConfirmOpen}
+        title="Discard changes?"
+        message="You have unsaved sub-item details. Close without saving?"
+        confirmLabel="Discard"
+        destructive
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+      />
 
       <ConfirmDialog
         open={pendingDeleteId != null}

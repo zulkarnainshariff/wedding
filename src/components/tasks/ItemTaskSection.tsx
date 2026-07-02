@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useDiscardConfirm } from "@/hooks/useDiscardConfirm";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { TaskNoteIcon } from "@/components/tasks/TaskNoteIcon";
 import {
@@ -241,6 +243,33 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
     setError(null);
     setFocusTaskId(null);
     clearTaskQueryParams();
+  }
+
+  const formBaseline = useMemo(() => {
+    if (mode === "edit" && editingTask) return taskToForm(editingTask);
+    if (mode === "create") {
+      return {
+        ...EMPTY_FORM,
+        assigneeUserId: user ? String(user.id) : "",
+      };
+    }
+    return EMPTY_FORM;
+  }, [mode, editingTask, user]);
+
+  const isFormDirty = useMemo(
+    () => mode !== "list" && JSON.stringify(form) !== JSON.stringify(formBaseline),
+    [mode, form, formBaseline],
+  );
+
+  const {
+    discardConfirmOpen,
+    requestDismiss,
+    confirmDiscard,
+    cancelDiscard,
+  } = useDiscardConfirm(returnToList);
+
+  function handleDismissForm() {
+    requestDismiss(isFormDirty);
   }
 
   function startCreate() {
@@ -590,7 +619,7 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
           </div>
           <button
             type="button"
-            onClick={returnToList}
+            onClick={handleDismissForm}
             className="rounded-full border border-stone-200 p-2 text-stone-500 hover:bg-stone-50"
             aria-label="Cancel"
           >
@@ -668,12 +697,21 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
           )}
           <button
             type="button"
-            onClick={returnToList}
+            onClick={handleDismissForm}
             className="rounded-lg border border-stone-200 px-4 py-2 text-sm text-stone-600"
           >
             Cancel
           </button>
         </div>
+        <ConfirmDialog
+          open={discardConfirmOpen}
+          title="Discard changes?"
+          message="You have unsaved task details. Close without saving?"
+          confirmLabel="Discard"
+          destructive
+          onClose={cancelDiscard}
+          onConfirm={confirmDiscard}
+        />
       </div>
     );
   }

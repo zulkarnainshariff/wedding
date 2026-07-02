@@ -50,7 +50,7 @@ export function canSeeItemAdditionalViewers(
   user: SessionUser | null | undefined,
 ): boolean {
   if (!user) return false;
-  if (isAdminSession(user.roleLevel)) return true;
+  if (user.isAdmin || isAdminSession(user.roleLevel)) return true;
   return userIsItemParticipant(item, user);
 }
 

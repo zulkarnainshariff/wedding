@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileText, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useDiscardConfirm } from "@/hooks/useDiscardConfirm";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
 import { IconTooltip } from "@/components/ui/IconTooltip";
@@ -13,6 +15,7 @@ import {
   parseCoveredTravellers,
   parseExtraViewers,
 } from "@/lib/item-document-utils";
+import { canSeeItemAdditionalViewers } from "@/lib/item-viewers";
 import type { ItemDocument, ItineraryItem } from "@/lib/schema";
 
 function defaultLabelFromFileName(fileName: string): string {
@@ -187,7 +190,7 @@ function DocumentEditForm({
 }
 
 export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
-  const { canEdit } = useAuth();
+  const { canEdit, user } = useAuth();
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<ItemDocument[]>([]);
@@ -207,6 +210,35 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
   const travellerOptions = useMemo(
     () => extractTravellerOptions(item),
     [item],
+  );
+  const showDocumentViewers = canSeeItemAdditionalViewers(item, user);
+
+  const resetUploadForm = useCallback(() => {
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setSelectedFileName(null);
+    setCoveredTravellers([]);
+    setLabel("");
+    setExtraViewers([]);
+    setError(null);
+    setAddOpen(false);
+  }, []);
+
+  const {
+    discardConfirmOpen,
+    requestDismiss,
+    confirmDiscard,
+    cancelDiscard,
+  } = useDiscardConfirm(resetUploadForm);
+
+  const isUploadFormDirty = useMemo(
+    () =>
+      Boolean(
+        selectedFileName ||
+          label.trim() ||
+          coveredTravellers.length > 0 ||
+          extraViewers.length > 0,
+      ),
+    [selectedFileName, label, coveredTravellers, extraViewers],
   );
 
   useEffect(() => {
@@ -428,7 +460,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                     <p className="mt-1 text-xs text-stone-500">
                       Linked to: {covered.join(", ")}
                     </p>
-                    {additional.length > 0 && (
+                    {showDocumentViewers && additional.length > 0 && (
                       <p className="mt-0.5 text-xs text-stone-500">
                         {ADDITIONAL_VIEWERS_LABEL}: {additional.join(", ")}
                       </p>
@@ -486,10 +518,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                 <p className="text-sm font-medium text-stone-700">Upload document</p>
                 <button
                   type="button"
-                  onClick={() => {
-                    setAddOpen(false);
-                    setError(null);
-                  }}
+                  onClick={() => requestDismiss(isUploadFormDirty)}
                   className="rounded-full border border-stone-200 p-1.5 text-stone-500 hover:bg-stone-50"
                   aria-label="Cancel"
                 >
@@ -596,6 +625,15 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
           )}
         </>
       )}
+      <ConfirmDialog
+        open={discardConfirmOpen}
+        title="Discard changes?"
+        message="You have unsaved document upload details. Close without saving?"
+        confirmLabel="Discard"
+        destructive
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+      />
     </div>
   );
 }
