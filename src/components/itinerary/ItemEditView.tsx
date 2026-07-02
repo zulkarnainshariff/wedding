@@ -278,7 +278,7 @@ export function ItemEditView({
 
   if (modal) {
     return (
-      <div className="flex max-h-[92vh] flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-xl sm:rounded-3xl">
+      <div className="flex max-h-[92vh] max-w-full flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-xl sm:rounded-3xl">
         <div className="shrink-0 border-b border-stone-100 px-6 py-4 sm:px-8">
           <div className="flex items-center justify-between gap-3 sm:hidden">
             <p className="min-w-0 truncate text-xs font-semibold tracking-[0.2em] text-accent uppercase">
@@ -312,7 +312,10 @@ export function ItemEditView({
           <h2 className="mt-1 font-serif text-xl text-brand-deep sm:hidden">{item.title}</h2>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 sm:px-8">
+        <div
+          data-item-edit-scroll
+          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-4 sm:px-8"
+        >
           <ItemEditFormFields
             form={form}
             setForm={setForm}

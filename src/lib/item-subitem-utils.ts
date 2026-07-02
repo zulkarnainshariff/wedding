@@ -1,4 +1,5 @@
 import type { ItineraryItem } from "@/lib/schema";
+import { getItemSortTime } from "@/lib/item-schedule-datetime";
 
 export type ItineraryItemWithSubItems = ItineraryItem & {
   subItems?: ItineraryItem[];
@@ -6,16 +7,12 @@ export type ItineraryItemWithSubItems = ItineraryItem & {
   limitedView?: boolean;
 };
 
-function sortSubItems(items: ItineraryItem[]): ItineraryItem[] {
+export function sortSubItems(items: ItineraryItem[]): ItineraryItem[] {
   return [...items].sort((a, b) => {
-    const order = a.sortOrder - b.sortOrder;
-    if (order !== 0) return order;
-    if (a.startDatetime && b.startDatetime) {
-      return (
-        new Date(a.startDatetime).getTime() -
-        new Date(b.startDatetime).getTime()
-      );
-    }
+    const aTime = getItemSortTime(a);
+    const bTime = getItemSortTime(b);
+    if (aTime !== bTime) return aTime - bTime;
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
     return a.id - b.id;
   });
 }

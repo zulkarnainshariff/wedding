@@ -41,14 +41,14 @@ function SubItemFormFields({
   parentItem: ItineraryItem | null | undefined;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid min-w-0 max-w-full gap-3 sm:grid-cols-2">
       <label className="block text-sm sm:col-span-2">
         <span className="mb-1 block text-stone-500">Title *</span>
         <input
           value={form.title}
           onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))}
           placeholder={placeholders.title}
-          className="w-full rounded-lg border border-stone-200 px-3 py-2"
+          className="w-full min-w-0 rounded-lg border border-stone-200 px-3 py-2"
           required
         />
       </label>
@@ -58,7 +58,7 @@ function SubItemFormFields({
           type="time"
           value={form.time}
           onChange={(e) => setForm((current) => ({ ...current, time: e.target.value }))}
-          className="w-full rounded-lg border border-stone-200 px-3 py-2"
+          className="w-full min-w-0 rounded-lg border border-stone-200 px-3 py-2"
         />
       </label>
       <SubItemParticipantsField
@@ -86,7 +86,7 @@ function SubItemFormFields({
             setForm((current) => ({ ...current, locationName: e.target.value }))
           }
           placeholder={placeholders.locationName}
-          className="w-full rounded-lg border border-stone-200 px-3 py-2"
+          className="w-full min-w-0 rounded-lg border border-stone-200 px-3 py-2"
         />
       </label>
       <label className="block text-sm sm:col-span-2">
@@ -98,7 +98,7 @@ function SubItemFormFields({
             setForm((current) => ({ ...current, locationMapUrl: e.target.value }))
           }
           placeholder={placeholders.locationMapUrl}
-          className="w-full rounded-lg border border-stone-200 px-3 py-2"
+          className="w-full min-w-0 rounded-lg border border-stone-200 px-3 py-2"
         />
       </label>
       <label className="block text-sm sm:col-span-2">
@@ -107,7 +107,7 @@ function SubItemFormFields({
           value={form.summary}
           onChange={(e) => setForm((current) => ({ ...current, summary: e.target.value }))}
           rows={3}
-          className="w-full rounded-lg border border-stone-200 px-3 py-2"
+          className="w-full min-w-0 rounded-lg border border-stone-200 px-3 py-2"
         />
       </label>
     </div>
@@ -236,14 +236,21 @@ export function SubItemEditForm({
 
   if (modal) {
     return (
-      <div className="flex max-h-[92vh] flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-xl sm:rounded-3xl">
+      <div className="flex max-h-[92vh] max-w-full flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-xl sm:rounded-3xl">
         <div className="shrink-0 border-b border-stone-100 px-6 py-4 sm:px-8">
           <p className="text-xs font-semibold tracking-[0.2em] text-accent uppercase">
             Edit sub-item
           </p>
-          <h2 className="mt-1 font-serif text-2xl text-brand-deep">{item.title}</h2>
+          <h2 className="mt-1 truncate font-serif text-2xl text-brand-deep">
+            {item.title}
+          </h2>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 sm:px-8">{body}</div>
+        <div
+          data-item-edit-scroll
+          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-4 sm:px-8"
+        >
+          {body}
+        </div>
         <div className="shrink-0 border-t border-stone-100 px-6 py-4 sm:px-8">
           {actions}
         </div>
@@ -252,7 +259,7 @@ export function SubItemEditForm({
   }
 
   return (
-    <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+    <div className="max-w-full overflow-x-hidden rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
       <div className="mb-6">
         <p className="text-xs font-semibold tracking-[0.2em] text-accent uppercase">
           Edit sub-item

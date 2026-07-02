@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useItineraryUI } from "@/components/itinerary/ItineraryUIContext";
 import { isSubItem } from "@/lib/item-subitems";
+import { itemSectionId, scrollToElementById } from "@/lib/day-jump";
 import type { ItineraryItem } from "@/lib/schema";
 import { useRouter } from "next/navigation";
 
@@ -32,6 +33,26 @@ export function ItemDetailModal() {
     setEditing(false);
     setDeleteConfirmOpen(false);
   }, [selectedItemId]);
+
+  useEffect(() => {
+    if (!editing) return;
+    requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>('[role="dialog"] [data-item-edit-scroll]')
+        ?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }, [editing, selectedItemId]);
+
+  function handleEditSaved() {
+    const itemId = selectedItem?.id;
+    setEditing(false);
+    void refreshSelectedItem({ silent: true }).then(() => {
+      if (itemId == null) return;
+      requestAnimationFrame(() => {
+        scrollToElementById(itemSectionId(itemId));
+      });
+    });
+  }
 
   useEffect(() => {
     if (!selectedItem?.parentItemId) {
@@ -90,7 +111,7 @@ export function ItemDetailModal() {
         <div className="absolute inset-0 bg-stone-900/45 backdrop-blur-[2px]" />
 
         <div
-          className="relative w-full max-w-3xl"
+          className="relative w-full max-w-3xl overflow-x-hidden"
           onClick={(event) => event.stopPropagation()}
           role="dialog"
           aria-modal="true"
@@ -107,10 +128,7 @@ export function ItemDetailModal() {
               parentItem={parentItem}
               modal
               onCancel={() => setEditing(false)}
-              onSaved={() => {
-                setEditing(false);
-                void refreshSelectedItem({ silent: true });
-              }}
+              onSaved={handleEditSaved}
               onDelete={requestDelete}
             />
           )}
@@ -120,10 +138,7 @@ export function ItemDetailModal() {
               item={selectedItem}
               modal
               onCancel={() => setEditing(false)}
-              onSaved={() => {
-                setEditing(false);
-                void refreshSelectedItem({ silent: true });
-              }}
+              onSaved={handleEditSaved}
               onDelete={requestDelete}
             />
           )}
