@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ExternalLink, Eye, EyeOff, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 type GuestbookEntry = {
   id: number;
@@ -23,6 +24,7 @@ export function GuestbookManagementPanel({
 }: {
   guestbookEnabled: boolean;
 }) {
+  const { user, guestListAccess } = useAuth();
   const toast = useToast();
   const [entries, setEntries] = useState<GuestbookEntry[]>([]);
   const [events, setEvents] = useState<EventOption[]>([]);
@@ -32,6 +34,10 @@ export function GuestbookManagementPanel({
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<GuestbookEntry | null>(null);
+  const hasAnyModerationAccess = Boolean(
+    user?.isAdmin ||
+      guestListAccess.some((entry) => entry.canModerateGuestbook),
+  );
 
   const loadEntries = useCallback(async () => {
     setLoading(true);
@@ -115,6 +121,15 @@ export function GuestbookManagementPanel({
 
   function canModerateEntry(entryEventId: number): boolean {
     return canModerateAny || moderatableEventIds.includes(entryEventId);
+  }
+
+  if (!hasAnyModerationAccess) {
+    return (
+      <p className="text-sm text-stone-500">
+        You can moderate guestbook entries once an event grants you Guestbook
+        moderator access.
+      </p>
+    );
   }
 
   return (
