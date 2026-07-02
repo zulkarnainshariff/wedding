@@ -3,6 +3,10 @@ import {
   travellerMatchesUsername,
 } from "@/lib/item-travellers";
 import { extractItemAdditionalViewers } from "@/lib/item-viewers";
+import {
+  extractSubItemParticipants,
+  isSubItem,
+} from "@/lib/item-subitems";
 import type { SessionUser } from "@/lib/permissions";
 import { userIsGuardianOfTravellers } from "@/lib/user-guardian-access";
 import type { ItineraryItem } from "@/lib/schema";
@@ -35,7 +39,9 @@ export function userIsItemParticipant(
   item: ItineraryItem,
   user: SessionUser,
 ): boolean {
-  const travellers = extractItemTravellers(item.details, item.category);
+  const travellers = isSubItem(item)
+    ? extractSubItemParticipants(item.details)
+    : extractItemTravellers(item.details, item.category);
   return travellers.some((traveller) =>
     travellerMatchesUsername(traveller, user.username),
   );
