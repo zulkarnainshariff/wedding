@@ -201,7 +201,7 @@ export function ItemCard({
 }) {
   const { openItem, viewMode } = useItineraryUI();
   const {
-    formatDateTime,
+    formatWallClockDateTime,
     formatClockTime,
     formatBaggage,
     formatFlightSchedule,
@@ -319,7 +319,7 @@ export function ItemCard({
     (activityDetails?.time
       ? formatClockTime(activityDetails.time)
       : null) ??
-    (item.startDatetime ? formatDateTime(item.startDatetime) : null);
+    (item.startDatetime ? formatWallClockDateTime(item.startDatetime) : null);
 
   return (
     <div
@@ -486,7 +486,7 @@ export function ItemCard({
             category !== "accommodation" &&
             item.startDatetime && (
               <p className="mt-2 text-xs text-stone-400">
-                {formatDateTime(item.startDatetime)}
+                {formatWallClockDateTime(item.startDatetime)}
               </p>
             )}
 

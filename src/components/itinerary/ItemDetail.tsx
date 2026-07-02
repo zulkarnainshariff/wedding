@@ -656,7 +656,7 @@ export function ItemDetailView({
   const activityDetails = getActivityDetails(item.details);
   const { linkedItem } = useLinkedItem(activityDetails?.linkedItemId);
   const sharedLocation = getItemLocation(item.details as Record<string, unknown>);
-  const { formatDateTime, formatFlightSchedule } = useDisplayFormat();
+  const { formatWallClockDateTime, formatFlightSchedule } = useDisplayFormat();
   const documentCounts = useDocumentIndicators();
   const limitedView = Boolean((item as ItineraryItemWithSubItems).limitedView);
 
@@ -668,7 +668,7 @@ export function ItemDetailView({
       styles={styles}
       Icon={Icon}
       sharedLocation={sharedLocation}
-      formatDateTime={formatDateTime}
+      formatDateTime={formatWallClockDateTime}
       formatFlightSchedule={formatFlightSchedule}
       documentCount={documentCounts[item.id]}
       modal={modal}

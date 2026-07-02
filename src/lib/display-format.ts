@@ -91,17 +91,41 @@ export function formatStayDateTimeWithPrefs(
 ): string | null {
   if (!date) return null;
   const clock = time?.trim() || "00:00";
-  const instant = new Date(`${date}T${clock}:00`);
-  if (Number.isNaN(instant.getTime())) return formatDateOnlyWithPrefs(date, preferences);
+  const parts = parseCalendarDate(date);
+  if (!parts) return formatDateOnlyWithPrefs(date, preferences);
 
   const locale = preferences.dateFormat === "mdy" ? "en-US" : "en-GB";
-  const datePart = instant.toLocaleDateString(locale, {
+  const weekdayDate = new Date(
+    Date.UTC(Number(parts.y), Number(parts.m) - 1, Number(parts.d), 12, 0, 0),
+  );
+  const datePart = weekdayDate.toLocaleDateString(locale, {
+    timeZone: "UTC",
     weekday: "short",
     day: "numeric",
     month: "short",
     year: "numeric",
   });
   return `${datePart}, ${formatClockTimeWithPrefs(clock, preferences)}`;
+}
+
+export function formatWallClockDateTimeWithPrefs(
+  iso: string | Date | null | undefined,
+  preferences: UserPreferences = DEFAULT_USER_PREFERENCES,
+): string {
+  if (!iso) return "—";
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  if (Number.isNaN(d.getTime())) return "—";
+  const locale = preferences.dateFormat === "mdy" ? "en-US" : "en-GB";
+  return d.toLocaleString(locale, {
+    timeZone: "UTC",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: preferences.timeFormat === "12h",
+  });
 }
 
 export function formatDateTimeWithPrefs(

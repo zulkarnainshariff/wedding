@@ -1,3 +1,4 @@
+import { wallClockToDate } from "./item-schedule-datetime";
 import type { CarRentalDetails } from "./types";
 
 export type RawCarRental = {
@@ -39,6 +40,5 @@ export function buildCarRentalSummary(raw: RawCarRental): string {
 }
 
 export function carRentalPickupDatetime(date: string, time?: string): Date {
-  if (time) return new Date(`${date}T${time}:00`);
-  return new Date(`${date}T12:00:00`);
+  return wallClockToDate(date, time ?? "12:00")!;
 }

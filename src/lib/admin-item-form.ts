@@ -34,15 +34,16 @@ export function toDatetimeLocal(value: string | Date | null | undefined): string
   const d = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return "";
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
 
-/** Parse a datetime-local value in the browser's timezone and return UTC ISO. */
+/** Parse a datetime-local value as wall-clock and return UTC ISO. */
 export function datetimeLocalToIso(value: string): string | null {
   if (!value.trim()) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString();
+  const [date, time] = value.trim().split("T");
+  if (!date) return null;
+  const instant = wallClockToDate(date, time?.slice(0, 5));
+  return instant ? instant.toISOString() : null;
 }
 
 function isoFromDateAndClock(date: string, time?: string): string | null {

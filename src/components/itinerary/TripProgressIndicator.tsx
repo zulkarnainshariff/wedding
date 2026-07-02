@@ -17,7 +17,7 @@ export function TripProgressIndicator({
   items?: ItineraryItemWithSubItems[];
 }) {
   const { effectiveDate, devMode } = useTripTime();
-  const { formatDateOnly, formatDateTime, formatClockTime } = useDisplayFormat();
+  const { formatDateOnly, formatWallClockDateTime, formatClockTime } = useDisplayFormat();
   const progress = computeTripProgress(days, effectiveDate);
   const nextItem = items ? findNextItineraryItem(items, effectiveDate) : null;
 
@@ -42,7 +42,7 @@ export function TripProgressIndicator({
       return formatClockTime(details.time);
     }
     if (nextItem.startDatetime) {
-      return formatDateTime(nextItem.startDatetime);
+      return formatWallClockDateTime(nextItem.startDatetime);
     }
     return null;
   })();

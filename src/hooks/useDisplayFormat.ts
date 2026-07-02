@@ -12,6 +12,7 @@ import {
   formatDayOptionLabel,
   formatInstantWithPrefs,
   formatStayDateTimeWithPrefs,
+  formatWallClockDateTimeWithPrefs,
 } from "@/lib/display-format";
 import { formatFlightEndpointLabel, formatFlightScheduleLines } from "@/lib/flight-datetime";
 import { DEFAULT_USER_PREFERENCES } from "@/lib/user-preferences";
@@ -26,6 +27,8 @@ export function useDisplayFormat() {
       preferences,
       formatDateTime: (iso: string | Date | null | undefined) =>
         formatDateTimeWithPrefs(iso, preferences),
+      formatWallClockDateTime: (iso: string | Date | null | undefined) =>
+        formatWallClockDateTimeWithPrefs(iso, preferences),
       formatInstant: (
         iso: string | Date | null | undefined,
         timeZone: string | null | undefined,
