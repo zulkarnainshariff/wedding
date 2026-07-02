@@ -2,6 +2,7 @@ import type { ItineraryItem } from "@/lib/schema";
 import type { SessionUser } from "@/lib/permissions";
 import {
   extractItemTravellers,
+  EVERYONE_TRAVELLER,
   itemIncludesEveryone,
   SYSTEM_ACCOUNT_USERNAMES,
   travellerMatchesUsername,
@@ -45,13 +46,30 @@ export function userIsItemParticipant(
   );
 }
 
+/** Participant by explicit name — not via "Everyone" or additional-viewer access. */
+export function userIsNamedItemParticipant(
+  item: ItineraryItem,
+  user: SessionUser,
+): boolean {
+  const participants = isSubItem(item)
+    ? extractSubItemParticipants(item.details)
+    : extractItemTravellers(item.details, item.category);
+
+  return participants.some(
+    (participant) =>
+      participant !== EVERYONE_TRAVELLER &&
+      participant.toLowerCase() !== "all" &&
+      travellerMatchesUsername(participant, user.username),
+  );
+}
+
 export function canSeeItemAdditionalViewers(
   item: ItineraryItem,
   user: SessionUser | null | undefined,
 ): boolean {
   if (!user) return false;
   if (user.isAdmin || isAdminSession(user.roleLevel)) return true;
-  return userIsItemParticipant(item, user);
+  return userIsNamedItemParticipant(item, user);
 }
 
 export function extractItemAdditionalViewers(details: unknown): string[] {
