@@ -6,27 +6,31 @@ import {
   getGuestbookEntryById,
   serializeGuestbookEntry,
 } from "@/lib/guestbook-queries";
-import { canModerateGuestbook } from "@/lib/permissions";
+import { canModerateGuestbookForEvent } from "@/lib/guest-queries";
 import { db } from "@/lib/db";
 import { guestbookEntries } from "@/lib/schema";
 
 type Params = { params: Promise<{ id: string }> };
 
-async function requireGuestbookModerator() {
+async function requireGuestbookModeratorForEntry(entryId: number) {
   const user = await requireAuth();
   if (isAuthError(user)) return user;
-  if (!canModerateGuestbook(user)) {
+  const entry = await getGuestbookEntryById(entryId);
+  if (!entry) {
+    return NextResponse.json({ error: "Entry not found." }, { status: 404 });
+  }
+  if (!(await canModerateGuestbookForEvent(user, entry.eventId))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  return user;
+  return { user, entry };
 }
 
 export async function PATCH(request: Request, { params }: Params) {
-  const user = await requireGuestbookModerator();
-  if (user instanceof NextResponse) return user;
-
   const { id } = await params;
   const entryId = Number(id);
+  const auth = await requireGuestbookModeratorForEntry(entryId);
+  if (auth instanceof NextResponse) return auth;
+  const { user } = auth;
   const body = (await request.json()) as { hidden?: boolean };
 
   const [updated] = await db
@@ -56,15 +60,11 @@ export async function PATCH(request: Request, { params }: Params) {
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
-  const user = await requireGuestbookModerator();
-  if (user instanceof NextResponse) return user;
-
   const { id } = await params;
   const entryId = Number(id);
-  const existing = await getGuestbookEntryById(entryId);
-  if (!existing) {
-    return NextResponse.json({ error: "Entry not found." }, { status: 404 });
-  }
+  const auth = await requireGuestbookModeratorForEntry(entryId);
+  if (auth instanceof NextResponse) return auth;
+  const { user, entry: existing } = auth;
 
   await db.delete(guestbookEntries).where(eq(guestbookEntries.id, entryId));
 

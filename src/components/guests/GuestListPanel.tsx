@@ -22,6 +22,8 @@ type PermissionRow = {
   username: string;
   canView: boolean;
   canEdit: boolean;
+  isWeddingCoordinator: boolean;
+  canModerateGuestbook: boolean;
 };
 
 type PanelTab = "summary" | "invitations" | "settings";
@@ -148,6 +150,8 @@ export function GuestListPanel({
                 username: user.username,
                 canView: existing?.canView ?? false,
                 canEdit: existing?.canEdit ?? false,
+                isWeddingCoordinator: existing?.isWeddingCoordinator ?? false,
+                canModerateGuestbook: existing?.canModerateGuestbook ?? false,
               };
             },
           );
@@ -203,11 +207,19 @@ export function GuestListPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         permissions: permissions
-          .filter((row) => row.canView || row.canEdit)
+          .filter(
+            (row) =>
+              row.canView ||
+              row.canEdit ||
+              row.isWeddingCoordinator ||
+              row.canModerateGuestbook,
+          )
           .map((row) => ({
             userId: row.userId,
             canView: row.canView,
             canEdit: row.canEdit,
+            isWeddingCoordinator: row.isWeddingCoordinator,
+            canModerateGuestbook: row.canModerateGuestbook,
           })),
       }),
     });
@@ -600,7 +612,12 @@ export function GuestListPanel({
                                 ? {
                                     ...entry,
                                     canView: e.target.checked,
-                                    canEdit: e.target.checked ? entry.canEdit : false,
+                                    canEdit: e.target.checked
+                                      ? entry.canEdit
+                                      : false,
+                                    isWeddingCoordinator: e.target.checked
+                                      ? entry.isWeddingCoordinator
+                                      : false,
                                   }
                                 : entry,
                             ),
@@ -628,6 +645,45 @@ export function GuestListPanel({
                         }
                       />
                       Edit
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={row.isWeddingCoordinator}
+                        onChange={(e) =>
+                          setPermissions((current) =>
+                            current.map((entry) =>
+                              entry.userId === row.userId
+                                ? {
+                                    ...entry,
+                                    isWeddingCoordinator: e.target.checked,
+                                    canView: e.target.checked ? true : entry.canView,
+                                  }
+                                : entry,
+                            ),
+                          )
+                        }
+                      />
+                      Wedding coordinator (invite alerts)
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={row.canModerateGuestbook}
+                        onChange={(e) =>
+                          setPermissions((current) =>
+                            current.map((entry) =>
+                              entry.userId === row.userId
+                                ? {
+                                    ...entry,
+                                    canModerateGuestbook: e.target.checked,
+                                  }
+                                : entry,
+                            ),
+                          )
+                        }
+                      />
+                      Guestbook moderator
                     </label>
                   </div>
                 ))}

@@ -7,7 +7,7 @@ import {
   listPublishedEventsForGuestbook,
   serializeGuestbookEntry,
 } from "@/lib/guestbook-queries";
-import { canModerateGuestbook } from "@/lib/permissions";
+import { getGuestListAccessForUser } from "@/lib/guest-queries";
 import { db } from "@/lib/db";
 import { guestbookEntries, weddingEvents } from "@/lib/schema";
 import { eq } from "drizzle-orm";
@@ -16,17 +16,42 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const eventId = searchParams.get("eventId");
   const sessionUser = await getSessionUser();
-  const includeHidden = sessionUser ? canModerateGuestbook(sessionUser) : false;
+  let moderatableEventIds: number[] = [];
+  let canModerateAny = false;
+
+  if (sessionUser) {
+    if (sessionUser.isAdmin) {
+      canModerateAny = true;
+    } else {
+      const guestListAccess = await getGuestListAccessForUser(sessionUser);
+      moderatableEventIds = guestListAccess
+        .filter((entry) => entry.canModerateGuestbook)
+        .map((entry) => entry.eventId);
+      canModerateAny = moderatableEventIds.length > 0;
+    }
+  }
+
+  const requestedEventId = eventId ? Number(eventId) : undefined;
+  const includeHidden =
+    requestedEventId != null &&
+    (canModerateAny &&
+      (sessionUser?.isAdmin ||
+        moderatableEventIds.includes(requestedEventId)));
 
   const entries = await listGuestbookEntries(
-    eventId ? Number(eventId) : undefined,
-    { includeHidden },
+    requestedEventId,
+    {
+      includeHidden,
+      includeHiddenForEventIds:
+        !requestedEventId && canModerateAny ? moderatableEventIds : [],
+    },
   );
   const events = await listPublishedEventsForGuestbook();
   return NextResponse.json({
     entries: entries.map(serializeGuestbookEntry),
     events,
-    canModerate: includeHidden,
+    canModerateAny,
+    moderatableEventIds,
   });
 }
 

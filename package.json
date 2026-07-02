@@ -28,6 +28,7 @@
     "db:migrate-guestbook-moderation": "tsx src/db/migrate-guestbook-moderation.ts",
     "db:migrate-pet-relocation-participants": "tsx src/db/migrate-pet-relocation-participants.ts",
     "db:migrate-user-guardians": "tsx src/db/migrate-user-guardians.ts",
+    "db:migrate-guest-list-event-roles": "tsx src/db/migrate-guest-list-event-roles.ts",
     "db:migrate-all": "npm run db:push && npm run db:migrate-task-view-permissions && npm run db:migrate-item-features && npm run db:migrate-system-logs && npm run db:migrate-app-settings && npm run db:migrate-error-logs && npm run db:migrate-public-features && npm run db:migrate-trip-days && npm run db:migrate-guestbook-moderation && npm run db:migrate-pet-relocation-participants",
     "db:dump-seed": "bash scripts/dump-wedding-seed.sh",
     "db:reset-sequences": "tsx src/db/reset-sequences.ts",

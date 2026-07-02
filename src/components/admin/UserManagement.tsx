@@ -29,8 +29,6 @@ const EMPTY_FORM = {
   canEdit: false,
   canViewAllGuestLists: false,
   canEditAllGuestLists: false,
-  isWeddingCoordinator: false,
-  canModerateGuestbook: false,
 };
 
 function formatTravellerAccess(permissions: UserPermissions): string {
@@ -87,8 +85,6 @@ export function UserManagement({
       canEdit: user.permissions.canEdit,
       canViewAllGuestLists: Boolean(user.permissions.canViewAllGuestLists),
       canEditAllGuestLists: Boolean(user.permissions.canEditAllGuestLists),
-      isWeddingCoordinator: Boolean(user.permissions.isWeddingCoordinator),
-      canModerateGuestbook: Boolean(user.permissions.canModerateGuestbook),
       guardianUserIds: user.guardianUserIds ?? [],
     });
     setError(null);
@@ -117,8 +113,6 @@ export function UserManagement({
       canViewAllGuestLists:
         form.isAdmin || form.canViewAllGuestLists || form.canEditAllGuestLists,
       canEditAllGuestLists: form.isAdmin || form.canEditAllGuestLists,
-      isWeddingCoordinator: form.isAdmin || form.isWeddingCoordinator,
-      canModerateGuestbook: form.isAdmin || form.canModerateGuestbook,
     };
 
     try {
@@ -367,37 +361,6 @@ export function UserManagement({
                   }
                 />
                 Can edit all guest lists
-              </label>
-
-              <label className="flex items-center gap-2 text-sm text-stone-700">
-                <input
-                  type="checkbox"
-                  checked={form.isWeddingCoordinator}
-                  onChange={(e) =>
-                    setForm((current) => ({
-                      ...current,
-                      isWeddingCoordinator: e.target.checked,
-                      canViewAllGuestLists: e.target.checked
-                        ? true
-                        : current.canViewAllGuestLists,
-                    }))
-                  }
-                />
-                Wedding coordinator (guest list visibility & invite alerts)
-              </label>
-
-              <label className="flex items-center gap-2 text-sm text-stone-700">
-                <input
-                  type="checkbox"
-                  checked={form.canModerateGuestbook}
-                  onChange={(e) =>
-                    setForm((current) => ({
-                      ...current,
-                      canModerateGuestbook: e.target.checked,
-                    }))
-                  }
-                />
-                Can moderate guestbook (hide or delete messages)
               </label>
 
               <label className="flex items-center gap-2 text-sm text-stone-700">

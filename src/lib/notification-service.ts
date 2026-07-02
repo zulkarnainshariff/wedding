@@ -1,11 +1,10 @@
 import { and, desc, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  isWeddingCoordinator,
   normalizePermissions,
   receivesAllGuestListNotifications,
 } from "@/lib/permissions";
-import { DEFAULT_USER_PREFERENCES } from "@/lib/user-preferences";
+import { getWeddingCoordinatorUserIdsForEvent } from "@/lib/guest-queries";
 import {
   guestListPermissions,
   notifications,
@@ -50,6 +49,7 @@ export async function notifyGuestListWatchers(
         or(
           eq(guestListPermissions.canView, true),
           eq(guestListPermissions.canEdit, true),
+          eq(guestListPermissions.isWeddingCoordinator, true),
         ),
       ),
     );
@@ -108,32 +108,7 @@ export async function notifyWeddingCoordinatorsOnGuestInvite(input: {
   guestLabel: string;
   guestId: number;
 }) {
-  const allUsers = await db
-    .select({
-      id: users.id,
-      username: users.username,
-      isAdmin: users.isAdmin,
-      roleLevel: users.roleLevel,
-      permissions: users.permissions,
-    })
-    .from(users);
-
-  const coordinatorIds = allUsers
-    .filter((row) =>
-      isWeddingCoordinator({
-        id: row.id,
-        username: row.username,
-        roleLevel: row.roleLevel,
-        isAdmin: row.isAdmin,
-        permissions: normalizePermissions(
-          row.permissions,
-          row.isAdmin,
-          row.username,
-        ),
-        preferences: DEFAULT_USER_PREFERENCES,
-      }),
-    )
-    .map((row) => row.id);
+  const coordinatorIds = await getWeddingCoordinatorUserIdsForEvent(input.eventId);
 
   if (!coordinatorIds.length) return;
 
