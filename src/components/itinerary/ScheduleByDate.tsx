@@ -54,7 +54,7 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
     () =>
       visibleDays.map((day) => ({
         ...day,
-        items: sortDayItems(day.items),
+        items: sortDayItems(day.items, day.date),
       })),
     [visibleDays],
   );

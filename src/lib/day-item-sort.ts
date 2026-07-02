@@ -1,15 +1,21 @@
-import { getItemSortTime } from "@/lib/item-schedule-datetime";
+import { getItemSortTimeForDay } from "@/lib/item-schedule-datetime";
 import type { ItineraryItem } from "@/lib/schema";
 
-export function getItemScheduleSortTime(item: ItineraryItem): number | null {
-  const time = getItemSortTime(item);
+export function getItemScheduleSortTime(
+  item: ItineraryItem,
+  dayDate?: string | null,
+): number | null {
+  const time = getItemSortTimeForDay(item, dayDate);
   return time === Number.MAX_SAFE_INTEGER ? null : time;
 }
 
-export function sortDayItems(items: ItineraryItem[]): ItineraryItem[] {
+export function sortDayItems(
+  items: ItineraryItem[],
+  dayDate?: string | null,
+): ItineraryItem[] {
   return [...items].sort((left, right) => {
-    const leftTime = getItemScheduleSortTime(left);
-    const rightTime = getItemScheduleSortTime(right);
+    const leftTime = getItemScheduleSortTime(left, dayDate);
+    const rightTime = getItemScheduleSortTime(right, dayDate);
 
     if (leftTime == null && rightTime == null) {
       return left.sortOrder - right.sortOrder;

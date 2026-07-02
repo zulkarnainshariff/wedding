@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FileText, Pencil, Trash2, Upload, X } from "lucide-react";
+import { FileText, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
 import { IconTooltip } from "@/components/ui/IconTooltip";
@@ -200,6 +200,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
   const [label, setLabel] = useState("");
   const [extraViewers, setExtraViewers] = useState<string[]>([]);
   const [editingDocId, setEditingDocId] = useState<number | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
   const [savingDocId, setSavingDocId] = useState<number | null>(null);
   const [viewerOptions, setViewerOptions] = useState<string[]>([]);
 
@@ -300,6 +301,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
       setLabel("");
       setExtraViewers([]);
       setUploadProgress(100);
+      setAddOpen(false);
       toast.success(`Uploaded ${file.name}`);
       await refresh();
     } catch {
@@ -357,23 +359,45 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
     }
   }
 
+  if (!loading && documents.length === 0 && !canEdit) {
+    return null;
+  }
+
+  const showSectionBody = loading || documents.length > 0 || addOpen;
+
   return (
     <div className="border-t border-stone-100 py-4">
-      <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
-        Documents
-      </h3>
-      <p className="mt-1 text-xs text-stone-500">
-        Travelling party members can view each other&apos;s documents. Add{" "}
-        {ADDITIONAL_VIEWERS_LABEL.toLowerCase()} (e.g. parents) when uploading.
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
+            Documents
+          </h3>
+          {showSectionBody && (
+            <p className="mt-1 text-xs text-stone-500">
+              Travelling party members can view each other&apos;s documents. Add{" "}
+              {ADDITIONAL_VIEWERS_LABEL.toLowerCase()} (e.g. parents) when uploading.
+            </p>
+          )}
+        </div>
+        {canEdit && !addOpen && (
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-brand-deep hover:underline"
+          >
+            <Plus className="h-4 w-4" />
+            Upload document
+          </button>
+        )}
+      </div>
 
-      {loading ? (
-        <p className="mt-3 text-sm text-stone-400">Loading documents…</p>
-      ) : documents.length === 0 ? (
-        <p className="mt-3 text-sm text-stone-400">No documents uploaded yet.</p>
-      ) : (
-        <ul className="mt-3 space-y-2">
-          {documents.map((doc) => {
+      {showSectionBody && (
+        <>
+          {loading ? (
+            <p className="mt-3 text-sm text-stone-400">Loading documents…</p>
+          ) : documents.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {documents.map((doc) => {
             const covered = parseCoveredTravellers(doc);
             const additional = parseExtraViewers(doc.extraViewers);
             const isEditing = editingDocId === doc.id;
@@ -450,15 +474,28 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
               </li>
             );
           })}
-        </ul>
-      )}
+            </ul>
+          ) : null}
 
-      {canEdit && (
-        <form
-          onSubmit={(e) => void handleUpload(e)}
-          className="mt-4 space-y-3 rounded-xl border border-dashed border-stone-300 bg-white p-4"
-        >
-          <p className="text-sm font-medium text-stone-700">Upload document</p>
+          {canEdit && addOpen && (
+            <form
+              onSubmit={(e) => void handleUpload(e)}
+              className="mt-4 space-y-3 rounded-xl border border-dashed border-stone-300 bg-white p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-medium text-stone-700">Upload document</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddOpen(false);
+                    setError(null);
+                  }}
+                  className="rounded-full border border-stone-200 p-1.5 text-stone-500 hover:bg-stone-50"
+                  aria-label="Cancel"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="text-sm sm:col-span-2">
               <p className="mb-2 text-stone-500">{DOCUMENT_LINKED_TRAVELLERS_LABEL}</p>
@@ -555,7 +592,9 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
             <Upload className="h-4 w-4" />
             {uploading ? "Uploading…" : "Upload"}
           </button>
-        </form>
+            </form>
+          )}
+        </>
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Trash2, X } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { SubItemAdditionalViewersField } from "@/components/itinerary/SubItemAdditionalViewersField";
 import { SubItemParticipantsField } from "@/components/itinerary/SubItemParticipantsField";
@@ -91,6 +91,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
   const [viewers, setViewers] = useState<string[]>([]);
   const [viewerLinks, setViewerLinks] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const placeholders = getSubItemFormPlaceholders(item);
@@ -147,6 +148,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
     setParticipants([]);
     setViewers([]);
     setViewerLinks({});
+    setAddOpen(false);
     await refresh();
   }
 
@@ -173,37 +175,61 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
     return null;
   }
 
+  const showSectionBody = loading || subItems.length > 0 || addOpen;
+
   return (
     <>
       <div className="border-t border-stone-100 py-4">
-        <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
-          Sub-itinerary
-        </h3>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
+            Sub-itinerary
+          </h3>
+          {canEdit && !addOpen && (
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="inline-flex items-center gap-1 text-sm font-medium text-brand-deep hover:underline"
+            >
+              <Plus className="h-4 w-4" />
+              Add sub-item
+            </button>
+          )}
+        </div>
 
-        {loading ? (
-          <p className="mt-3 text-sm text-stone-400">Loading…</p>
-        ) : subItems.length === 0 ? (
-          <p className="mt-3 text-sm text-stone-400">No sub-items yet.</p>
-        ) : (
-          <div className="mt-3 space-y-2 border-l-2 border-accent/40 pl-3">
-            {subItems.map((subItem) => (
-              <SubItemDetailRow
-                key={subItem.id}
-                subItem={subItem}
-                canEdit={canEdit}
-                onDelete={requestDelete}
-                taskSummary={itemSummaries[subItem.id]}
-              />
-            ))}
-          </div>
-        )}
+        {showSectionBody && (
+          <>
+            {loading ? (
+              <p className="mt-3 text-sm text-stone-400">Loading…</p>
+            ) : subItems.length > 0 ? (
+              <div className="mt-3 space-y-2 border-l-2 border-accent/40 pl-3">
+                {subItems.map((subItem) => (
+                  <SubItemDetailRow
+                    key={subItem.id}
+                    subItem={subItem}
+                    canEdit={canEdit}
+                    onDelete={requestDelete}
+                    taskSummary={itemSummaries[subItem.id]}
+                  />
+                ))}
+              </div>
+            ) : null}
 
-        {canEdit && (
-          <form
-            onSubmit={(e) => void handleAdd(e)}
-            className="mt-4 space-y-3 rounded-xl border border-dashed border-stone-300 bg-white p-4"
-          >
-            <p className="text-sm font-medium text-stone-700">Add sub-item</p>
+            {canEdit && addOpen && (
+              <form
+                onSubmit={(e) => void handleAdd(e)}
+                className="mt-4 space-y-3 rounded-xl border border-dashed border-stone-300 bg-white p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-medium text-stone-700">Add sub-item</p>
+                  <button
+                    type="button"
+                    onClick={() => setAddOpen(false)}
+                    className="rounded-full border border-stone-200 p-1.5 text-stone-500 hover:bg-stone-50"
+                    aria-label="Cancel"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm sm:col-span-2">
                 <span className="mb-1 block text-stone-500">Title *</span>
@@ -279,7 +305,9 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
               <Plus className="h-4 w-4" />
               {saving ? "Adding…" : "Add sub-item"}
             </button>
-          </form>
+              </form>
+            )}
+          </>
         )}
       </div>
 
