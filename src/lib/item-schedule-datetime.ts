@@ -1,7 +1,6 @@
 import { applyFlightDatetimeOverrides, resolveFlightSchedule } from "@/lib/flight-datetime";
 import { getFlightItemSortTime } from "@/lib/flight-schedule-sort";
 import {
-  getAccommodationDetails,
   getActivityDetails,
   getCarRentalDetails,
   getPetRelocationDetails,
@@ -75,6 +74,39 @@ function pickInstant(
   return derived;
 }
 
+type AccommodationScheduleFields = {
+  checkInDate?: string;
+  checkInTime?: string;
+  checkOutDate?: string | null;
+  checkOutTime?: string;
+};
+
+function readAccommodationSchedule(
+  details: unknown,
+): AccommodationScheduleFields | null {
+  if (!details || typeof details !== "object") return null;
+  const d = details as Record<string, unknown>;
+  return {
+    checkInDate:
+      typeof d.checkInDate === "string" ? d.checkInDate : undefined,
+    checkInTime:
+      typeof d.checkInTime === "string" ? d.checkInTime : undefined,
+    checkOutDate:
+      typeof d.checkOutDate === "string" ? d.checkOutDate : undefined,
+    checkOutTime:
+      typeof d.checkOutTime === "string" ? d.checkOutTime : undefined,
+  };
+}
+
+function accommodationHasCheckInSchedule(
+  schedule: AccommodationScheduleFields | null,
+): schedule is AccommodationScheduleFields & {
+  checkInDate: string;
+  checkInTime: string;
+} {
+  return Boolean(schedule?.checkInDate && schedule.checkInTime);
+}
+
 export function resolveItemSchedule(
   input: ItemScheduleInput,
 ): ResolvedItemSchedule {
@@ -109,26 +141,28 @@ export function resolveItemSchedule(
   }
 
   if (input.category === "accommodation") {
-    const details = getAccommodationDetails(input.details);
-    if (details) {
-      if (details.checkInDate) {
-        eventDate = details.checkInDate;
-        derivedStart = wallClockToDate(
-          details.checkInDate,
-          details.checkInTime,
-        );
-      }
-      if (details.checkOutDate) {
-        derivedEnd = wallClockToDate(
-          details.checkOutDate,
-          details.checkOutTime,
-        );
-      }
+    const schedule = readAccommodationSchedule(input.details);
+    if (schedule?.checkInDate) {
+      eventDate = schedule.checkInDate;
+      derivedStart = wallClockToDate(
+        schedule.checkInDate,
+        schedule.checkInTime,
+      );
+    }
+    if (schedule?.checkOutDate) {
+      derivedEnd = wallClockToDate(
+        schedule.checkOutDate,
+        schedule.checkOutTime,
+      );
     }
   }
 
   const activityDetails =
     input.category === "activity" ? getActivityDetails(input.details) : null;
+  const accommodationSchedule =
+    input.category === "accommodation"
+      ? readAccommodationSchedule(input.details)
+      : null;
   if (activityDetails?.time && eventDate) {
     derivedStart = wallClockToDate(eventDate, activityDetails.time);
   }
@@ -144,12 +178,15 @@ export function resolveItemSchedule(
   const startDatetime =
     input.category === "activity" && activityDetails?.time && eventDate
       ? derivedStart
-      : pickInstant(
-          fallbackStart && !Number.isNaN(fallbackStart.getTime())
-            ? fallbackStart
-            : null,
-          derivedStart,
-        );
+      : input.category === "accommodation" &&
+          accommodationHasCheckInSchedule(accommodationSchedule)
+        ? derivedStart
+        : pickInstant(
+            fallbackStart && !Number.isNaN(fallbackStart.getTime())
+              ? fallbackStart
+              : null,
+            derivedStart,
+          );
   const endDatetime = pickInstant(
     fallbackEnd && !Number.isNaN(fallbackEnd.getTime()) ? fallbackEnd : null,
     derivedEnd,
@@ -194,6 +231,46 @@ export function applyItemDatetimeOverrides<T extends ItemScheduleInput>(body: T)
     return applyFlightDatetimeOverrides(body);
   }
   return applyItemScheduleOverrides(body);
+}
+
+export function getItemSortTimeForDay(
+  item: {
+    category: string;
+    eventDate?: string | null;
+    startDatetime?: Date | string | null;
+    endDatetime?: Date | string | null;
+    details?: unknown;
+  },
+  dayDate?: string | null,
+): number {
+  if (item.category === "accommodation" && dayDate) {
+    const schedule = readAccommodationSchedule(item.details);
+    if (schedule?.checkOutDate && dayDate === schedule.checkOutDate) {
+      const checkout = wallClockToDate(
+        schedule.checkOutDate,
+        schedule.checkOutTime,
+      );
+      if (checkout) return checkout.getTime();
+    }
+    if (schedule?.checkInDate && dayDate === schedule.checkInDate) {
+      const checkIn = wallClockToDate(
+        schedule.checkInDate,
+        schedule.checkInTime,
+      );
+      if (checkIn) return checkIn.getTime();
+    }
+    if (
+      schedule?.checkInDate &&
+      schedule.checkOutDate &&
+      dayDate > schedule.checkInDate &&
+      dayDate < schedule.checkOutDate
+    ) {
+      const midday = wallClockToDate(dayDate, "12:00");
+      if (midday) return midday.getTime();
+    }
+  }
+
+  return getItemSortTime(item);
 }
 
 export function getItemSortTime(item: {
