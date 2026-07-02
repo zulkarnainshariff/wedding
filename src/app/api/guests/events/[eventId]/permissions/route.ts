@@ -38,13 +38,26 @@ export async function PUT(request: Request, { params }: Params) {
     userId: number;
     canView: boolean;
     canEdit: boolean;
+    isWeddingCoordinator: boolean;
+    canModerateGuestbook: boolean;
   }[] = Array.isArray(body.permissions) ? body.permissions : [];
 
   await db
     .delete(guestListPermissions)
     .where(eq(guestListPermissions.eventId, eventId));
 
-  const active = entries.filter((entry) => entry.canView || entry.canEdit);
+  const active = entries
+    .map((entry) => ({
+      ...entry,
+      canView: entry.isWeddingCoordinator ? true : entry.canView,
+    }))
+    .filter(
+      (entry) =>
+        entry.canView ||
+        entry.canEdit ||
+        entry.isWeddingCoordinator ||
+        entry.canModerateGuestbook,
+    );
   if (active.length > 0) {
     await db.insert(guestListPermissions).values(
       active.map((entry) => ({
@@ -52,6 +65,8 @@ export async function PUT(request: Request, { params }: Params) {
         userId: entry.userId,
         canView: entry.canView,
         canEdit: entry.canEdit,
+        isWeddingCoordinator: entry.isWeddingCoordinator,
+        canModerateGuestbook: entry.canModerateGuestbook,
       })),
     );
   }

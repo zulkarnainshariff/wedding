@@ -26,6 +26,8 @@ export function GuestbookManagementPanel({
   const toast = useToast();
   const [entries, setEntries] = useState<GuestbookEntry[]>([]);
   const [events, setEvents] = useState<EventOption[]>([]);
+  const [canModerateAny, setCanModerateAny] = useState(false);
+  const [moderatableEventIds, setModeratableEventIds] = useState<number[]>([]);
   const [eventFilter, setEventFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -43,14 +45,19 @@ export function GuestbookManagementPanel({
       const data = (await response.json()) as {
         entries: GuestbookEntry[];
         events: EventOption[];
-        canModerate?: boolean;
+        canModerateAny?: boolean;
+        moderatableEventIds?: number[];
       };
-      if (!data.canModerate) {
+      if (!data.canModerateAny) {
         toast.error("You do not have permission to moderate the guestbook.");
         return;
       }
       setEntries(data.entries ?? []);
       setEvents(data.events ?? []);
+      setCanModerateAny(Boolean(data.canModerateAny));
+      setModeratableEventIds(
+        Array.isArray(data.moderatableEventIds) ? data.moderatableEventIds : [],
+      );
     } catch {
       toast.error("Could not load guestbook messages.");
     } finally {
@@ -104,6 +111,10 @@ export function GuestbookManagementPanel({
       setBusyId(null);
       setPendingDelete(null);
     }
+  }
+
+  function canModerateEntry(entryEventId: number): boolean {
+    return canModerateAny || moderatableEventIds.includes(entryEventId);
   }
 
   return (
@@ -174,6 +185,7 @@ export function GuestbookManagementPanel({
                       {entry.hidden ? " · Hidden from public" : ""}
                     </p>
                   </div>
+                  {canModerateEntry(entry.eventId) ? (
                   <div className="flex shrink-0 gap-1">
                     <button
                       type="button"
@@ -200,6 +212,7 @@ export function GuestbookManagementPanel({
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
+                  ) : null}
                 </div>
                 <p className="mt-2 text-sm text-stone-700">{entry.message}</p>
               </article>

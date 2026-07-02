@@ -30,6 +30,8 @@ async function getAllGuestListAccess(
     eventName: event.name,
     canView: true,
     canEdit,
+    isWeddingCoordinator: true,
+    canModerateGuestbook: true,
   }));
 }
 
@@ -47,12 +49,20 @@ export async function getGuestListAccessForUser(
       eventName: weddingEvents.name,
       canView: guestListPermissions.canView,
       canEdit: guestListPermissions.canEdit,
+      isWeddingCoordinator: guestListPermissions.isWeddingCoordinator,
+      canModerateGuestbook: guestListPermissions.canModerateGuestbook,
     })
     .from(guestListPermissions)
     .innerJoin(weddingEvents, eq(guestListPermissions.eventId, weddingEvents.id))
     .where(eq(guestListPermissions.userId, user.id));
 
-  return rows.filter((row) => row.canView || row.canEdit);
+  return rows.filter(
+    (row) =>
+      row.canView ||
+      row.canEdit ||
+      row.isWeddingCoordinator ||
+      row.canModerateGuestbook,
+  );
 }
 
 export async function canViewGuestList(
@@ -70,7 +80,7 @@ export async function canViewGuestList(
       ),
     )
     .limit(1);
-  return Boolean(row?.canView || row?.canEdit);
+  return Boolean(row?.canView || row?.canEdit || row?.isWeddingCoordinator);
 }
 
 export async function canEditGuestList(
@@ -155,6 +165,57 @@ export async function getGuestListPermissionsForEvent(eventId: number) {
     .select()
     .from(guestListPermissions)
     .where(eq(guestListPermissions.eventId, eventId));
+}
+
+export async function canModerateGuestbookForEvent(
+  user: SessionUser,
+  eventId: number,
+): Promise<boolean> {
+  if (canEditAllGuestLists(user)) return true;
+  const [row] = await db
+    .select({ canModerateGuestbook: guestListPermissions.canModerateGuestbook })
+    .from(guestListPermissions)
+    .where(
+      and(
+        eq(guestListPermissions.userId, user.id),
+        eq(guestListPermissions.eventId, eventId),
+      ),
+    )
+    .limit(1);
+  return Boolean(row?.canModerateGuestbook);
+}
+
+export async function isWeddingCoordinatorForEvent(
+  user: SessionUser,
+  eventId: number,
+): Promise<boolean> {
+  if (canEditAllGuestLists(user)) return true;
+  const [row] = await db
+    .select({ isWeddingCoordinator: guestListPermissions.isWeddingCoordinator })
+    .from(guestListPermissions)
+    .where(
+      and(
+        eq(guestListPermissions.userId, user.id),
+        eq(guestListPermissions.eventId, eventId),
+      ),
+    )
+    .limit(1);
+  return Boolean(row?.isWeddingCoordinator);
+}
+
+export async function getWeddingCoordinatorUserIdsForEvent(
+  eventId: number,
+): Promise<number[]> {
+  const rows = await db
+    .select({ userId: guestListPermissions.userId })
+    .from(guestListPermissions)
+    .where(
+      and(
+        eq(guestListPermissions.eventId, eventId),
+        eq(guestListPermissions.isWeddingCoordinator, true),
+      ),
+    );
+  return [...new Set(rows.map((row) => row.userId))];
 }
 
 export function isRsvpExpired(

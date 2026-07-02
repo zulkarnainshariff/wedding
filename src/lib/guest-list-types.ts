@@ -28,6 +28,8 @@ export type GuestListAccess = {
   eventName: string;
   canView: boolean;
   canEdit: boolean;
+  isWeddingCoordinator?: boolean;
+  canModerateGuestbook?: boolean;
 };
 
 export type GuestMemberInput = {

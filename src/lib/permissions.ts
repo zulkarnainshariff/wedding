@@ -27,8 +27,6 @@ export type UserPermissions = {
   canManageUsers?: boolean;
   canViewAllGuestLists?: boolean;
   canEditAllGuestLists?: boolean;
-  isWeddingCoordinator?: boolean;
-  canModerateGuestbook?: boolean;
 };
 
 export type SessionUser = {
@@ -58,8 +56,6 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   canManageUsers: true,
   canViewAllGuestLists: true,
   canEditAllGuestLists: true,
-  isWeddingCoordinator: true,
-  canModerateGuestbook: true,
 };
 
 export function normalizeViewTravellers(
@@ -119,16 +115,25 @@ export function normalizePermissions(
       value.canViewAllGuestLists || value.canEditAllGuestLists,
     ),
     canEditAllGuestLists: Boolean(value.canEditAllGuestLists),
-    isWeddingCoordinator: Boolean(value.isWeddingCoordinator),
-    canModerateGuestbook: Boolean(value.canModerateGuestbook),
   };
 }
 
-export function canModerateGuestbook(user: SessionUser): boolean {
-  return (
-    isAdminSession(user.roleLevel) ||
-    Boolean(user.permissions.canModerateGuestbook)
-  );
+export function canModerateGuestbook(
+  user: SessionUser,
+  guestListAccess?: Array<{ eventId: number; canModerateGuestbook?: boolean }>,
+  eventId?: number,
+): boolean {
+  if (isAdminSession(user.roleLevel)) return true;
+  if (!guestListAccess?.length) return false;
+
+  if (eventId != null) {
+    return guestListAccess.some(
+      (entry) =>
+        entry.eventId === eventId && Boolean(entry.canModerateGuestbook),
+    );
+  }
+
+  return guestListAccess.some((entry) => Boolean(entry.canModerateGuestbook));
 }
 
 export function canViewCategory(
@@ -154,8 +159,7 @@ export function canViewAllGuestLists(user: SessionUser): boolean {
   return (
     isAdminSession(user.roleLevel) ||
     canManageUsers(user) ||
-    Boolean(user.permissions.canViewAllGuestLists) ||
-    Boolean(user.permissions.isWeddingCoordinator)
+    Boolean(user.permissions.canViewAllGuestLists)
   );
 }
 
@@ -176,7 +180,6 @@ export function receivesAllGuestListNotifications(user: {
   return (
     isAdminSession(level) ||
     Boolean(user.permissions.canManageUsers) ||
-    Boolean(user.permissions.isWeddingCoordinator) ||
     Boolean(
       user.permissions.canViewAllGuestLists ||
         user.permissions.canEditAllGuestLists,
@@ -185,10 +188,7 @@ export function receivesAllGuestListNotifications(user: {
 }
 
 export function isWeddingCoordinator(user: SessionUser): boolean {
-  return (
-    isAdminSession(user.roleLevel) ||
-    Boolean(user.permissions.isWeddingCoordinator)
-  );
+  return isAdminSession(user.roleLevel);
 }
 
 export function canViewItemTravellers(

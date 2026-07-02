@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Trash2, EyeOff, Eye } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { PublicHeader } from "@/components/landing/PublicHeader";
-import { canModerateGuestbook } from "@/lib/permissions";
 
 type GuestbookEntry = {
   id: number;
@@ -27,10 +26,11 @@ export function GuestbookClient({
   guestbookEnabled?: boolean;
   photoGalleryEnabled?: boolean;
 }) {
-  const { user } = useAuth();
+  const { user, guestListAccess } = useAuth();
   const [entries, setEntries] = useState<GuestbookEntry[]>([]);
   const [events, setEvents] = useState<EventOption[]>([]);
-  const [canModerate, setCanModerate] = useState(false);
+  const [canModerateAny, setCanModerateAny] = useState(false);
+  const [moderatableEventIds, setModeratableEventIds] = useState<number[]>([]);
   const [eventFilter, setEventFilter] = useState("");
   const [form, setForm] = useState({
     eventId: "",
@@ -42,8 +42,18 @@ export function GuestbookClient({
   const [busy, setBusy] = useState(false);
   const [moderatingId, setModeratingId] = useState<number | null>(null);
 
-  const showModeration =
-    canModerate || (user ? canModerateGuestbook(user) : false);
+  const canModerateEntry = (entryEventId: number) =>
+    Boolean(
+      user?.isAdmin ||
+        moderatableEventIds.includes(entryEventId) ||
+        guestListAccess.some(
+          (entry) =>
+            entry.eventId === entryEventId && entry.canModerateGuestbook,
+        ),
+    );
+  const showModeration = Boolean(
+    user?.isAdmin || canModerateAny || moderatableEventIds.length > 0,
+  );
 
   async function loadEntries(filter = eventFilter) {
     const params = filter ? `?eventId=${filter}` : "";
@@ -52,7 +62,10 @@ export function GuestbookClient({
     const data = await response.json();
     setEntries(data.entries ?? []);
     setEvents(data.events ?? []);
-    setCanModerate(Boolean(data.canModerate));
+    setCanModerateAny(Boolean(data.canModerateAny));
+    setModeratableEventIds(
+      Array.isArray(data.moderatableEventIds) ? data.moderatableEventIds : [],
+    );
     if (!form.eventId && data.events?.[0]) {
       setForm((current) => ({
         ...current,
@@ -256,7 +269,7 @@ export function GuestbookClient({
                       {entry.hidden ? " · Hidden from public" : ""}
                     </p>
                   </div>
-                  {showModeration && (
+                  {canModerateEntry(entry.eventId) && (
                     <div className="flex shrink-0 gap-1">
                       <button
                         type="button"

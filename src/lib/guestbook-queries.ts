@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { guestbookEntries, weddingEvents } from "@/lib/schema";
 
@@ -15,11 +15,23 @@ export type GuestbookEntryRow = {
 
 export async function listGuestbookEntries(
   eventId?: number,
-  options?: { includeHidden?: boolean },
+  options?: { includeHidden?: boolean; includeHiddenForEventIds?: number[] },
 ): Promise<GuestbookEntryRow[]> {
   const conditions = [];
   if (eventId) conditions.push(eq(guestbookEntries.eventId, eventId));
-  if (!options?.includeHidden) {
+  if (options?.includeHidden) {
+    // Event-scoped permissions are handled by caller for includeHidden=true.
+  } else if ((options?.includeHiddenForEventIds?.length ?? 0) > 0) {
+    conditions.push(
+      or(
+        eq(guestbookEntries.hidden, false),
+        and(
+          inArray(guestbookEntries.eventId, options?.includeHiddenForEventIds ?? []),
+          eq(guestbookEntries.hidden, true),
+        ),
+      ),
+    );
+  } else {
     conditions.push(eq(guestbookEntries.hidden, false));
   }
 

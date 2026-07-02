@@ -155,6 +155,8 @@ export const guestListPermissions = pgTable("guest_list_permissions", {
     .references(() => users.id, { onDelete: "cascade" }),
   canView: boolean("can_view").default(true).notNull(),
   canEdit: boolean("can_edit").default(false).notNull(),
+  isWeddingCoordinator: boolean("is_wedding_coordinator").default(false).notNull(),
+  canModerateGuestbook: boolean("can_moderate_guestbook").default(false).notNull(),
 });
 
 export const guests = pgTable("guests", {
