@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import {
   applyFlightStartDatetimeChange,
+  applyFlightTravelDateChange,
   copyFlightDepartureDateToArrival,
   type ItemFormState,
 } from "@/lib/admin-item-form";
@@ -436,7 +437,9 @@ export function FlightScheduleTimes({
           type="date"
           required
           value={itemForm.eventDate}
-          onChange={(e) => setItemForm({ ...itemForm, eventDate: e.target.value })}
+          onChange={(e) =>
+            setItemForm(applyFlightTravelDateChange(itemForm, e.target.value))
+          }
           className="w-full rounded-lg border border-stone-200 px-3 py-2"
         />
       </label>

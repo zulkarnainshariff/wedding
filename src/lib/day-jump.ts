@@ -90,3 +90,39 @@ export function formatDayJumpLabel(
   const primary = formatDayJumpPrimary(day, formatDateOnly);
   return title ? `${primary} · ${title}` : primary;
 }
+
+export function dayJumpCalendarBounds(
+  days: DayJumpTarget[],
+): { min: string; max: string } | null {
+  if (days.length === 0) return null;
+  const sorted = [...days].sort((left, right) => left.date.localeCompare(right.date));
+  return { min: sorted[0].date, max: sorted[sorted.length - 1].date };
+}
+
+export function findDayJumpTargetByDate(
+  days: DayJumpTarget[],
+  date: string,
+): DayJumpTarget | null {
+  const trimmed = date.trim();
+  if (!trimmed) return null;
+
+  const exact = days.find((day) => day.date === trimmed);
+  if (exact) return exact;
+
+  const targetMs = Date.parse(`${trimmed}T12:00:00Z`);
+  if (Number.isNaN(targetMs)) return null;
+
+  let nearest: DayJumpTarget | null = null;
+  let nearestDiff = Number.POSITIVE_INFINITY;
+  for (const day of days) {
+    const dayMs = Date.parse(`${day.date}T12:00:00Z`);
+    if (Number.isNaN(dayMs)) continue;
+    const diff = Math.abs(dayMs - targetMs);
+    if (diff < nearestDiff) {
+      nearestDiff = diff;
+      nearest = day;
+    }
+  }
+
+  return nearest;
+}

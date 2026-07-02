@@ -144,6 +144,20 @@ export function SettingsForm({
           />
           Hide past days in itinerary views
         </label>
+        <label className="flex items-center gap-2 text-sm text-stone-700">
+          <input
+            type="checkbox"
+            checked={preferences.hideFreeDays}
+            onChange={(e) =>
+              setPreferences({
+                ...preferences,
+                hideFreeDays: e.target.checked,
+              })
+            }
+            className="h-4 w-4 rounded border-stone-300"
+          />
+          Hide free days in itinerary views
+        </label>
         <button
           type="button"
           disabled={saving}
