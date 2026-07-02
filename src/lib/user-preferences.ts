@@ -18,7 +18,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   timeFormat: "24h",
   dateFormat: "dmy",
   hidePastDays: false,
-  hideFreeDays: false,
+  hideFreeDays: true,
   hideUntouchedDays: false,
   hiddenDayIds: [],
   forceVisibleDayIds: [],
@@ -36,9 +36,10 @@ export function normalizeUserPreferences(raw: unknown): UserPreferences {
     units: value.units === "imperial" ? "imperial" : "metric",
     timeFormat: value.timeFormat === "12h" ? "12h" : "24h",
     dateFormat: value.dateFormat === "mdy" ? "mdy" : "dmy",
-    hidePastDays: Boolean(value.hidePastDays),
-    hideFreeDays: Boolean(value.hideFreeDays),
-    hideUntouchedDays: Boolean(value.hideUntouchedDays),
+    hidePastDays: value.hidePastDays ?? DEFAULT_USER_PREFERENCES.hidePastDays,
+    hideFreeDays: value.hideFreeDays ?? DEFAULT_USER_PREFERENCES.hideFreeDays,
+    hideUntouchedDays:
+      value.hideUntouchedDays ?? DEFAULT_USER_PREFERENCES.hideUntouchedDays,
     hiddenDayIds: normalizeHiddenDayIds(value.hiddenDayIds),
     forceVisibleDayIds: normalizeHiddenDayIds(value.forceVisibleDayIds),
   };

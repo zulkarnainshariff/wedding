@@ -13,6 +13,7 @@ import {
 import { resolveFlightScheduleForItem } from "@/lib/flight-segment-timing";
 import { getAirportTimezone } from "@/lib/airport-timezones";
 import { wallClockToDate } from "@/lib/item-schedule-datetime";
+import { getEffectiveFlightScheduleSortBy } from "@/lib/flight-schedule-sort";
 import type { Category, FlightSegment } from "@/lib/types";
 import type { ItineraryItem } from "@/lib/schema";
 
@@ -485,6 +486,80 @@ function flightArrivalTimePart(
   return "12:00";
 }
 
+function shiftCalendarDate(date: string, days: number): string | null {
+  const [year, month, day] = date.split("-").map(Number);
+  if ([year, month, day].some((part) => Number.isNaN(part))) return null;
+  const shifted = new Date(Date.UTC(year, month - 1, day + days, 12, 0, 0));
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
+}
+
+/** Departures shortly after midnight belong on the previous itinerary travel day. */
+const EARLY_MORNING_DEPARTURE_CUTOFF_MINUTES = 3 * 60;
+
+function departureClockMinutes(time: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})/.exec(time.trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (
+    Number.isNaN(hour) ||
+    Number.isNaN(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return null;
+  }
+  return hour * 60 + minute;
+}
+
+export function travelDateFromDepartureDatetime(
+  departureDatetime: string,
+): string | null {
+  const date = departureDatetime.split("T")[0]?.trim();
+  if (!date) return null;
+
+  const time = departureDatetime.split("T")[1]?.slice(0, 5) ?? "";
+  if (!time) return date;
+
+  const minutes = departureClockMinutes(time);
+  if (
+    minutes != null &&
+    minutes < EARLY_MORNING_DEPARTURE_CUTOFF_MINUTES
+  ) {
+    return shiftCalendarDate(date, -1) ?? date;
+  }
+
+  return date;
+}
+
+/** Fill departure date from travel date when departure has no date yet. */
+export function applyFlightTravelDateChange(
+  form: ItemFormState,
+  nextTravelDate: string,
+): ItemFormState {
+  if (form.category !== "flight") {
+    return { ...form, eventDate: nextTravelDate };
+  }
+
+  const next: ItemFormState = { ...form, eventDate: nextTravelDate };
+  if (!nextTravelDate.trim()) return next;
+
+  const departureDate = form.startDatetime.split("T")[0]?.trim() ?? "";
+  if (departureDate) return next;
+
+  const timePart = form.startDatetime.includes("T")
+    ? (form.startDatetime.split("T")[1] ?? "")
+    : "";
+  next.startDatetime = timePart
+    ? `${nextTravelDate}T${timePart}`
+    : `${nextTravelDate}T`;
+
+  return next;
+}
+
 /** When departure datetime changes, keep arrival time but align its date if it still matched the old departure date. */
 export function applyFlightStartDatetimeChange(
   form: ItemFormState,
@@ -510,7 +585,18 @@ export function applyFlightStartDatetimeChange(
         )}`
       : form.endDatetime;
 
-  return { ...form, startDatetime: nextStart, endDatetime: nextEnd };
+  let nextEventDate = form.eventDate;
+  if (!nextEventDate.trim() && nextStartDate) {
+    nextEventDate =
+      travelDateFromDepartureDatetime(nextStart) ?? nextStartDate;
+  }
+
+  return {
+    ...form,
+    eventDate: nextEventDate,
+    startDatetime: nextStart,
+    endDatetime: nextEnd,
+  };
 }
 
 export function copyFlightDepartureDateToArrival(
@@ -525,4 +611,38 @@ export function copyFlightDepartureDateToArrival(
     form.structured.simple.arrivalTime,
   );
   return { ...form, endDatetime: `${startDate}T${time}` };
+}
+
+/** Ignore flight fields that are auto-normalized on mount when checking for edits. */
+export function normalizeItemFormForCompare(form: ItemFormState): ItemFormState {
+  if (form.category !== "flight") return form;
+
+  const effectiveSort = getEffectiveFlightScheduleSortBy({
+    category: "flight",
+    eventDate: form.eventDate || null,
+    startDatetime: form.startDatetime || null,
+    endDatetime: form.endDatetime || null,
+    details: {
+      ...form.structured.simple,
+      segments: form.structured.segments,
+    },
+  });
+
+  return {
+    ...form,
+    structured: {
+      ...form.structured,
+      simple: {
+        ...form.structured.simple,
+        scheduleSortBy: effectiveSort,
+      },
+    },
+  };
+}
+
+export function itemFormsEqual(a: ItemFormState, b: ItemFormState): boolean {
+  return (
+    JSON.stringify(normalizeItemFormForCompare(a)) ===
+    JSON.stringify(normalizeItemFormForCompare(b))
+  );
 }

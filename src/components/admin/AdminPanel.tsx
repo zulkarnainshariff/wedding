@@ -23,6 +23,7 @@ import {
   applyStructuredDetailsToForm,
   buildItemApiPayload,
   emptyItemForm,
+  itemFormsEqual,
   itemToForm,
   type ItemFormState,
 } from "@/lib/admin-item-form";
@@ -130,11 +131,11 @@ export function AdminPanel({
   );
 
   const itemDirty = useMemo(
-    () => JSON.stringify(itemForm) !== JSON.stringify(itemBaseline),
+    () => !itemFormsEqual(itemForm, itemBaseline),
     [itemForm, itemBaseline],
   );
 
-  useUnsavedChangesGuard(itemDirty);
+  useUnsavedChangesGuard(tab === "items" && itemDirty);
   const { formatDayOption, formatDateOnly } = useDisplayFormat();
 
   useEffect(() => {
@@ -183,11 +184,16 @@ export function AdminPanel({
     : [["insurance", "Travel insurance"]];
 
   function switchTab(next: AdminTab) {
-    if (itemDirty) {
+    if (tab === "items" && itemDirty) {
       const ok = window.confirm(
         "You have unsaved changes. Leave this tab without saving?",
       );
       if (!ok) return;
+      const cleared = emptyItemForm();
+      setItemForm(cleared);
+      setItemBaseline(cleared);
+      setEditingItemId(null);
+      setStatus(null);
     }
     setTab(next);
   }
