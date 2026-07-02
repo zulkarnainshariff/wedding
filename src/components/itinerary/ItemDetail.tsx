@@ -32,7 +32,11 @@ import { useLinkedItem } from "@/hooks/useLinkedItem";
 import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/activity-utils";
 import { getItemLocation } from "@/lib/item-location";
-import { extractItemAdditionalViewers } from "@/lib/item-viewers";
+import {
+  canSeeItemAdditionalViewers,
+  extractItemAdditionalViewers,
+} from "@/lib/item-viewers";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { extractViewerLinks, viewerLinkLabel } from "@/lib/item-viewer-links";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import {
@@ -130,9 +134,12 @@ function MapLink({
   );
 }
 
-function AdditionalViewersRow({ details }: { details: unknown }) {
-  const viewers = extractItemAdditionalViewers(details);
-  const links = extractViewerLinks(details);
+function AdditionalViewersRow({ item }: { item: ItineraryItem }) {
+  const { user } = useAuth();
+  if (!canSeeItemAdditionalViewers(item, user)) return null;
+
+  const viewers = extractItemAdditionalViewers(item.details);
+  const links = extractViewerLinks(item.details);
   if (viewers.length === 0) return null;
 
   return (
@@ -577,7 +584,7 @@ function ItemDetailBody({
       {category === "travel_insurance" && (
         <InsuranceDetail details={item.details as TravelInsuranceDetails} />
       )}
-      <AdditionalViewersRow details={item.details} />
+      <AdditionalViewersRow item={item} />
       {!item.parentItemId && <ItemSubItemsSection item={item} />}
       {!item.parentItemId && <ItemDocumentsSection item={item} />}
       <ItemTaskSection item={item} />

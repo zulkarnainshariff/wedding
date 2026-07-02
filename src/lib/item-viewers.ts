@@ -1,10 +1,13 @@
 import type { ItineraryItem } from "@/lib/schema";
+import type { SessionUser } from "@/lib/permissions";
 import {
   extractItemTravellers,
+  itemIncludesEveryone,
   SYSTEM_ACCOUNT_USERNAMES,
   travellerMatchesUsername,
   usernameToTravellerName,
 } from "@/lib/item-travellers";
+import { isAdminSession } from "@/lib/role-levels";
 import {
   extractSubItemParticipants,
   extractSubItemViewers,
@@ -24,6 +27,31 @@ export function isParticipantPerson(
     if (participantKey === personKey) return true;
     return travellerMatchesUsername(participant, person.toLowerCase());
   });
+}
+
+export function userIsItemParticipant(
+  item: ItineraryItem,
+  user: SessionUser,
+): boolean {
+  const participants = isSubItem(item)
+    ? extractSubItemParticipants(item.details)
+    : extractItemTravellers(item.details, item.category);
+
+  if (participants.length === 0) return false;
+  if (itemIncludesEveryone(participants)) return true;
+
+  return participants.some((participant) =>
+    travellerMatchesUsername(participant, user.username),
+  );
+}
+
+export function canSeeItemAdditionalViewers(
+  item: ItineraryItem,
+  user: SessionUser | null | undefined,
+): boolean {
+  if (!user) return false;
+  if (isAdminSession(user.roleLevel)) return true;
+  return userIsItemParticipant(item, user);
 }
 
 export function extractItemAdditionalViewers(details: unknown): string[] {

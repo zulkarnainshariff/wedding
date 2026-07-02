@@ -9,7 +9,9 @@ import {
   extractSubItemParticipants,
   extractSubItemViewers,
 } from "@/lib/item-subitems";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { ViewerLinkedPill } from "@/components/itinerary/ViewerLinkedPill";
+import { canSeeItemAdditionalViewers } from "@/lib/item-viewers";
 import { ItemTaskIcon } from "@/components/itinerary/ItemTaskIcon";
 import {
   ItemCompleteToggle,
@@ -43,10 +45,12 @@ function SubItemTime({
 function SubItemPeopleMeta({
   participants,
   viewers,
+  showViewers = true,
   compact = false,
 }: {
   participants: string[];
   viewers: string[];
+  showViewers?: boolean;
   compact?: boolean;
 }) {
   if (participants.length === 0 && viewers.length === 0) return null;
@@ -61,7 +65,7 @@ function SubItemPeopleMeta({
       {participants.length > 0 && (
         <p>Participants: {participants.join(", ")}</p>
       )}
-      {viewers.length > 0 && (
+      {showViewers && viewers.length > 0 && (
         <p>Also visible to: {viewers.join(", ")}</p>
       )}
     </div>
@@ -79,10 +83,12 @@ export function SubItemRow({
   onClick?: () => void;
   taskSummary?: ItemTaskSummary;
 }) {
+  const { user } = useAuth();
   const { formatClockTime } = useDisplayFormat();
   const location = getItemLocation(subItem.details as Record<string, unknown>);
   const participants = extractSubItemParticipants(subItem.details);
   const viewers = extractSubItemViewers(subItem.details);
+  const showViewers = canSeeItemAdditionalViewers(subItem, user);
   const completed = isItemCompleted(subItem);
   const description =
     subItem.summary ||
@@ -135,6 +141,7 @@ export function SubItemRow({
     <SubItemPeopleMeta
       participants={participants}
       viewers={viewers}
+      showViewers={showViewers}
       compact={compact}
     />
   );
