@@ -25,8 +25,6 @@ export type UserPermissions = {
   viewTravellers: string[] | "all";
   canEdit: boolean;
   canManageUsers?: boolean;
-  canViewAllGuestLists?: boolean;
-  canEditAllGuestLists?: boolean;
 };
 
 export type SessionUser = {
@@ -45,8 +43,6 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   viewTravellers: [],
   canEdit: false,
   canManageUsers: false,
-  canViewAllGuestLists: false,
-  canEditAllGuestLists: false,
 };
 
 export const ADMIN_PERMISSIONS: UserPermissions = {
@@ -54,8 +50,6 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   viewTravellers: "all",
   canEdit: true,
   canManageUsers: true,
-  canViewAllGuestLists: true,
-  canEditAllGuestLists: true,
 };
 
 export function normalizeViewTravellers(
@@ -111,11 +105,12 @@ export function normalizePermissions(
     viewTravellers: normalizeViewTravellers(value.viewTravellers, username),
     canEdit: Boolean(value.canEdit),
     canManageUsers: Boolean(value.canManageUsers),
-    canViewAllGuestLists: Boolean(
-      value.canViewAllGuestLists || value.canEditAllGuestLists,
-    ),
-    canEditAllGuestLists: Boolean(value.canEditAllGuestLists),
   };
+}
+
+/** Admins and user managers retain access to every event's guest list. */
+export function hasGlobalGuestListAccess(user: SessionUser): boolean {
+  return isAdminSession(user.roleLevel) || canManageUsers(user);
 }
 
 export function canModerateGuestbook(
@@ -155,36 +150,13 @@ export function canManageUsers(user: SessionUser): boolean {
   );
 }
 
-export function canViewAllGuestLists(user: SessionUser): boolean {
-  return (
-    isAdminSession(user.roleLevel) ||
-    canManageUsers(user) ||
-    Boolean(user.permissions.canViewAllGuestLists)
-  );
-}
-
-export function canEditAllGuestLists(user: SessionUser): boolean {
-  return (
-    isAdminSession(user.roleLevel) ||
-    canManageUsers(user) ||
-    Boolean(user.permissions.canEditAllGuestLists)
-  );
-}
-
 export function receivesAllGuestListNotifications(user: {
   roleLevel?: number;
   isAdmin: boolean;
   permissions: UserPermissions;
 }): boolean {
   const level = user.roleLevel ?? (user.isAdmin ? ROLE_ADMIN : ROLE_USER);
-  return (
-    isAdminSession(level) ||
-    Boolean(user.permissions.canManageUsers) ||
-    Boolean(
-      user.permissions.canViewAllGuestLists ||
-        user.permissions.canEditAllGuestLists,
-    )
-  );
+  return isAdminSession(level) || Boolean(user.permissions.canManageUsers);
 }
 
 export function isWeddingCoordinator(user: SessionUser): boolean {

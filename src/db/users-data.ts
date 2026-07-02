@@ -24,18 +24,13 @@ export const SEED_USERS: SeedUser[] = [
     password: "nafeesa",
     permissions: {
       canEdit: true,
-      canViewAllGuestLists: true,
-      canEditAllGuestLists: true,
     },
   },
   {
     username: "natalie",
     password: "sweetpea",
     updateIfExists: true,
-    permissions: {
-      canViewAllGuestLists: true,
-      canEditAllGuestLists: true,
-    },
+    permissions: {},
   },
   { username: "zulfikar", password: "nafeesa" },
   { username: "nadya", password: "nafeesa" },

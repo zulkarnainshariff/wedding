@@ -1,11 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import type { GuestListAccess } from "@/lib/guest-list-types";
-import {
-  canEditAllGuestLists,
-  canViewAllGuestLists,
-  type SessionUser,
-} from "@/lib/permissions";
+import { hasGlobalGuestListAccess, type SessionUser } from "@/lib/permissions";
 import {
   eventRsvpSettings,
   guestListPermissions,
@@ -13,6 +9,12 @@ import {
   guests,
   weddingEvents,
 } from "@/lib/schema";
+
+function hasGuestListPanelAccess(entry: GuestListAccess): boolean {
+  return Boolean(
+    entry.canView || entry.canEdit || entry.isWeddingCoordinator,
+  );
+}
 
 async function getAllGuestListAccess(
   user: SessionUser,
@@ -22,14 +24,12 @@ async function getAllGuestListAccess(
     .from(weddingEvents)
     .orderBy(asc(weddingEvents.sortOrder));
 
-  const canEdit = canEditAllGuestLists(user);
-
   return events.map((event) => ({
     eventId: event.id,
     eventSlug: event.slug,
     eventName: event.name,
     canView: true,
-    canEdit,
+    canEdit: true,
     isWeddingCoordinator: true,
     canModerateGuestbook: true,
   }));
@@ -38,7 +38,7 @@ async function getAllGuestListAccess(
 export async function getGuestListAccessForUser(
   user: SessionUser,
 ): Promise<GuestListAccess[]> {
-  if (canViewAllGuestLists(user)) {
+  if (hasGlobalGuestListAccess(user)) {
     return getAllGuestListAccess(user);
   }
 
@@ -69,7 +69,7 @@ export async function canViewGuestList(
   user: SessionUser,
   eventId: number,
 ): Promise<boolean> {
-  if (canViewAllGuestLists(user)) return true;
+  if (hasGlobalGuestListAccess(user)) return true;
   const [row] = await db
     .select()
     .from(guestListPermissions)
@@ -87,7 +87,7 @@ export async function canEditGuestList(
   user: SessionUser,
   eventId: number,
 ): Promise<boolean> {
-  if (canEditAllGuestLists(user)) return true;
+  if (hasGlobalGuestListAccess(user)) return true;
   const [row] = await db
     .select()
     .from(guestListPermissions)
@@ -171,7 +171,7 @@ export async function canModerateGuestbookForEvent(
   user: SessionUser,
   eventId: number,
 ): Promise<boolean> {
-  if (canEditAllGuestLists(user)) return true;
+  if (hasGlobalGuestListAccess(user)) return true;
   const [row] = await db
     .select({ canModerateGuestbook: guestListPermissions.canModerateGuestbook })
     .from(guestListPermissions)
@@ -189,7 +189,7 @@ export async function isWeddingCoordinatorForEvent(
   user: SessionUser,
   eventId: number,
 ): Promise<boolean> {
-  if (canEditAllGuestLists(user)) return true;
+  if (hasGlobalGuestListAccess(user)) return true;
   const [row] = await db
     .select({ isWeddingCoordinator: guestListPermissions.isWeddingCoordinator })
     .from(guestListPermissions)
@@ -224,3 +224,5 @@ export function isRsvpExpired(
   if (!deadline) return false;
   return new Date(deadline).getTime() < Date.now();
 }
+
+export { hasGuestListPanelAccess };

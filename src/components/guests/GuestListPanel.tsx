@@ -53,7 +53,11 @@ export function GuestListPanel({
   const accessibleEvents = useMemo(
     () =>
       events.filter((event) =>
-        access.some((entry) => entry.eventId === event.id && entry.canView),
+        access.some(
+          (entry) =>
+            entry.eventId === event.id &&
+            (entry.canView || entry.canEdit || entry.isWeddingCoordinator),
+        ),
       ),
     [events, access],
   );
@@ -590,7 +594,8 @@ export function GuestListPanel({
                 Guest list access
               </h3>
               <p className="mt-1 text-sm text-stone-500">
-                Choose which users can view or edit this event&apos;s guest list.
+                Assign view, edit, coordinator, and guestbook moderator access for
+                this event.
               </p>
               <div className="mt-3 space-y-2">
                 {permissions.map((row) => (
