@@ -198,6 +198,7 @@ export function TripDaysPanel({
       setScrollToDayId(saved.id);
       setStatus("Day saved.");
       toast.success("Day saved.");
+      await onDaysChanged?.();
     } finally {
       setBusy(false);
     }

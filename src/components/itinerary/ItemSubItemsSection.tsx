@@ -7,6 +7,7 @@ import { SubItemAdditionalViewersField } from "@/components/itinerary/SubItemAdd
 import { SubItemParticipantsField } from "@/components/itinerary/SubItemParticipantsField";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SubItemRow } from "@/components/itinerary/SubItemDisplay";
+import { sortSubItems } from "@/lib/item-subitem-utils";
 import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 import { getSubItemFormPlaceholders } from "@/lib/sub-item-placeholders";
 import { parentItemParticipants } from "@/lib/item-subitems";
@@ -104,7 +105,7 @@ export function ItemSubItemsSection({ item }: { item: ItineraryItem }) {
     try {
       const response = await fetch(`/api/items/${item.id}/subitems`);
       if (response.ok) {
-        setSubItems(await response.json());
+        setSubItems(sortSubItems(await response.json()));
       }
     } finally {
       setLoading(false);
