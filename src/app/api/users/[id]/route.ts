@@ -183,9 +183,5 @@ function parsePermissionsBody(
     viewTravellers,
     canEdit: Boolean(value.canEdit),
     canManageUsers: Boolean(value.canManageUsers),
-    canViewAllGuestLists: Boolean(
-      value.canViewAllGuestLists || value.canEditAllGuestLists,
-    ),
-    canEditAllGuestLists: Boolean(value.canEditAllGuestLists),
   };
 }

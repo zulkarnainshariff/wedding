@@ -3,7 +3,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { PageShell } from "@/components/layout/PageShell";
 import { GuestListClient } from "@/components/guests/GuestListClient";
 import { getSessionUser } from "@/lib/auth";
-import { getGuestListAccessForUser } from "@/lib/guest-queries";
+import { getGuestListAccessForUser, hasGuestListPanelAccess } from "@/lib/guest-queries";
 import { getAllInvitationEvents } from "@/lib/public-queries";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export default async function GuestsPage() {
   if (!user) redirect("/login?next=/guests");
 
   const access = await getGuestListAccessForUser(user);
-  if (!access.some((entry) => entry.canView)) {
+  if (!access.some(hasGuestListPanelAccess)) {
     redirect("/itinerary");
   }
 
