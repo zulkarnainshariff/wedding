@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { getAppSettings, isGuestbookEnabled } from "@/lib/app-settings";
 import {
-  getGuestbookEntryById,
   listGuestbookEntries,
   listPublishedEventsForGuestbook,
   serializeGuestbookEntry,
