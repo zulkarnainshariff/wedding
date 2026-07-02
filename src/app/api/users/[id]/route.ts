@@ -7,16 +7,22 @@ import { db } from "@/lib/db";
 import { isSuperuser, normalizePermissions, normalizeViewTravellers, type UserPermissions } from "@/lib/permissions";
 import { ROLE_ADMIN, ROLE_USER, roleLevelFromDb } from "@/lib/role-levels";
 import { users } from "@/lib/schema";
+import {
+  getGuardianUserIdsForWard,
+  setGuardiansForWard,
+} from "@/lib/user-guardians-server";
 import { CATEGORIES, type Category } from "@/lib/types";
 
 type Params = { params: Promise<{ id: string }> };
 
-function serializeUser(user: typeof users.$inferSelect) {
+async function serializeUser(user: typeof users.$inferSelect) {
+  const guardianUserIds = await getGuardianUserIdsForWard(user.id);
   return {
     id: user.id,
     username: user.username,
     isAdmin: user.isAdmin,
     permissions: normalizePermissions(user.permissions, user.isAdmin, user.username),
+    guardianUserIds,
     createdAt: user.createdAt,
   };
 }
@@ -91,7 +97,14 @@ export async function PUT(request: Request, { params }: Params) {
     .where(eq(users.id, userId))
     .returning();
 
-  return NextResponse.json(serializeUser(updated));
+  if (Array.isArray(body.guardianUserIds)) {
+    const guardianUserIds = body.guardianUserIds
+      .map((value: unknown) => Number(value))
+      .filter((value: number) => Number.isFinite(value));
+    await setGuardiansForWard(userId, guardianUserIds);
+  }
+
+  return NextResponse.json(await serializeUser(updated));
 }
 
 export async function DELETE(_request: Request, { params }: Params) {

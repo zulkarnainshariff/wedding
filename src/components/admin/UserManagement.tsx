@@ -14,6 +14,7 @@ export type ManagedUser = {
   username: string;
   isAdmin: boolean;
   permissions: UserPermissions;
+  guardianUserIds?: number[];
 };
 
 const EMPTY_FORM = {
@@ -24,6 +25,7 @@ const EMPTY_FORM = {
   viewCategories: [] as Category[],
   viewAllTravellers: true,
   viewTravellers: [] as string[],
+  guardianUserIds: [] as number[],
   canEdit: false,
   canViewAllGuestLists: false,
   canEditAllGuestLists: false,
@@ -87,6 +89,7 @@ export function UserManagement({
       canEditAllGuestLists: Boolean(user.permissions.canEditAllGuestLists),
       isWeddingCoordinator: Boolean(user.permissions.isWeddingCoordinator),
       canModerateGuestbook: Boolean(user.permissions.canModerateGuestbook),
+      guardianUserIds: user.guardianUserIds ?? [],
     });
     setError(null);
     requestAnimationFrame(() => {
@@ -124,6 +127,7 @@ export function UserManagement({
         password: form.password || undefined,
         isAdmin: form.isAdmin,
         permissions,
+        ...(editingId ? { guardianUserIds: form.guardianUserIds } : {}),
       };
 
       const response = await fetch(
@@ -206,6 +210,15 @@ export function UserManagement({
       viewTravellers: current.viewTravellers.includes(normalized)
         ? current.viewTravellers.filter((name) => name !== normalized)
         : [...current.viewTravellers, normalized],
+    }));
+  }
+
+  function toggleGuardian(guardianUserId: number) {
+    setForm((current) => ({
+      ...current,
+      guardianUserIds: current.guardianUserIds.includes(guardianUserId)
+        ? current.guardianUserIds.filter((id) => id !== guardianUserId)
+        : [...current.guardianUserIds, guardianUserId],
     }));
   }
 
@@ -479,6 +492,33 @@ export function UserManagement({
                 </div>
               )}
             </>
+          )}
+
+          {editingId && !form.isAdmin && (
+            <div className="space-y-2 sm:col-span-2">
+              <p className="text-sm text-stone-500">Guardians</p>
+              <p className="text-xs text-stone-400">
+                Guardians can view all of {form.username}&apos;s itinerary entries
+                automatically, without being added as extra viewers on each item.
+              </p>
+              <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-stone-200 bg-white p-2">
+                {users
+                  .filter((user) => user.id !== editingId)
+                  .map((user) => (
+                    <label
+                      key={user.id}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-stone-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.guardianUserIds.includes(user.id)}
+                        onChange={() => toggleGuardian(user.id)}
+                      />
+                      <span>{user.username}</span>
+                    </label>
+                  ))}
+              </div>
+            </div>
           )}
         </div>
 

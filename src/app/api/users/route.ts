@@ -13,14 +13,17 @@ import {
 } from "@/lib/permissions";
 import { roleLevelFromDb, ROLE_ADMIN, ROLE_USER } from "@/lib/role-levels";
 import { users } from "@/lib/schema";
+import { loadGuardianUserIdsByWard } from "@/lib/user-guardians-server";
 import { CATEGORIES, type Category } from "@/lib/types";
 
-function serializeUser(user: typeof users.$inferSelect) {
+async function serializeUser(user: typeof users.$inferSelect) {
+  const guardianMap = await loadGuardianUserIdsByWard([user.id]);
   return {
     id: user.id,
     username: user.username,
     isAdmin: user.isAdmin,
     permissions: normalizePermissions(user.permissions, user.isAdmin, user.username),
+    guardianUserIds: guardianMap.get(user.id) ?? [],
     createdAt: user.createdAt,
   };
 }
@@ -33,7 +36,17 @@ export async function GET() {
   const visible = isSuperuser(user)
     ? rows
     : rows.filter((row) => roleLevelFromDb(row.roleLevel, row.isAdmin) !== 0);
-  return NextResponse.json(visible.map(serializeUser));
+  const guardianMap = await loadGuardianUserIdsByWard(visible.map((row) => row.id));
+  return NextResponse.json(
+    visible.map((row) => ({
+      id: row.id,
+      username: row.username,
+      isAdmin: row.isAdmin,
+      permissions: normalizePermissions(row.permissions, row.isAdmin, row.username),
+      guardianUserIds: guardianMap.get(row.id) ?? [],
+      createdAt: row.createdAt,
+    })),
+  );
 }
 
 export async function POST(request: Request) {
@@ -78,7 +91,7 @@ export async function POST(request: Request) {
       })
       .returning();
 
-    return NextResponse.json(serializeUser(created), { status: 201 });
+    return NextResponse.json(await serializeUser(created), { status: 201 });
   } catch {
     return NextResponse.json(
       { error: "Username already exists" },

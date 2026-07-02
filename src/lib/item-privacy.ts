@@ -4,6 +4,7 @@ import {
 } from "@/lib/item-travellers";
 import { extractItemAdditionalViewers } from "@/lib/item-viewers";
 import type { SessionUser } from "@/lib/permissions";
+import { userIsGuardianOfTravellers } from "@/lib/user-guardian-access";
 import type { ItineraryItem } from "@/lib/schema";
 import { isAdminSession } from "@/lib/role-levels";
 
@@ -64,6 +65,9 @@ export function canViewPrivateItem(
 ): boolean {
   if (isAdminSession(user.roleLevel)) return true;
   if (userIsItemParticipant(item, user)) return true;
+  if (userIsGuardianOfTravellers(user, extractItemTravellers(item.details, item.category))) {
+    return true;
+  }
   if (userIsPrivateViewer(item, user)) return true;
   if (userIsAdditionalViewer(item, user)) return true;
   return false;

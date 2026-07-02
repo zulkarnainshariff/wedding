@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Save, Trash2, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useDiscardConfirm } from "@/hooks/useDiscardConfirm";
 import { SubItemAdditionalViewersField } from "@/components/itinerary/SubItemAdditionalViewersField";
 import { SubItemParticipantsField } from "@/components/itinerary/SubItemParticipantsField";
 import { getSubItemFormPlaceholders } from "@/lib/sub-item-placeholders";
@@ -135,16 +137,28 @@ export function SubItemEditForm({
     () => (parentItem ? parentItemParticipants(parentItem) : []),
     [parentItem],
   );
-  const [form, setForm] = useState<SubItemFormState>(() =>
-    isSubItem(item) ? subItemToFormState(item) : EMPTY_FORM,
+  const initialForm = useMemo(
+    () => (isSubItem(item) ? subItemToFormState(item) : EMPTY_FORM),
+    [item],
   );
+  const [form, setForm] = useState<SubItemFormState>(() => initialForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isDirty = useMemo(
+    () => JSON.stringify(form) !== JSON.stringify(initialForm),
+    [form, initialForm],
+  );
+  const {
+    discardConfirmOpen,
+    requestDismiss,
+    confirmDiscard,
+    cancelDiscard,
+  } = useDiscardConfirm(onCancel);
 
   useEffect(() => {
-    setForm(isSubItem(item) ? subItemToFormState(item) : EMPTY_FORM);
+    setForm(initialForm);
     setError(null);
-  }, [item.id]);
+  }, [initialForm]);
 
   async function handleSave() {
     if (!form.title.trim()) {
@@ -206,7 +220,7 @@ export function SubItemEditForm({
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
-          onClick={onCancel}
+          onClick={() => requestDismiss(isDirty)}
           className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm text-stone-600"
         >
           Cancel
@@ -223,7 +237,7 @@ export function SubItemEditForm({
         {modal ? (
           <button
             type="button"
-            onClick={onCancel}
+            onClick={() => requestDismiss(isDirty)}
             className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-50"
           >
             <X className="h-4 w-4" />
@@ -236,7 +250,8 @@ export function SubItemEditForm({
 
   if (modal) {
     return (
-      <div className="flex max-h-[92vh] max-w-full flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-xl sm:rounded-3xl">
+      <>
+        <div className="flex max-h-[92vh] max-w-full flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-xl sm:rounded-3xl">
         <div className="shrink-0 border-b border-stone-100 px-6 py-4 sm:px-8">
           <p className="text-xs font-semibold tracking-[0.2em] text-accent uppercase">
             Edit sub-item
@@ -254,12 +269,23 @@ export function SubItemEditForm({
         <div className="shrink-0 border-t border-stone-100 px-6 py-4 sm:px-8">
           {actions}
         </div>
-      </div>
+        </div>
+        <ConfirmDialog
+          open={discardConfirmOpen}
+          title="Discard changes?"
+          message="You have unsaved changes. Close without saving?"
+          confirmLabel="Discard"
+          destructive
+          onClose={cancelDiscard}
+          onConfirm={confirmDiscard}
+        />
+      </>
     );
   }
 
   return (
-    <div className="max-w-full overflow-x-hidden rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+    <>
+      <div className="max-w-full overflow-x-hidden rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
       <div className="mb-6">
         <p className="text-xs font-semibold tracking-[0.2em] text-accent uppercase">
           Edit sub-item
@@ -268,6 +294,16 @@ export function SubItemEditForm({
       </div>
       {body}
       <div className="mt-6">{actions}</div>
-    </div>
+      </div>
+      <ConfirmDialog
+        open={discardConfirmOpen}
+        title="Discard changes?"
+        message="You have unsaved changes. Close without saving?"
+        confirmLabel="Discard"
+        destructive
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+      />
+    </>
   );
 }

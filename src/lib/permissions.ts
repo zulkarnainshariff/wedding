@@ -7,6 +7,7 @@ import {
 import { isItemPrivate, canViewPrivateItem } from "./item-privacy";
 import { isSubItem } from "./item-subitems";
 import { itemPeopleForPermission } from "./item-viewers";
+import { userIsGuardianOfTravellers } from "./user-guardian-access";
 import { CATEGORIES, type Category } from "./types";
 
 import type { UserPreferences } from "./user-preferences";
@@ -37,6 +38,8 @@ export type SessionUser = {
   isAdmin: boolean;
   permissions: UserPermissions;
   preferences: UserPreferences;
+  /** Lowercase usernames this user is a designated guardian for. */
+  guardianForUsernames?: string[];
 };
 
 export const DEFAULT_PERMISSIONS: UserPermissions = {
@@ -211,6 +214,10 @@ export function canViewItemTravellers(
   }
 
   if (itemIncludesEveryone(travellers)) {
+    return true;
+  }
+
+  if (userIsGuardianOfTravellers(user, travellers)) {
     return true;
   }
 

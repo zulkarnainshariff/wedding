@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Save, Trash2, X } from "lucide-react";
 import { AdminItemDetailsForm } from "@/components/admin/AdminItemDetailsForm";
 import { FlightScheduleTimes } from "@/components/admin/FlightScheduleTimes";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useDiscardConfirm } from "@/hooks/useDiscardConfirm";
 import {
   applyStructuredDetailsToForm,
   buildItemApiPayload,
@@ -159,11 +161,27 @@ export function ItemEditView({
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const [form, setForm] = useState<ItemFormState>(() => itemToForm(item));
+  const initialForm = useMemo(() => itemToForm(item), [item]);
+  const [form, setForm] = useState<ItemFormState>(() => initialForm);
   const [days, setDays] = useState<ItineraryDay[]>([]);
   const [allItems, setAllItems] = useState<ItineraryItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isDirty = useMemo(
+    () => JSON.stringify(form) !== JSON.stringify(initialForm),
+    [form, initialForm],
+  );
+  const {
+    discardConfirmOpen,
+    requestDismiss,
+    confirmDiscard,
+    cancelDiscard,
+  } = useDiscardConfirm(onCancel);
+
+  useEffect(() => {
+    setForm(initialForm);
+    setError(null);
+  }, [initialForm]);
 
   useEffect(() => {
     void Promise.all([fetch("/api/days"), fetch("/api/items")]).then(
@@ -219,7 +237,7 @@ export function ItemEditView({
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
-          onClick={onCancel}
+          onClick={() => requestDismiss(isDirty)}
           className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm text-stone-600"
         >
           Cancel
@@ -235,7 +253,7 @@ export function ItemEditView({
         </button>
         <button
           type="button"
-          onClick={onCancel}
+          onClick={() => requestDismiss(isDirty)}
           className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-50"
         >
           <X className="h-4 w-4" />
@@ -258,7 +276,7 @@ export function ItemEditView({
       </button>
       <button
         type="button"
-        onClick={onCancel}
+        onClick={() => requestDismiss(isDirty)}
         className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm text-stone-600"
       >
         Cancel
@@ -278,7 +296,8 @@ export function ItemEditView({
 
   if (modal) {
     return (
-      <div className="flex max-h-[92vh] max-w-full flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-xl sm:rounded-3xl">
+      <>
+        <div className="flex max-h-[92vh] max-w-full flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-xl sm:rounded-3xl">
         <div className="shrink-0 border-b border-stone-100 px-6 py-4 sm:px-8">
           <div className="flex items-center justify-between gap-3 sm:hidden">
             <p className="min-w-0 truncate text-xs font-semibold tracking-[0.2em] text-accent uppercase">
@@ -286,7 +305,7 @@ export function ItemEditView({
             </p>
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => requestDismiss(isDirty)}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-stone-200 bg-white text-stone-500 hover:border-brand-deep/30 hover:text-brand-deep"
               aria-label="Close"
             >
@@ -302,7 +321,7 @@ export function ItemEditView({
             </div>
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => requestDismiss(isDirty)}
               className="rounded-full border border-stone-200 bg-white p-2 text-stone-500 shadow-sm hover:bg-stone-50"
               aria-label="Cancel editing"
             >
@@ -332,12 +351,23 @@ export function ItemEditView({
         <div className="shrink-0 border-t border-stone-100 px-6 py-4 sm:px-8">
           {modalFooter}
         </div>
-      </div>
+        </div>
+        <ConfirmDialog
+          open={discardConfirmOpen}
+          title="Discard changes?"
+          message="You have unsaved changes. Close without saving?"
+          confirmLabel="Discard"
+          destructive
+          onClose={cancelDiscard}
+          onConfirm={confirmDiscard}
+        />
+      </>
     );
   }
 
   return (
-    <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+    <>
+      <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
       <div className="mb-6">
         <p className="text-xs font-semibold tracking-[0.2em] text-accent uppercase">
           Edit item
@@ -359,6 +389,16 @@ export function ItemEditView({
       )}
 
       <div className="mt-6">{inlineActions}</div>
-    </div>
+      </div>
+      <ConfirmDialog
+        open={discardConfirmOpen}
+        title="Discard changes?"
+        message="You have unsaved changes. Close without saving?"
+        confirmLabel="Discard"
+        destructive
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+      />
+    </>
   );
 }

@@ -73,6 +73,20 @@ export const users = pgTable("users", {
     .notNull(),
 });
 
+/** Users listed here can view all itinerary entries for the ward account. */
+export const userGuardians = pgTable(
+  "user_guardians",
+  {
+    wardUserId: integer("ward_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    guardianUserId: integer("guardian_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.wardUserId, table.guardianUserId] })],
+);
+
 export const syncMetadata = pgTable("sync_metadata", {
   id: integer("id").primaryKey().default(1),
   updateId: text("update_id").notNull(),
@@ -390,6 +404,7 @@ export type ItemDocument = typeof itemDocuments.$inferSelect;
 export type NewItemDocument = typeof itemDocuments.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type UserGuardian = typeof userGuardians.$inferSelect;
 export type SyncMetadata = typeof syncMetadata.$inferSelect;
 export type AppSettingsRow = typeof appSettings.$inferSelect;
 export type WeddingEvent = typeof weddingEvents.$inferSelect;

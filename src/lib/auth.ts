@@ -11,6 +11,7 @@ import {
 } from "./permissions";
 import { isAdminSession, roleLevelFromDb } from "./role-levels";
 import { users } from "./schema";
+import { getWardUsernamesForGuardian } from "./user-guardians-server";
 import {
   normalizeUserPreferences,
   type UserPreferences,
@@ -113,6 +114,7 @@ export async function verifySessionToken(
     if (tokenVersion !== row.tokenVersion) return null;
 
     const roleLevel = roleLevelFromDb(row.roleLevel, row.isAdmin);
+    const guardianForUsernames = await getWardUsernamesForGuardian(row.id);
 
     return {
       id: row.id,
@@ -121,6 +123,7 @@ export async function verifySessionToken(
       isAdmin: isAdminSession(roleLevel),
       permissions: normalizePermissions(row.permissions, row.isAdmin, row.username),
       preferences: normalizeUserPreferences(row.preferences),
+      guardianForUsernames,
     };
   } catch {
     return null;
@@ -178,6 +181,7 @@ export async function authenticateUser(
   if (!valid) return null;
 
   const roleLevel = roleLevelFromDb(user.roleLevel, user.isAdmin);
+  const guardianForUsernames = await getWardUsernamesForGuardian(user.id);
 
   return {
     id: user.id,
@@ -186,6 +190,7 @@ export async function authenticateUser(
     isAdmin: isAdminSession(roleLevel),
     permissions: normalizePermissions(user.permissions, user.isAdmin, user.username),
     preferences: normalizeUserPreferences(user.preferences),
+    guardianForUsernames,
   };
 }
 
