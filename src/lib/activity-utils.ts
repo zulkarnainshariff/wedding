@@ -2,6 +2,7 @@ import {
   normalizeGuestText,
   normalizeTravellerList,
 } from "./travellers";
+import { wallClockToDate } from "@/lib/item-schedule-datetime";
 import type { ActivityDetails } from "./types";
 
 export type RawActivityLocation = {
@@ -136,7 +137,7 @@ export function combineActivityDatetime(
   time: string | null | undefined,
 ): Date | null {
   if (!time) return null;
-  return new Date(`${date}T${time}:00`);
+  return wallClockToDate(date, time);
 }
 
 export const ACTIVITY_TYPE_LABELS: Record<string, string> = {

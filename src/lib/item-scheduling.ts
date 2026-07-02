@@ -16,7 +16,9 @@ export function getItemCalendarDate(item: ItineraryItem): string | null {
   if (item.startDatetime) {
     const start = new Date(item.startDatetime);
     return toDateString(
-      new Date(start.getFullYear(), start.getMonth(), start.getDate(), 12, 0, 0),
+      new Date(
+        Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), 12, 0, 0),
+      ),
     );
   }
   return null;
@@ -46,7 +48,9 @@ export function normalizeItemSchedule<T extends {
         ? item.startDatetime
         : new Date(item.startDatetime);
     eventDate = toDateString(
-      new Date(start.getFullYear(), start.getMonth(), start.getDate(), 12, 0, 0),
+      new Date(
+        Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), 12, 0, 0),
+      ),
     );
   }
 

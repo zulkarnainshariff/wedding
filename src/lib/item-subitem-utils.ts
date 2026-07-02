@@ -48,10 +48,9 @@ export function getSubItemTimeLabel(item: {
   }
   if (item.startDatetime) {
     const date = new Date(item.startDatetime);
-    return date.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    const hours = date.getUTCHours();
+    const minutes = date.getUTCMinutes();
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
   }
   return null;
 }

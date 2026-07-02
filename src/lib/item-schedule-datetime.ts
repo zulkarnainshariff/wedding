@@ -46,7 +46,7 @@ function dateFromInstant(value?: Date | string | null): string | null {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 }
 
 /** Build a Date from YYYY-MM-DD + HH:mm interpreted as a wall-clock instant. */
@@ -57,10 +57,10 @@ export function wallClockToDate(dateStr: string, timeStr?: string | null): Date 
 
   const clock = parseClock(timeStr);
   if (!clock) {
-    return new Date(year, month - 1, day, 12, 0, 0);
+    return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
   }
 
-  return new Date(year, month - 1, day, clock.hour, clock.minute, 0);
+  return new Date(Date.UTC(year, month - 1, day, clock.hour, clock.minute, 0));
 }
 
 function pickInstant(
