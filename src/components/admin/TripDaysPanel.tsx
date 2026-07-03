@@ -312,6 +312,58 @@ export function TripDaysPanel({
         </p>
       ) : null}
 
+      <SectionShell title="All days">
+        {daysWithCounts.length === 0 ? (
+          <p className="text-sm text-stone-500">
+            No days yet. Set a date range and click Generate days.
+          </p>
+        ) : (
+          <div className="divide-y divide-stone-100">
+            {daysWithCounts.map((day) => {
+              const itemCount = itemCounts.get(day.id) ?? 0;
+              const untouched = itemCount === 0 && !day.title?.trim() && !day.notes?.trim();
+              const free = itemCount === 0;
+              return (
+                <div
+                  key={day.id}
+                  id={adminDayRowId(day.id)}
+                  className="scroll-mt-24 flex flex-wrap items-center justify-between gap-3 py-3"
+                >
+                  <div>
+                    <p className="font-medium text-stone-800">
+                      Day {day.dayNumber} · {day.title || (untouched ? "Blank day" : free ? "Free day" : "Untitled")}
+                    </p>
+                    <p className="text-sm text-stone-500">
+                      {formatDateOnlyWithWeekday(day.date)}
+                      {day.hidden ? " · Hidden" : ""}
+                      {untouched ? " · Blank" : free ? " · No items" : ` · ${itemCount} item(s)`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-stone-600">
+                      <input
+                        type="checkbox"
+                        checked={day.hidden}
+                        disabled={busy}
+                        onChange={() => void toggleHidden(day)}
+                      />
+                      Hidden
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => startEdit(day)}
+                      className="cursor-pointer rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SectionShell>
+
       <SectionShell title="Trip date range">
         <p className="mb-4 text-sm text-stone-500">
           Generate creates any missing calendar days between start and end. It does
@@ -487,58 +539,6 @@ export function TripDaysPanel({
         </SectionShell>
         </div>
       ) : null}
-
-      <SectionShell title="All days">
-        {daysWithCounts.length === 0 ? (
-          <p className="text-sm text-stone-500">
-            No days yet. Set a date range and click Generate days.
-          </p>
-        ) : (
-          <div className="divide-y divide-stone-100">
-            {daysWithCounts.map((day) => {
-              const itemCount = itemCounts.get(day.id) ?? 0;
-              const untouched = itemCount === 0 && !day.title?.trim() && !day.notes?.trim();
-              const free = itemCount === 0;
-              return (
-                <div
-                  key={day.id}
-                  id={adminDayRowId(day.id)}
-                  className="scroll-mt-24 flex flex-wrap items-center justify-between gap-3 py-3"
-                >
-                  <div>
-                    <p className="font-medium text-stone-800">
-                      Day {day.dayNumber} · {day.title || (untouched ? "Blank day" : free ? "Free day" : "Untitled")}
-                    </p>
-                    <p className="text-sm text-stone-500">
-                      {formatDateOnlyWithWeekday(day.date)}
-                      {day.hidden ? " · Hidden" : ""}
-                      {untouched ? " · Blank" : free ? " · No items" : ` · ${itemCount} item(s)`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-stone-600">
-                      <input
-                        type="checkbox"
-                        checked={day.hidden}
-                        disabled={busy}
-                        onChange={() => void toggleHidden(day)}
-                      />
-                      Hidden
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => startEdit(day)}
-                      className="cursor-pointer rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </SectionShell>
     </div>
   );
 }

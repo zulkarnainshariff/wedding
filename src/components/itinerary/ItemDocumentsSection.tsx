@@ -208,8 +208,8 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
   const [viewerOptions, setViewerOptions] = useState<string[]>([]);
 
   const travellerOptions = useMemo(
-    () => extractTravellerOptions(item),
-    [item],
+    () => extractTravellerOptions(item, viewerOptions),
+    [item, viewerOptions],
   );
   const showDocumentViewers = canSeeItemAdditionalViewers(item, user);
 

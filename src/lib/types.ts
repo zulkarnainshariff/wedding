@@ -134,6 +134,10 @@ export type CarRentalDetails = {
   returnMapUrl?: string;
   confirmationCode?: string;
   notes?: string | string[];
+  driver?: string;
+  participants?: string[];
+  linkedItemId?: number;
+  isCarRentalBooking?: boolean;
 };
 
 export type ActivityLocation = {

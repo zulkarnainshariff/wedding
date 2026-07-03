@@ -34,6 +34,7 @@ import {
   normalizeFlightScheduleSortBy,
   type FlightScheduleSortBy,
 } from "@/lib/flight-schedule-sort";
+import { listUnlinkedSuggestedCarRentalBookings } from "@/lib/car-rental-booking";
 
 function TimeInput({
   label,
@@ -848,6 +849,9 @@ export function AdminItemDetailsForm({
   eventDate = null,
   startDatetime = null,
   endDatetime = null,
+  hasAssignedDay = false,
+  editingItemId = null,
+  onCreateCarRentalBooking,
 }: {
   category: Category;
   structured: StructuredItemDetails;
@@ -857,6 +861,9 @@ export function AdminItemDetailsForm({
   eventDate?: string | null;
   startDatetime?: string | null;
   endDatetime?: Date | string | null;
+  hasAssignedDay?: boolean;
+  editingItemId?: number | null;
+  onCreateCarRentalBooking?: () => void;
 }) {
   const [loadedUsernames, setLoadedUsernames] = useState<string[]>([]);
 
@@ -953,10 +960,19 @@ export function AdminItemDetailsForm({
     });
 
   const linkableItems = allItems.filter((item) => item.category !== "activity");
+  const unlinkedSuggestedCarRentals = useMemo(
+    () =>
+      listUnlinkedSuggestedCarRentalBookings(
+        allItems,
+        editingItemId ?? undefined,
+      ),
+    [allItems, editingItemId],
+  );
+  const isScheduleCarRental = category === "car_rental" && hasAssignedDay;
 
   return (
     <div className="mt-3 grid gap-4 sm:grid-cols-2">
-      {category !== "flight" && (
+      {category !== "flight" && !isScheduleCarRental && (
         <LocationFields
           locationName={structured.locationName}
           locationMapUrl={structured.locationMapUrl}
@@ -1272,7 +1288,62 @@ export function AdminItemDetailsForm({
         </>
       )}
 
-      {category === "car_rental" && (
+      {category === "car_rental" && isScheduleCarRental && (
+        <>
+          <label className="block text-sm sm:col-span-2">
+            <span className="mb-1 block text-stone-500">Status</span>
+            <select
+              value={structured.simple.bookingStatus}
+              onChange={(e) => setSimple("bookingStatus", e.target.value)}
+              className="w-full rounded-lg border border-stone-200 px-3 py-2"
+            >
+              <option value="confirmed">Confirmed</option>
+              <option value="suggested">Not confirmed</option>
+            </select>
+          </label>
+          {structured.simple.bookingStatus === "suggested" ? (
+            <>
+              <label className="block text-sm sm:col-span-2">
+                <span className="mb-1 block text-stone-500">
+                  Link to car rental booking
+                </span>
+                <select
+                  value={structured.linkedItemId}
+                  onChange={(e) =>
+                    onChange({ ...structured, linkedItemId: e.target.value })
+                  }
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                >
+                  <option value="">Select an unbooked car rental…</option>
+                  {unlinkedSuggestedCarRentals.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-stone-500">
+                  Choose an existing unlinked booking, or create a new one below.
+                  Full booking details live on the Car Rental page.
+                </p>
+              </label>
+              {onCreateCarRentalBooking ? (
+                <div className="sm:col-span-2">
+                  <button
+                    type="button"
+                    onClick={onCreateCarRentalBooking}
+                    className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create new car rental booking
+                  </button>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </>
+      )}
+
+      {category === "car_rental" && !isScheduleCarRental && (
         <>
           <ParticipantMultiSelect
             label="Driver / participants"
