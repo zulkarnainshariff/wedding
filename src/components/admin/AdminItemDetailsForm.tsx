@@ -968,7 +968,13 @@ export function AdminItemDetailsForm({
       ),
     [allItems, editingItemId],
   );
-  const isScheduleCarRental = category === "car_rental" && hasAssignedDay;
+  const isScheduleCarRental =
+    category === "car_rental" &&
+    hasAssignedDay &&
+    !structured.simple.company?.trim() &&
+    !structured.simple.vehicleModel?.trim() &&
+    !structured.simple.pickupLocation?.trim() &&
+    !structured.simple.confirmationCode?.trim();
 
   return (
     <div className="mt-3 grid gap-4 sm:grid-cols-2">

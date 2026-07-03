@@ -220,8 +220,21 @@ export async function archiveNotificationAdmin(id: number) {
     .where(eq(notifications.id, id));
 }
 
+export async function setNotificationReadAdmin(id: number, read: boolean) {
+  await db
+    .update(notifications)
+    .set({ readAt: read ? new Date() : null })
+    .where(eq(notifications.id, id));
+}
+
 export async function deleteNotificationAdmin(id: number) {
   await db.delete(notifications).where(eq(notifications.id, id));
+}
+
+export async function deleteNotificationsAdmin(ids: number[]) {
+  if (ids.length === 0) return 0;
+  await db.delete(notifications).where(inArray(notifications.id, ids));
+  return ids.length;
 }
 
 export async function markNotificationRead(userId: number, id: number) {
