@@ -14,6 +14,7 @@ import { GalleryManagementPanel } from "./GalleryManagementPanel";
 import { GuestbookManagementPanel } from "./GuestbookManagementPanel";
 import { LandingPagePanel } from "./LandingPagePanel";
 import { TripDaysPanel } from "./TripDaysPanel";
+import { TbcItemsPanel } from "./TbcItemsPanel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { GuestListClient } from "@/components/guests/GuestListClient";
 import { TaskPermissionsPanel } from "./TaskPermissionsPanel";
@@ -30,6 +31,7 @@ import {
 import { getItemSortTime } from "@/lib/item-schedule-datetime";
 import { useUnsavedChangesGuard } from "@/components/layout/NavigationGuard";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
+import { DocumentsPanelContent } from "@/components/itinerary/DocumentsPanel";
 import { PageShell, SectionShell } from "@/components/layout/PageShell";
 import { CATEGORY_META, CATEGORIES, type Category } from "@/lib/types";
 import type { AppThemeId } from "@/lib/app-theme";
@@ -38,10 +40,13 @@ import type {
   PublicScheduleItem,
 } from "@/lib/invitation-types";
 import type { ItineraryDay, ItineraryItem, PublicScheduleItemRow, WeddingEvent } from "@/lib/schema";
+import { isItemTbc } from "@/lib/item-tbc";
 
 type AdminTab =
   | "days"
   | "items"
+  | "documents"
+  | "tbc"
   | "users"
   | "invitations"
   | "landing"
@@ -78,6 +83,7 @@ export function AdminPanel({
   initialLandingEvents = [],
   showUserManagement = false,
   showFullAdmin = true,
+  canEditItinerary = false,
   showDiagnostics = false,
   showSuperuserTools = false,
   initialThemeId,
@@ -94,6 +100,7 @@ export function AdminPanel({
   >;
   showUserManagement?: boolean;
   showFullAdmin?: boolean;
+  canEditItinerary?: boolean;
   showDiagnostics?: boolean;
   showSuperuserTools?: boolean;
   initialThemeId: AppThemeId;
@@ -137,15 +144,22 @@ export function AdminPanel({
 
   useUnsavedChangesGuard(tab === "items" && itemDirty);
   const { formatDayOption, formatDateOnly } = useDisplayFormat();
+  const showItineraryExtras = showFullAdmin || canEditItinerary;
+  const sortedItems = useMemo(() => sortItems(items), [items]);
+  const tbcItems = useMemo(
+    () => sortedItems.filter((item) => isItemTbc(item)),
+    [sortedItems],
+  );
 
   useEffect(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
     if (
-      showFullAdmin &&
       requestedTab &&
       [
         "days",
         "items",
+        "documents",
+        "tbc",
         "invitations",
         "landing",
         "guests",
@@ -157,18 +171,29 @@ export function AdminPanel({
         "guestbook",
         "users",
         "diagnostics",
-      ].includes(requestedTab)
+      ].includes(requestedTab) &&
+      (showFullAdmin ||
+        requestedTab === "insurance" ||
+        (showItineraryExtras &&
+          (requestedTab === "documents" || requestedTab === "tbc")))
     ) {
       setTab(requestedTab as AdminTab);
     }
-  }, [showFullAdmin]);
+  }, [showFullAdmin, showItineraryExtras]);
 
-  const sortedItems = useMemo(() => sortItems(items), [items]);
+  const itineraryExtraTabs: ReadonlyArray<readonly [AdminTab, string]> =
+    showItineraryExtras
+      ? [
+          ["documents", "Documents"],
+          ["tbc", "TBC"],
+        ]
+      : [];
 
   const tabs: ReadonlyArray<readonly [AdminTab, string]> = showFullAdmin
     ? [
         ["days", "Days"],
         ["items", "Items"],
+        ...itineraryExtraTabs,
         ["invitations", "Invitations"],
         ["landing", "Landing page"],
         ["guests", "Guest lists"],
@@ -181,7 +206,9 @@ export function AdminPanel({
         ...(showUserManagement ? ([["users", "Users"]] as const) : []),
         ...(showDiagnostics ? ([["diagnostics", "Diagnostics"]] as const) : []),
       ]
-    : [["insurance", "Travel insurance"]];
+    : canEditItinerary
+      ? [["insurance", "Travel insurance"], ...itineraryExtraTabs]
+      : [["insurance", "Travel insurance"]];
 
   function switchTab(next: AdminTab) {
     if (tab === "items" && itemDirty) {
@@ -624,6 +651,34 @@ export function AdminPanel({
                 </div>
               ))}
             </div>
+          </SectionShell>
+        </div>
+      )}
+
+      {tab === "documents" && showItineraryExtras && (
+        <div className={TAB_CONTENT_CLASS}>
+          <SectionShell title="Documents">
+            <p className="mb-4 text-sm text-stone-500">
+              All documents you can access, grouped by itinerary item type.
+            </p>
+            <DocumentsPanelContent
+              onOpenLinkedItem={(itemId) => {
+                const item = items.find((entry) => entry.id === itemId);
+                if (item) startEditItem(item);
+              }}
+            />
+          </SectionShell>
+        </div>
+      )}
+
+      {tab === "tbc" && showItineraryExtras && (
+        <div className={TAB_CONTENT_CLASS}>
+          <SectionShell title="TBC & unbooked items">
+            <p className="mb-4 text-sm text-stone-500">
+              Flights and pet travel marked to be confirmed, plus stays and car
+              rentals that are not booked yet.
+            </p>
+            <TbcItemsPanel items={tbcItems} days={days} onEdit={startEditItem} />
           </SectionShell>
         </div>
       )}

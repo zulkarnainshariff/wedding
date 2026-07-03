@@ -61,6 +61,7 @@ export default async function AdminPage() {
         initialUsers={initialUsers}
         showUserManagement={canManageUsers(sessionUser)}
         showFullAdmin={sessionUser.isAdmin}
+        canEditItinerary={canEditItinerary(sessionUser)}
         showDiagnostics={sessionUser.isAdmin}
         showSuperuserTools={isSuperuser(sessionUser)}
         initialThemeId={appSettings.themeId}
