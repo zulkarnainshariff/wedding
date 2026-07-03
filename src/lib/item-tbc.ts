@@ -1,9 +1,9 @@
 import type { ItineraryItem } from "@/lib/schema";
 import {
   getAccommodationDetails,
-  getCarRentalDetails,
   getFlightDetails,
   getPetRelocationDetails,
+  type CarRentalDetails,
 } from "@/lib/types";
 
 export function getItemTbcReason(item: ItineraryItem): string | null {
@@ -21,8 +21,9 @@ export function getItemTbcReason(item: ItineraryItem): string | null {
       return details?.bookingStatus === "suggested" ? "Not booked yet" : null;
     }
     case "car_rental": {
-      const details = getCarRentalDetails(item.details);
-      return details?.bookingStatus === "suggested" ? "Not booked yet" : null;
+      if (!item.details || typeof item.details !== "object") return null;
+      const details = item.details as CarRentalDetails;
+      return details.bookingStatus === "suggested" ? "Not booked yet" : null;
     }
     default:
       return null;

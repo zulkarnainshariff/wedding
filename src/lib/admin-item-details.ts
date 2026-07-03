@@ -299,6 +299,9 @@ export function parseStructuredDetails(
     } else if (typeof details.driver === "string" && details.driver.trim()) {
       structured.participants = [details.driver.trim()];
     }
+    structured.linkedItemId = details.linkedItemId
+      ? String(details.linkedItemId)
+      : "";
   }
 
   if (category === "pet_relocation") {
@@ -327,6 +330,7 @@ export function parseStructuredDetails(
 export function buildStructuredDetailsPayload(
   category: Category,
   structured: StructuredItemDetails,
+  options?: { hasAssignedDay?: boolean },
 ): Record<string, unknown> {
   const location = buildLocationPayload(
     structured.locationName,
@@ -453,8 +457,15 @@ export function buildStructuredDetailsPayload(
     payload.suggestions = structured.suggestions.filter((s) => s.label && s.url);
   }
 
-  if (category === "car_rental" && structured.participants.length > 0) {
-    payload.driver = structured.participants[0];
+  if (category === "car_rental") {
+    if (structured.participants.length > 0) {
+      payload.participants = structured.participants;
+      payload.driver = structured.participants[0];
+    }
+    if (structured.linkedItemId) {
+      payload.linkedItemId = Number(structured.linkedItemId);
+    }
+    payload.isCarRentalBooking = !options?.hasAssignedDay;
   }
 
   if (category === "pet_relocation") {

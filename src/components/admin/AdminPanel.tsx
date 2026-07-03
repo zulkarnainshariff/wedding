@@ -130,6 +130,7 @@ export function AdminPanel({
     [initialUsers],
   );
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [itemFormOpen, setItemFormOpen] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [savingItem, setSavingItem] = useState(false);
@@ -191,7 +192,7 @@ export function AdminPanel({
 
   const tabs: ReadonlyArray<readonly [AdminTab, string]> = showFullAdmin
     ? [
-        ["days", "Days"],
+        ["days", "All days"],
         ["items", "Items"],
         ...itineraryExtraTabs,
         ["invitations", "Invitations"],
@@ -220,6 +221,7 @@ export function AdminPanel({
       setItemForm(cleared);
       setItemBaseline(cleared);
       setEditingItemId(null);
+      setItemFormOpen(false);
       setStatus(null);
     }
     setTab(next);
@@ -301,6 +303,7 @@ export function AdminPanel({
         setItemForm(cleared);
         setItemBaseline(cleared);
         setEditingItemId(null);
+        setItemFormOpen(false);
         setStatus("Item saved.");
         toast.success("Item saved.");
       }
@@ -333,18 +336,71 @@ export function AdminPanel({
       setItemForm(cleared);
       setItemBaseline(cleared);
       setEditingItemId(null);
+      setItemFormOpen(false);
     }
     await refresh();
+  }
+
+  async function createCarRentalBooking() {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dayId: null,
+          category: "car_rental",
+          title: "New car rental booking",
+          summary: null,
+          eventDate: null,
+          startDatetime: null,
+          endDatetime: null,
+          sortOrder: 0,
+          details: {
+            isCarRentalBooking: true,
+            bookingStatus: "suggested",
+            company: "TBC",
+            pickupLocation: "TBC",
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        toast.error(body.error ?? "Could not create car rental booking.");
+        return;
+      }
+
+      const created = (await response.json()) as ItineraryItem;
+      await refresh();
+      setItemForm((current) => ({
+        ...current,
+        structured: {
+          ...current.structured,
+          linkedItemId: String(created.id),
+          simple: {
+            ...current.structured.simple,
+            bookingStatus: "suggested",
+          },
+        },
+      }));
+      toast.success("Car rental booking created and linked.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function startEditItem(item: ItineraryItem) {
     const form = itemToForm(item);
     setTab("items");
     setEditingItemId(item.id);
+    setItemFormOpen(true);
     setItemForm(form);
     setItemBaseline(form);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  const showItemForm = itemFormOpen || editingItemId !== null;
 
   return (
     <>
@@ -466,136 +522,19 @@ export function AdminPanel({
       )}
 
       {tab === "items" && showFullAdmin && (
-        <div className={TAB_CONTENT_CLASS}>
+        <div className={`${TAB_CONTENT_CLASS} space-y-6`}>
           {status && (
-            <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
               {status}
             </p>
           )}
-          <SectionShell title={editingItemId ? "Edit item" : "Add item"}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-sm">
-                <span className="mb-1 block text-stone-500">Category</span>
-                <select
-                  value={itemForm.category}
-                  onChange={(e) => {
-                    const category = e.target.value as Category;
-                    setItemForm({
-                      ...itemForm,
-                      category,
-                      structured: emptyItemForm(category).structured,
-                    });
-                  }}
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {CATEGORY_META[c].label}
-                    </option>
-                  ))}
-                </select>
-              </label>
 
-              <label className="block text-sm">
-                <span className="mb-1 block text-stone-500">Day</span>
-                <select
-                  value={itemForm.dayId}
-                  onChange={(e) => setItemForm({ ...itemForm, dayId: e.target.value })}
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                >
-                  <option value="">Unassigned</option>
-                  {assignableDays.map((day) => (
-                    <option key={day.id} value={day.id}>
-                      {formatDayOption(day)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block text-sm sm:col-span-2">
-                <span className="mb-1 block text-stone-500">Title *</span>
-                <input
-                  required
-                  value={itemForm.title}
-                  onChange={(e) => setItemForm({ ...itemForm, title: e.target.value })}
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                />
-              </label>
-
-              <label className="block text-sm sm:col-span-2">
-                <span className="mb-1 block text-stone-500">Summary</span>
-                <input
-                  value={itemForm.summary}
-                  onChange={(e) => setItemForm({ ...itemForm, summary: e.target.value })}
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                />
-              </label>
-
-              {itemForm.category === "flight" ? (
-                <FlightScheduleTimes itemForm={itemForm} setItemForm={setItemForm} />
-              ) : itemForm.category !== "accommodation" &&
-                itemForm.category !== "activity" ? (
-                <>
-                  <label className="block text-sm">
-                    <span className="mb-1 block text-stone-500">Start</span>
-                    <input
-                      type="datetime-local"
-                      value={itemForm.startDatetime}
-                      onChange={(e) =>
-                        setItemForm({ ...itemForm, startDatetime: e.target.value })
-                      }
-                      className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                    />
-                  </label>
-
-                  <label className="block text-sm">
-                    <span className="mb-1 block text-stone-500">End</span>
-                    <input
-                      type="datetime-local"
-                      value={itemForm.endDatetime}
-                      onChange={(e) =>
-                        setItemForm({ ...itemForm, endDatetime: e.target.value })
-                      }
-                      className="w-full rounded-lg border border-stone-200 px-3 py-2"
-                    />
-                  </label>
-                </>
-              ) : null}
-            </div>
-
-            <h3 className="mt-6 text-sm font-semibold tracking-wide text-stone-600 uppercase">
-              {CATEGORY_META[itemForm.category].label} details
-            </h3>
-            <AdminItemDetailsForm
-              category={itemForm.category}
-              structured={itemForm.structured}
-              allItems={items}
-              systemUsernames={systemUsernames}
-              eventDate={itemForm.eventDate}
-              startDatetime={itemForm.startDatetime}
-              endDatetime={itemForm.endDatetime}
-              onChange={(structured) =>
-                setItemForm((current) =>
-                  applyStructuredDetailsToForm(current, structured),
-                )
-              }
-            />
-
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                disabled={busy || savingItem || !itemForm.title.trim()}
-                onClick={saveItem}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {savingItem ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                {savingItem ? "Saving…" : "Save item"}
-              </button>
-              {editingItemId ? (
+          <SectionShell title="Items">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-stone-500">
+                {sortedItems.length} itinerary item{sortedItems.length === 1 ? "" : "s"}
+              </p>
+              {!showItemForm ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -603,24 +542,16 @@ export function AdminPanel({
                     setEditingItemId(null);
                     setItemForm(cleared);
                     setItemBaseline(cleared);
+                    setItemFormOpen(true);
                   }}
-                  className="rounded-lg border border-stone-200 px-4 py-2 text-sm"
-                >
-                  Cancel
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setItemForm(emptyItemForm(itemForm.category))}
-                  className="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-4 py-2 text-sm"
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
                 >
                   <Plus className="h-4 w-4" />
-                  Clear form
+                  Add item
                 </button>
-              )}
+              ) : null}
             </div>
-
-            <div className="mt-6 divide-y divide-stone-100">
+            <div className="divide-y divide-stone-100">
               {sortedItems.map((item) => (
                 <div key={item.id} className="flex items-center justify-between gap-4 py-3">
                   <div className="min-w-0">
@@ -652,6 +583,161 @@ export function AdminPanel({
               ))}
             </div>
           </SectionShell>
+
+          {showItemForm ? (
+            <SectionShell title={editingItemId ? "Edit item" : "Add item"}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm">
+                  <span className="mb-1 block text-stone-500">Category</span>
+                  <select
+                    value={itemForm.category}
+                    onChange={(e) => {
+                      const category = e.target.value as Category;
+                      setItemForm({
+                        ...itemForm,
+                        category,
+                        structured: emptyItemForm(category).structured,
+                      });
+                    }}
+                    className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {CATEGORY_META[c].label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block text-sm">
+                  <span className="mb-1 block text-stone-500">Day</span>
+                  <select
+                    value={itemForm.dayId}
+                    onChange={(e) => setItemForm({ ...itemForm, dayId: e.target.value })}
+                    className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                  >
+                    <option value="">Unassigned</option>
+                    {assignableDays.map((day) => (
+                      <option key={day.id} value={day.id}>
+                        {formatDayOption(day)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block text-sm sm:col-span-2">
+                  <span className="mb-1 block text-stone-500">Title *</span>
+                  <input
+                    required
+                    value={itemForm.title}
+                    onChange={(e) => setItemForm({ ...itemForm, title: e.target.value })}
+                    className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                  />
+                </label>
+
+                <label className="block text-sm sm:col-span-2">
+                  <span className="mb-1 block text-stone-500">Summary</span>
+                  <input
+                    value={itemForm.summary}
+                    onChange={(e) => setItemForm({ ...itemForm, summary: e.target.value })}
+                    className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                  />
+                </label>
+
+                {itemForm.category === "flight" ? (
+                  <FlightScheduleTimes itemForm={itemForm} setItemForm={setItemForm} />
+                ) : itemForm.category !== "accommodation" &&
+                  itemForm.category !== "activity" ? (
+                  <>
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-stone-500">Start</span>
+                      <input
+                        type="datetime-local"
+                        value={itemForm.startDatetime}
+                        onChange={(e) =>
+                          setItemForm({ ...itemForm, startDatetime: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                      />
+                    </label>
+
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-stone-500">End</span>
+                      <input
+                        type="datetime-local"
+                        value={itemForm.endDatetime}
+                        onChange={(e) =>
+                          setItemForm({ ...itemForm, endDatetime: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                      />
+                    </label>
+                  </>
+                ) : null}
+              </div>
+
+              <h3 className="mt-6 text-sm font-semibold tracking-wide text-stone-600 uppercase">
+                {CATEGORY_META[itemForm.category].label} details
+              </h3>
+              <AdminItemDetailsForm
+                category={itemForm.category}
+                structured={itemForm.structured}
+                allItems={items}
+                systemUsernames={systemUsernames}
+                eventDate={itemForm.eventDate}
+                startDatetime={itemForm.startDatetime}
+                endDatetime={itemForm.endDatetime}
+                hasAssignedDay={Boolean(itemForm.dayId)}
+                editingItemId={editingItemId}
+                onCreateCarRentalBooking={() => void createCarRentalBooking()}
+                onChange={(structured) =>
+                  setItemForm((current) =>
+                    applyStructuredDetailsToForm(current, structured),
+                  )
+                }
+              />
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  disabled={busy || savingItem || !itemForm.title.trim()}
+                  onClick={() => void saveItem()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {savingItem ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {savingItem ? "Saving…" : "Save item"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cleared = emptyItemForm();
+                    setEditingItemId(null);
+                    setItemForm(cleared);
+                    setItemBaseline(cleared);
+                    setItemFormOpen(false);
+                    setStatus(null);
+                  }}
+                  className="rounded-lg border border-stone-200 px-4 py-2 text-sm"
+                >
+                  Cancel
+                </button>
+                {!editingItemId ? (
+                  <button
+                    type="button"
+                    onClick={() => setItemForm(emptyItemForm(itemForm.category))}
+                    className="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-4 py-2 text-sm"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Clear form
+                  </button>
+                ) : null}
+              </div>
+            </SectionShell>
+          ) : null}
         </div>
       )}
 

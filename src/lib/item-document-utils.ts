@@ -1,6 +1,6 @@
 import type { ItemDocument, ItineraryItem } from "@/lib/schema";
 import { normalizeTravellerName } from "@/lib/travellers";
-import { extractItemTravellers } from "@/lib/item-travellers";
+import { extractItemTravellers, travellerOptionsFromAccounts } from "@/lib/item-travellers";
 
 /** Shared copy for document upload/edit UI */
 export const DOCUMENT_LINKED_TRAVELLERS_LABEL =
@@ -32,9 +32,18 @@ export function parseCoveredTravellers(
   return doc.travellerName ? [normalizeTravellerName(doc.travellerName)] : [];
 }
 
-export function extractTravellerOptions(item: ItineraryItem): string[] {
+export function extractTravellerOptions(
+  item: ItineraryItem,
+  accountUsernames: string[] = [],
+): string[] {
   const names = extractItemTravellers(item.details, item.category);
-  return [...new Set(names.map(normalizeTravellerName))].sort();
+  const fromItem = [...new Set(names.map(normalizeTravellerName))];
+
+  if (item.category === "car_rental" || fromItem.length === 0) {
+    return travellerOptionsFromAccounts(accountUsernames, fromItem);
+  }
+
+  return fromItem.sort((a, b) => a.localeCompare(b));
 }
 
 export function formatExtraViewersInput(raw: unknown): string {

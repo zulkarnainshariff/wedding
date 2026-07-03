@@ -13,6 +13,7 @@ import { itineraryDays, itineraryItems } from "./schema";
 import { prepareDayItems, prepareScheduleDayItems } from "./timeline-utils";
 import type { Category } from "./types";
 import type { ItineraryItem } from "./schema";
+import { isCarRentalBookingItem } from "./car-rental-booking";
 
 const DAILY_SCHEDULE_CATEGORIES = ["activity", "flight", "pet_relocation"] as const;
 
@@ -145,8 +146,12 @@ export async function getItemsByCategory(category: Category) {
     user,
   );
   const items = filterParentsWithSubitemAccess(categoryParents, children, user);
+  const filtered =
+    category === "car_rental"
+      ? items.filter((item) => isCarRentalBookingItem(item))
+      : items;
 
-  return attachSubItemsToItems(items, user);
+  return attachSubItemsToItems(filtered, user);
 }
 
 export async function getAllItems() {

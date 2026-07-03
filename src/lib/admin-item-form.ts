@@ -412,7 +412,9 @@ export function buildItemApiPayload(
     form.endDatetime,
   );
 
-  let details = buildStructuredDetailsPayload(form.category, synced.structured);
+  let details = buildStructuredDetailsPayload(form.category, synced.structured, {
+    hasAssignedDay: Boolean(form.dayId),
+  });
 
   if (form.category === "flight" && existingDetails) {
     details = preserveLiveDepartureDetails(details, existingDetails);
