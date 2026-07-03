@@ -29,12 +29,17 @@ export function DayJumpSelector({
   const [mounted, setMounted] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuStyle = useAnchoredDropdownPosition(open, triggerRef, {
     minWidth: 320,
     maxHeight: 320,
   });
   const calendarBounds = useMemo(() => dayJumpCalendarBounds(days), [days]);
+  const selectedDay = useMemo(
+    () => days.find((day) => day.date === selectedDate) ?? null,
+    [days, selectedDate],
+  );
 
   useEffect(() => setMounted(true), []);
   useDropdownDismiss(open, () => setOpen(false), triggerRef, menuRef);
@@ -53,85 +58,104 @@ export function DayJumpSelector({
     jumpToDay(day);
   }
 
+  function openCalendarPicker() {
+    const input = dateInputRef.current;
+    if (!input) return;
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+      return;
+    }
+    input.click();
+  }
+
+  const jumpLabel = selectedDay
+    ? formatDayJumpPrimary(selectedDay, formatDateOnly)
+    : "Jump to day";
+
   return (
     <div className="inline-flex items-stretch overflow-hidden rounded-xl border border-stone-200 bg-white text-sm shadow-sm">
-      <label className="relative inline-flex min-w-0 items-center gap-2 px-3 py-2">
-        <CalendarDays className="h-4 w-4 shrink-0 text-stone-400" aria-hidden />
-        <span className="sr-only">Jump to date</span>
-        <input
-          type="date"
-          value={selectedDate}
-          min={calendarBounds?.min}
-          max={calendarBounds?.max}
-          onChange={(event) => {
-            const nextDate = event.target.value;
-            setSelectedDate(nextDate);
-            jumpToDate(nextDate);
-          }}
-          className="min-w-0 border-0 bg-transparent p-0 text-stone-700 outline-none [color-scheme:light]"
-          aria-label="Jump to date"
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className="inline-flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-stone-700 hover:bg-stone-50"
+      >
+        <span className="truncate font-medium">{jumpLabel}</span>
+        <ChevronDown
+          className={[
+            "ml-auto h-4 w-4 shrink-0 text-stone-400 transition-transform",
+            open ? "rotate-180" : "",
+          ].join(" ")}
         />
-      </label>
+      </button>
 
       <div className="w-px self-stretch bg-stone-200" aria-hidden />
 
-      <div className="relative">
-        <button
-          ref={triggerRef}
-          type="button"
-          onClick={() => setOpen((current) => !current)}
-          aria-expanded={open}
-          aria-haspopup="listbox"
-          className="inline-flex h-full items-center gap-2 px-3 py-2 text-stone-700 hover:bg-stone-50"
-        >
-          <span className="font-medium">Jump to day</span>
-          <ChevronDown
-            className={[
-              "h-4 w-4 text-stone-400 transition-transform",
-              open ? "rotate-180" : "",
-            ].join(" ")}
-          />
-        </button>
+      <button
+        type="button"
+        onClick={openCalendarPicker}
+        className="inline-flex items-center px-2.5 py-2 text-stone-500 hover:bg-stone-50"
+        aria-label="Pick date on calendar"
+      >
+        <CalendarDays className="h-4 w-4" aria-hidden />
+      </button>
 
-        {open && mounted
-          ? createPortal(
-              <div
-                ref={menuRef}
-                role="listbox"
-                aria-label="Jump to day"
-                style={menuStyle}
-                className="overflow-y-auto overscroll-contain rounded-xl border border-stone-200 bg-white shadow-xl"
-              >
-                <ul className="p-2">
-                  {days.map((day) => {
-                    const title = formatDayJumpSecondary(day);
-                    return (
-                      <li key={day.id}>
-                        <button
-                          type="button"
-                          role="option"
-                          aria-selected={selectedDate === day.date}
-                          onClick={() => jumpToDay(day)}
-                          className="w-full rounded-lg px-3 py-2.5 text-left hover:bg-stone-50 active:bg-stone-100"
-                        >
-                          <span className="block text-sm font-medium text-stone-800">
-                            {formatDayJumpPrimary(day, formatDateOnly)}
+      <input
+        ref={dateInputRef}
+        type="date"
+        value={selectedDate}
+        min={calendarBounds?.min}
+        max={calendarBounds?.max}
+        onChange={(event) => {
+          const nextDate = event.target.value;
+          setSelectedDate(nextDate);
+          jumpToDate(nextDate);
+        }}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+      />
+
+      {open && mounted
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="listbox"
+              aria-label="Jump to day"
+              style={menuStyle}
+              className="overflow-y-auto overscroll-contain rounded-xl border border-stone-200 bg-white shadow-xl"
+            >
+              <ul className="p-2">
+                {days.map((day) => {
+                  const title = formatDayJumpSecondary(day);
+                  return (
+                    <li key={day.id}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={selectedDate === day.date}
+                        onClick={() => jumpToDay(day)}
+                        className="w-full rounded-lg px-3 py-2.5 text-left hover:bg-stone-50 active:bg-stone-100"
+                      >
+                        <span className="block text-sm font-medium text-stone-800">
+                          {formatDayJumpPrimary(day, formatDateOnly)}
+                        </span>
+                        {title ? (
+                          <span className="mt-0.5 block text-xs leading-snug text-stone-500">
+                            {title}
                           </span>
-                          {title ? (
-                            <span className="mt-0.5 block text-xs leading-snug text-stone-500">
-                              {title}
-                            </span>
-                          ) : null}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>,
-              document.body,
-            )
-          : null}
-      </div>
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

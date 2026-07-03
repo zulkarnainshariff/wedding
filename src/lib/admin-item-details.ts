@@ -465,7 +465,17 @@ export function buildStructuredDetailsPayload(
     if (structured.linkedItemId) {
       payload.linkedItemId = Number(structured.linkedItemId);
     }
-    payload.isCarRentalBooking = !options?.hasAssignedDay;
+    const hasBookingDetails = Boolean(
+      structured.simple.company?.trim() ||
+        structured.simple.vehicleModel?.trim() ||
+        structured.simple.pickupLocation?.trim() ||
+        structured.simple.confirmationCode?.trim(),
+    );
+    if (options?.hasAssignedDay) {
+      payload.isCarRentalBooking = hasBookingDetails;
+    } else {
+      payload.isCarRentalBooking = true;
+    }
   }
 
   if (category === "pet_relocation") {
