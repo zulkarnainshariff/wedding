@@ -26,6 +26,10 @@ export function adminDayEditSectionId(): string {
   return "admin-day-edit-section";
 }
 
+export function adminItemEditSectionId(): string {
+  return "admin-item-edit-section";
+}
+
 export function taskEditSectionId(): string {
   return "task-edit-section";
 }

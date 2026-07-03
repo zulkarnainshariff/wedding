@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -29,6 +29,7 @@ import {
   type ItemFormState,
 } from "@/lib/admin-item-form";
 import { getItemSortTime } from "@/lib/item-schedule-datetime";
+import { adminItemEditSectionId, scrollToElementById } from "@/lib/day-jump";
 import { useUnsavedChangesGuard } from "@/components/layout/NavigationGuard";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { DocumentsPanelContent } from "@/components/itinerary/DocumentsPanel";
@@ -397,10 +398,20 @@ export function AdminPanel({
     setItemFormOpen(true);
     setItemForm(form);
     setItemBaseline(form);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    requestAnimationFrame(() => {
+      scrollToElementById(adminItemEditSectionId());
+    });
   }
 
   const showItemForm = itemFormOpen || editingItemId !== null;
+
+  useLayoutEffect(() => {
+    if (tab !== "items" || !showItemForm) return;
+    const frame = requestAnimationFrame(() => {
+      scrollToElementById(adminItemEditSectionId());
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [tab, showItemForm, editingItemId]);
 
   return (
     <>
@@ -529,62 +540,11 @@ export function AdminPanel({
             </p>
           )}
 
-          <SectionShell title="Items">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-stone-500">
-                {sortedItems.length} itinerary item{sortedItems.length === 1 ? "" : "s"}
-              </p>
-              {!showItemForm ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const cleared = emptyItemForm();
-                    setEditingItemId(null);
-                    setItemForm(cleared);
-                    setItemBaseline(cleared);
-                    setItemFormOpen(true);
-                  }}
-                  className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add item
-                </button>
-              ) : null}
-            </div>
-            <div className="divide-y divide-stone-100">
-              {sortedItems.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-4 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-stone-800">{item.title}</p>
-                    <p className="text-sm text-stone-500">
-                      {CATEGORY_META[item.category as Category]?.label ?? item.category}
-                      {item.startDatetime
-                        ? ` · ${new Date(item.startDatetime).toLocaleString()}`
-                        : ""}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => startEditItem(item)}
-                      className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteItem(item.id)}
-                      className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SectionShell>
-
           {showItemForm ? (
+            <div
+              id={adminItemEditSectionId()}
+              className="scroll-mt-24"
+            >
             <SectionShell title={editingItemId ? "Edit item" : "Add item"}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block text-sm">
@@ -737,7 +697,63 @@ export function AdminPanel({
                 ) : null}
               </div>
             </SectionShell>
+            </div>
           ) : null}
+
+          <SectionShell title="Items">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-stone-500">
+                {sortedItems.length} itinerary item{sortedItems.length === 1 ? "" : "s"}
+              </p>
+              {!showItemForm ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cleared = emptyItemForm();
+                    setEditingItemId(null);
+                    setItemForm(cleared);
+                    setItemBaseline(cleared);
+                    setItemFormOpen(true);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add item
+                </button>
+              ) : null}
+            </div>
+            <div className="divide-y divide-stone-100">
+              {sortedItems.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-stone-800">{item.title}</p>
+                    <p className="text-sm text-stone-500">
+                      {CATEGORY_META[item.category as Category]?.label ?? item.category}
+                      {item.startDatetime
+                        ? ` · ${new Date(item.startDatetime).toLocaleString()}`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => startEditItem(item)}
+                      className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteItem(item.id)}
+                      className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SectionShell>
         </div>
       )}
 

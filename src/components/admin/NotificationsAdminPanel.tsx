@@ -24,29 +24,44 @@ export function NotificationsAdminPanel() {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setStatus(null);
-    const params = new URLSearchParams();
-    if (includeArchived) params.set("includeArchived", "true");
-    if (username.trim()) params.set("username", username.trim());
+  const load = useCallback(
+    async (filters?: { username?: string; includeArchived?: boolean }) => {
+      setLoading(true);
+      setStatus(null);
+      const params = new URLSearchParams();
+      const archived = filters?.includeArchived ?? includeArchived;
+      const usernameFilter = filters?.username ?? username;
+      if (archived) params.set("includeArchived", "true");
+      if (usernameFilter.trim()) params.set("username", usernameFilter.trim());
 
-    const response = await fetch(`/api/system/notifications?${params.toString()}`);
-    if (!response.ok) {
-      setStatus("Could not load notifications.");
-      setItems([]);
-      setLoading(false);
-      return;
-    }
+      try {
+        const response = await fetch(`/api/system/notifications?${params.toString()}`);
+        if (!response.ok) {
+          setStatus(
+            response.status === 403
+              ? "You do not have permission to view notifications."
+              : "Could not load notifications.",
+          );
+          setItems([]);
+          return;
+        }
 
-    const payload = (await response.json()) as { items: AdminNotification[] };
-    setItems(payload.items ?? []);
-    setLoading(false);
-  }, [includeArchived, username]);
+        const payload = (await response.json()) as { items: AdminNotification[] };
+        setItems(payload.items ?? []);
+      } catch {
+        setStatus("Could not load notifications.");
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [includeArchived, username],
+  );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load({ includeArchived: false, username: "" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function archive(id: number) {
     const response = await fetch("/api/system/notifications", {
@@ -85,6 +100,12 @@ export function NotificationsAdminPanel() {
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void load();
+              }
+            }}
             className="rounded-lg border border-stone-200 px-3 py-2"
             placeholder="e.g. natalie"
           />
@@ -93,7 +114,11 @@ export function NotificationsAdminPanel() {
           <input
             type="checkbox"
             checked={includeArchived}
-            onChange={(e) => setIncludeArchived(e.target.checked)}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setIncludeArchived(next);
+              void load({ includeArchived: next });
+            }}
           />
           Include archived
         </label>
@@ -103,7 +128,7 @@ export function NotificationsAdminPanel() {
           disabled={loading}
           className="rounded-lg border border-stone-200 px-3 py-2 text-sm hover:bg-stone-50"
         >
-          Refresh
+          {loading ? "Loading…" : "Refresh"}
         </button>
       </div>
 
