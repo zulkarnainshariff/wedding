@@ -9,8 +9,13 @@ import { CATEGORY_META, type Category } from "@/lib/types";
 import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
 import type { DocumentListEntry } from "@/lib/document-queries";
 
-function DocumentRow({ entry }: { entry: DocumentListEntry }) {
-  const { openItem } = useItineraryUI();
+function DocumentRow({
+  entry,
+  onOpenLinkedItem,
+}: {
+  entry: DocumentListEntry;
+  onOpenLinkedItem: (itemId: number) => void;
+}) {
   const { formatDateTime } = useDisplayFormat();
   const styles = CATEGORY_STYLES[entry.itemCategory];
   const CategoryIcon = getCategoryIcon(entry.itemCategory);
@@ -42,7 +47,7 @@ function DocumentRow({ entry }: { entry: DocumentListEntry }) {
 
         <button
           type="button"
-          onClick={() => openItem(entry.itemId)}
+          onClick={() => onOpenLinkedItem(entry.itemId)}
           className={[
             "inline-flex max-w-full shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition hover:bg-white",
             styles.border,
@@ -72,9 +77,11 @@ function DocumentRow({ entry }: { entry: DocumentListEntry }) {
 function CategorySection({
   category,
   entries,
+  onOpenLinkedItem,
 }: {
   category: Category;
   entries: DocumentListEntry[];
+  onOpenLinkedItem: (itemId: number) => void;
 }) {
   const styles = CATEGORY_STYLES[category];
   const CategoryIcon = getCategoryIcon(category);
@@ -100,14 +107,22 @@ function CategorySection({
       </div>
       <ul className="space-y-2">
         {entries.map((entry) => (
-          <DocumentRow key={entry.id} entry={entry} />
+          <DocumentRow
+            key={entry.id}
+            entry={entry}
+            onOpenLinkedItem={onOpenLinkedItem}
+          />
         ))}
       </ul>
     </section>
   );
 }
 
-export function DocumentsPanel() {
+export function DocumentsPanelContent({
+  onOpenLinkedItem,
+}: {
+  onOpenLinkedItem: (itemId: number) => void;
+}) {
   const [documents, setDocuments] = useState<DocumentListEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -179,8 +194,14 @@ export function DocumentsPanel() {
           key={category}
           category={category}
           entries={grouped.get(category) ?? []}
+          onOpenLinkedItem={onOpenLinkedItem}
         />
       ))}
     </div>
   );
+}
+
+export function DocumentsPanel() {
+  const { openItem } = useItineraryUI();
+  return <DocumentsPanelContent onOpenLinkedItem={openItem} />;
 }
