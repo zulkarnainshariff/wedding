@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { isAuthError, requireSuperuserAccess } from "@/lib/api-auth";
+import {
+  isAuthError,
+  requireAdminAccess,
+  requireSuperuserAccess,
+} from "@/lib/api-auth";
 import {
   archiveNotificationAdmin,
   deleteNotificationAdmin,
@@ -7,7 +11,7 @@ import {
 } from "@/lib/notification-service";
 
 export async function GET(request: Request) {
-  const actor = await requireSuperuserAccess();
+  const actor = await requireAdminAccess();
   if (isAuthError(actor)) return actor;
 
   const { searchParams } = new URL(request.url);

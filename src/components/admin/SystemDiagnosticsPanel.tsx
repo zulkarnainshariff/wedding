@@ -90,7 +90,8 @@ export function SystemDiagnosticsPanel({
 
   useEffect(() => {
     void load();
-  }, [load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind]);
 
   function toggleSelected(id: number) {
     setSelected((current) =>
