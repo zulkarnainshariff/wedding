@@ -10,7 +10,7 @@ import {
   resolveFlightSchedule,
   zonedLocalToUtc,
 } from "@/lib/flight-datetime";
-import { resolveFlightScheduleForItem } from "@/lib/flight-segment-timing";
+import { resolveFlightScheduleForItem, isFlightLegSegment } from "@/lib/flight-segment-timing";
 import { getAirportTimezone } from "@/lib/airport-timezones";
 import { wallClockToDate } from "@/lib/item-schedule-datetime";
 import { getEffectiveFlightScheduleSortBy } from "@/lib/flight-schedule-sort";
@@ -67,11 +67,21 @@ function updateLastFlightSegmentArrival(
   const next = [...segments];
   for (let index = next.length - 1; index >= 0; index -= 1) {
     const segment = next[index];
-    if (segment.transit || !(segment.fromIata || segment.from)) continue;
+    if (!isFlightLegSegment(segment)) continue;
     next[index] = { ...segment, arrivalTime };
     break;
   }
   return next;
+}
+
+function lastFlightLegSegment(
+  segments: FlightSegment[],
+): FlightSegment | null {
+  for (let index = segments.length - 1; index >= 0; index -= 1) {
+    const segment = segments[index];
+    if (isFlightLegSegment(segment)) return segment;
+  }
+  return null;
 }
 
 function syncStructuredTimes(
@@ -120,7 +130,7 @@ function syncStructuredTimes(
     }
 
     let nextStructured = structured;
-    if (structured.segments.length > 0 && nextSimple.arrivalTime) {
+    if (structured.segments.length > 0 && nextSimple.arrivalTime && endDatetime) {
       nextStructured = {
         ...structured,
         segments: updateLastFlightSegmentArrival(
@@ -128,6 +138,14 @@ function syncStructuredTimes(
           nextSimple.arrivalTime,
         ),
       };
+    } else if (structured.segments.length > 0 && !endDatetime) {
+      const lastLeg = lastFlightLegSegment(structured.segments);
+      const lastArr = parseStoredClockTime(lastLeg?.arrivalTime);
+      if (lastArr?.clock) {
+        nextSimple.arrivalTime = lastArr.embeddedDate
+          ? formatArrivalTimeValue(lastArr.embeddedDate, lastArr.clock)
+          : lastArr.clock;
+      }
     }
 
     const flightDetails = {
@@ -136,9 +154,7 @@ function syncStructuredTimes(
       segments: nextStructured.segments,
     };
     const hasMultiSegment =
-      nextStructured.segments.filter(
-        (segment) => !segment.transit && (segment.fromIata || segment.from),
-      ).length >= 2;
+      nextStructured.segments.filter(isFlightLegSegment).length >= 2;
 
     const resolved = hasMultiSegment
       ? resolveFlightScheduleForItem({

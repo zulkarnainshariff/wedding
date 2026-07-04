@@ -1,4 +1,7 @@
-import { resolveAirportCitySync } from "@/lib/airport-cities";
+import {
+  normalizeIataCode,
+  resolveAirportCitySync,
+} from "@/lib/airport-cities";
 import { airlineInfoFromAirlabsLeg } from "@/lib/airlines";
 import { formatFlightNumberDisplay } from "@/lib/flight-numbers";
 import { getAirportTimezone } from "@/lib/airport-timezones";
@@ -112,6 +115,16 @@ function localFromUtc(
   return { datetimeLocal, clock: time.slice(0, 5), date };
 }
 
+/** Prefer API city names; never fall back to IATA codes in city fields. */
+export function airportCityLabel(
+  apiCity?: string | null,
+  iata?: string | null,
+): string | null {
+  const raw = apiCity?.trim();
+  if (raw && !normalizeIataCode(raw)) return raw;
+  return resolveAirportCitySync(iata) || null;
+}
+
 function formatDurationMinutes(minutes?: number | null): string | null {
   if (minutes == null || minutes <= 0) return null;
   const hours = Math.floor(minutes / 60);
@@ -146,16 +159,8 @@ export function airlabsLegToSegment(
       flightNumber ??
       leg.flight_iata ??
       undefined,
-    from:
-      leg.dep_city?.trim() ||
-      resolveAirportCitySync(fromIata) ||
-      fromIata ||
-      undefined,
-    to:
-      leg.arr_city?.trim() ||
-      resolveAirportCitySync(toIata) ||
-      toIata ||
-      undefined,
+    from: airportCityLabel(leg.dep_city, fromIata) || undefined,
+    to: airportCityLabel(leg.arr_city, toIata) || undefined,
     fromIata: fromIata ?? undefined,
     toIata: toIata ?? undefined,
     departureTime: dep?.clock ?? undefined,
@@ -183,7 +188,7 @@ export function orderAirlabsLegs(legs: AirlabsLeg[]): AirlabsLeg[] {
   const used = new Set<number>();
   const ordered: AirlabsLeg[] = [];
 
-  let current = pool.reduce((best, _leg, index) => {
+  const current = pool.reduce((best, _leg, index) => {
     const ms = legDepartureMs(pool[index]);
     return ms < legDepartureMs(pool[best]) ? index : best;
   }, 0);
@@ -249,24 +254,12 @@ export function routeFieldsFromLegChain(
 
   return {
     segments: segments.length === 1 ? [] : segments,
-    from:
-      first.dep_city?.trim() ||
-      resolveAirportCitySync(fromIata) ||
-      fromIata,
-    to:
-      last.arr_city?.trim() ||
-      resolveAirportCitySync(toIata) ||
-      toIata,
+    from: airportCityLabel(first.dep_city, fromIata),
+    to: airportCityLabel(last.arr_city, toIata),
     fromIata,
     toIata,
-    fromCity:
-      first.dep_city?.trim() ||
-      resolveAirportCitySync(fromIata) ||
-      fromIata,
-    toCity:
-      last.arr_city?.trim() ||
-      resolveAirportCitySync(toIata) ||
-      toIata,
+    fromCity: airportCityLabel(first.dep_city, fromIata),
+    toCity: airportCityLabel(last.arr_city, toIata),
     departureTime: departure?.clock ?? null,
     arrivalTime: arrival?.clock ?? null,
     departureDatetimeLocal: departure?.datetimeLocal,
@@ -339,12 +332,12 @@ export function routeFieldsFromSegments(
 
   return {
     segments: segments.length === 1 ? [] : segments,
-    from: first.from ?? first.fromIata,
-    to: last.to ?? last.toIata,
+    from: first.from ?? airportCityLabel(null, first.fromIata),
+    to: last.to ?? airportCityLabel(null, last.toIata),
     fromIata: first.fromIata ?? null,
     toIata: last.toIata ?? null,
-    fromCity: first.from ?? first.fromIata,
-    toCity: last.to ?? last.toIata,
+    fromCity: first.from ?? airportCityLabel(null, first.fromIata),
+    toCity: last.to ?? airportCityLabel(null, last.toIata),
     departureTime: first.departureTime ?? null,
     arrivalTime: last.arrivalTime ?? null,
     aircraft: first.aircraft ?? last.aircraft ?? null,

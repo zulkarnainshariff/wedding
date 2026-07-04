@@ -8,7 +8,7 @@ import {
   type StructuredItemDetails,
   type TravellerRecord,
 } from "@/lib/admin-item-details";
-import { travellerOptionsFromAccounts } from "@/lib/item-travellers";
+import { travellerOptionsFromAccounts, travellerOptionsFromNames } from "@/lib/item-travellers";
 import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
 import { AdditionalViewersDropdown } from "@/components/admin/AdditionalViewersDropdown";
 import {
@@ -35,6 +35,23 @@ import {
   type FlightScheduleSortBy,
 } from "@/lib/flight-schedule-sort";
 import { listUnlinkedSuggestedCarRentalBookings } from "@/lib/car-rental-booking";
+import { parseStoredClockTime } from "@/lib/flight-datetime";
+import { lastFlightLegDestination } from "@/lib/flight-segment-timing";
+
+function segmentClockValue(value?: string | null): string {
+  return parseStoredClockTime(value)?.clock ?? value?.trim().slice(0, 5) ?? "";
+}
+
+function segmentClockWithPreservedDate(
+  previousValue: string | null | undefined,
+  nextClock: string,
+): string {
+  const parsed = parseStoredClockTime(previousValue);
+  if (parsed?.embeddedDate) {
+    return `${parsed.embeddedDate}T${nextClock}`;
+  }
+  return nextClock;
+}
 
 function TimeInput({
   label,
@@ -50,7 +67,7 @@ function TimeInput({
       <span className="mb-1 block text-stone-500">{label}</span>
       <input
         type="time"
-        value={value?.slice(0, 5) ?? ""}
+        value={segmentClockValue(value)}
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-lg border border-stone-200 px-3 py-2"
       />
@@ -192,10 +209,15 @@ function TravellerRecordsEditor({
   nameOptions?: string[];
   accountUsernames: string[];
 }) {
-  const travellerNameOptions = travellerOptionsFromAccounts(
-    accountUsernames,
-    nameOptions ?? rows.map((row) => row.name),
-  );
+  const travellerNameOptions = nameOptions
+    ? travellerOptionsFromNames([
+        ...nameOptions,
+        ...rows.map((row) => row.name),
+      ])
+    : travellerOptionsFromAccounts(
+        accountUsernames,
+        rows.map((row) => row.name),
+      );
   return (
     <div className="sm:col-span-2">
       <div className="mb-2 flex items-center justify-between">
@@ -579,13 +601,9 @@ function FlightSegmentsEditor({
         <button
           type="button"
           onClick={() => {
-            const previous = segments[segments.length - 1];
             onChange([
               ...segments,
-              {
-                from: previous?.to,
-                fromIata: previous?.toIata,
-              },
+              lastFlightLegDestination(segments),
             ]);
           }}
           className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2 py-1 text-xs"
@@ -677,7 +695,13 @@ function FlightSegmentsEditor({
                 value={segment.departureTime ?? ""}
                 onChange={(value) => {
                   const next = [...segments];
-                  next[index] = { ...segment, departureTime: value };
+                  next[index] = {
+                    ...segment,
+                    departureTime: segmentClockWithPreservedDate(
+                      segment.departureTime,
+                      value,
+                    ),
+                  };
                   onChange(next);
                 }}
               />
@@ -686,7 +710,13 @@ function FlightSegmentsEditor({
                 value={segment.arrivalTime ?? ""}
                 onChange={(value) => {
                   const next = [...segments];
-                  next[index] = { ...segment, arrivalTime: value };
+                  next[index] = {
+                    ...segment,
+                    arrivalTime: segmentClockWithPreservedDate(
+                      segment.arrivalTime,
+                      value,
+                    ),
+                  };
                   onChange(next);
                 }}
               />
@@ -740,10 +770,15 @@ function SeatCheckInEditor({
   nameOptions?: string[];
   accountUsernames: string[];
 }) {
-  const travellerNameOptions = travellerOptionsFromAccounts(
-    accountUsernames,
-    nameOptions ?? rows.map((row) => row.name),
-  );
+  const travellerNameOptions = nameOptions
+    ? travellerOptionsFromNames([
+        ...nameOptions,
+        ...rows.map((row) => row.name),
+      ])
+    : travellerOptionsFromAccounts(
+        accountUsernames,
+        rows.map((row) => row.name),
+      );
   return (
     <div className="sm:col-span-2">
       <div className="mb-2 flex items-center justify-between">
@@ -1144,17 +1179,15 @@ export function AdminItemDetailsForm({
                       {
                         from: simple.from,
                         fromIata: simple.fromIata,
+                        to: simple.to,
+                        toIata: simple.toIata,
                         marketingFlightNumber: simple.marketingFlightNumber,
                         operatingFlightNumber:
                           simple.operatingFlightNumber ||
                           simple.marketingFlightNumber,
                         departureTime: simple.departureTime,
-                        aircraft: simple.aircraft,
-                      },
-                      {
-                        to: simple.to,
-                        toIata: simple.toIata,
                         arrivalTime: simple.arrivalTime,
+                        aircraft: simple.aircraft,
                       },
                     ],
                   });
