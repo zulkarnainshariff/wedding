@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Menu, MoreHorizontal, X } from "lucide-react";
+import { useAnchoredDropdownPosition } from "@/hooks/useAnchoredDropdownPosition";
+import { useDropdownDismiss } from "@/hooks/useDropdownDismiss";
 
 type TabEntry = readonly [string, string];
 
@@ -88,8 +91,26 @@ export function AdminTabBarDesktop({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
+  const overflowTriggerRef = useRef<HTMLButtonElement>(null);
+  const overflowMenuRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(tabs.length);
   const [overflowOpen, setOverflowOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  const overflowMenuStyle = useAnchoredDropdownPosition(
+    overflowOpen,
+    overflowTriggerRef,
+    { minWidth: 240, maxHeight: 360 },
+  );
+
+  useEffect(() => setMounted(true), []);
+
+  useDropdownDismiss(
+    overflowOpen,
+    () => setOverflowOpen(false),
+    overflowTriggerRef,
+    overflowMenuRef,
+  );
 
   const recalculate = useCallback(() => {
     const container = containerRef.current;
@@ -177,6 +198,7 @@ export function AdminTabBarDesktop({
         {overflowTabs.length > 0 ? (
           <div className="relative shrink-0">
             <button
+              ref={overflowTriggerRef}
               type="button"
               onClick={() => setOverflowOpen((open) => !open)}
               className={[
@@ -190,33 +212,32 @@ export function AdminTabBarDesktop({
             >
               <MoreHorizontal className="h-5 w-5" />
             </button>
-            {overflowOpen ? (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-40"
-                  aria-label="Close overflow menu"
-                  onClick={() => setOverflowOpen(false)}
-                />
-                <div className="absolute top-full right-0 z-50 mt-1 min-w-[12rem] rounded-lg border border-stone-200 bg-white py-1 shadow-lg">
-                  {overflowTabs.map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => selectTab(value)}
-                      className={[
-                        "block w-full px-4 py-2 text-left text-sm",
-                        activeTab === value
-                          ? "bg-brand-deep/10 font-medium text-brand-deep"
-                          : "text-stone-600 hover:bg-stone-50",
-                      ].join(" ")}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : null}
+            {overflowOpen && mounted
+              ? createPortal(
+                  <div
+                    ref={overflowMenuRef}
+                    style={overflowMenuStyle}
+                    className="overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 shadow-lg"
+                  >
+                    {overflowTabs.map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => selectTab(value)}
+                        className={[
+                          "block w-full px-4 py-2.5 text-left text-sm whitespace-nowrap",
+                          activeTab === value
+                            ? "bg-brand-deep/10 font-medium text-brand-deep"
+                            : "text-stone-600 hover:bg-stone-50",
+                        ].join(" ")}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>,
+                  document.body,
+                )
+              : null}
           </div>
         ) : null}
       </div>
