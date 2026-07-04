@@ -385,8 +385,8 @@ export function ItemCard({
             : "",
       ].join(" ")}
     >
-      <div className="flex items-start gap-1.5 p-4 max-md:gap-2">
-        <div className="flex shrink-0 flex-col items-center gap-2 md:hidden">
+      <div className="relative flex items-start gap-1.5 p-4 max-md:gap-2">
+        <div className="flex w-11 shrink-0 flex-col items-center gap-2 md:hidden">
           <div
             className={[
               "flex h-11 w-11 items-center justify-center rounded-xl",
@@ -405,7 +405,7 @@ export function ItemCard({
         <button
           type="button"
           onClick={() => openItem(item.id)}
-          className="flex min-w-0 flex-1 items-start gap-3 text-left"
+          className="flex min-w-0 flex-1 items-start gap-3 pr-6 text-left max-md:pr-7 md:pr-0"
         >
         <div
           className={[
@@ -418,54 +418,106 @@ export function ItemCard({
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                {categoryLabel && (
-                  <p className="text-[11px] font-semibold tracking-wide text-stone-400 uppercase">
-                    {categoryLabel}
-                  </p>
-                )}
-                <StatusPill status={status} />
-                {isItemPrivate(item.details) ? <PrivateItemPill /> : null}
-                <BookingStatusPill status={stayDetails?.bookingStatus} />
-                <BookingStatusPill status={carDetails?.bookingStatus} />
-                {linkedItemId && <LinkedPill />}
-                {subItems.length > 0 && (
-                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-brand-deep uppercase">
-                    {subItems.length} sub-item{subItems.length === 1 ? "" : "s"}
-                  </span>
-                )}
-                {limitedView && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 uppercase">
-                    Limited view
-                  </span>
-                )}
-                <ViewerLinkedPill item={item} />
-                {completed && <ItemDoneBadge accent={doneAccent} />}
-                {category === "flight" && <FlightCheckInReminderPill item={item} />}
-                {flightCheckedIn && <FlightCheckInBadge />}
-                <ItemTaskIndicator summary={taskSummary} />
-                <ItemDocumentIndicator count={documentCount} />
-              </div>
-              <h3
-                className={[
-                  "mt-0.5 break-normal font-medium group-hover:text-brand-deep",
-                  completed
-                    ? doneAccent === "amber"
-                      ? "text-stone-500 line-through decoration-amber-600/40"
-                      : "text-stone-500 line-through decoration-emerald-600/40"
-                    : "text-stone-900",
-                ].join(" ")}
-              >
-                {item.title}
-              </h3>
+          {/* Mobile: full-width header so title aligns with category */}
+          <div className="min-w-0 md:hidden">
+            <div className="flex flex-wrap items-center gap-2">
+              {categoryLabel && (
+                <p className="text-[11px] font-semibold tracking-wide text-stone-400 uppercase">
+                  {categoryLabel}
+                </p>
+              )}
+              <StatusPill status={status} />
+              {isItemPrivate(item.details) ? <PrivateItemPill /> : null}
+              <BookingStatusPill status={stayDetails?.bookingStatus} />
+              <BookingStatusPill status={carDetails?.bookingStatus} />
+              {linkedItemId && <LinkedPill />}
+              {subItems.length > 0 && (
+                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-brand-deep uppercase">
+                  {subItems.length} sub-item{subItems.length === 1 ? "" : "s"}
+                </span>
+              )}
+              {limitedView && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 uppercase">
+                  Limited view
+                </span>
+              )}
+              <ViewerLinkedPill item={item} />
+              {completed && <ItemDoneBadge accent={doneAccent} />}
+              {category === "flight" && <FlightCheckInReminderPill item={item} />}
+              {flightCheckedIn && <FlightCheckInBadge />}
+              <ItemTaskIndicator summary={taskSummary} />
+              <ItemDocumentIndicator count={documentCount} />
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              {itemMapLink ? (
+            <h3
+              className={[
+                "mt-0.5 break-normal font-medium group-hover:text-brand-deep",
+                completed
+                  ? doneAccent === "amber"
+                    ? "text-stone-500 line-through decoration-amber-600/40"
+                    : "text-stone-500 line-through decoration-emerald-600/40"
+                  : "text-stone-900",
+              ].join(" ")}
+            >
+              {item.title}
+            </h3>
+            {itemMapLink ? (
+              <div className="mt-2">
                 <ItemMapLink href={itemMapLink.href} label={itemMapLink.label} />
-              ) : null}
-              <ChevronRight className="mt-1 h-4 w-4 text-stone-300 group-hover:text-accent" />
+              </div>
+            ) : null}
+          </div>
+
+          {/* Desktop: map link may share the title row */}
+          <div className="hidden min-w-0 md:block">
+            <div className="flex min-w-0 items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  {categoryLabel && (
+                    <p className="text-[11px] font-semibold tracking-wide text-stone-400 uppercase">
+                      {categoryLabel}
+                    </p>
+                  )}
+                  <StatusPill status={status} />
+                  {isItemPrivate(item.details) ? <PrivateItemPill /> : null}
+                  <BookingStatusPill status={stayDetails?.bookingStatus} />
+                  <BookingStatusPill status={carDetails?.bookingStatus} />
+                  {linkedItemId && <LinkedPill />}
+                  {subItems.length > 0 && (
+                    <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-brand-deep uppercase">
+                      {subItems.length} sub-item{subItems.length === 1 ? "" : "s"}
+                    </span>
+                  )}
+                  {limitedView && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 uppercase">
+                      Limited view
+                    </span>
+                  )}
+                  <ViewerLinkedPill item={item} />
+                  {completed && <ItemDoneBadge accent={doneAccent} />}
+                  {category === "flight" && <FlightCheckInReminderPill item={item} />}
+                  {flightCheckedIn && <FlightCheckInBadge />}
+                  <ItemTaskIndicator summary={taskSummary} />
+                  <ItemDocumentIndicator count={documentCount} />
+                </div>
+                <h3
+                  className={[
+                    "mt-0.5 break-normal font-medium group-hover:text-brand-deep",
+                    completed
+                      ? doneAccent === "amber"
+                        ? "text-stone-500 line-through decoration-amber-600/40"
+                        : "text-stone-500 line-through decoration-emerald-600/40"
+                      : "text-stone-900",
+                  ].join(" ")}
+                >
+                  {item.title}
+                </h3>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {itemMapLink ? (
+                  <ItemMapLink href={itemMapLink.href} label={itemMapLink.label} />
+                ) : null}
+                <ChevronRight className="mt-1 h-4 w-4 text-stone-300 group-hover:text-accent" />
+              </div>
             </div>
           </div>
 
@@ -621,6 +673,11 @@ export function ItemCard({
           )}
         </div>
         </button>
+
+        <ChevronRight
+          aria-hidden
+          className="pointer-events-none absolute top-4 right-4 h-4 w-4 text-stone-300 group-hover:text-accent md:hidden"
+        />
 
         <div className="hidden shrink-0 items-center gap-1.5 self-start pt-0.5 md:flex">
           {category === "flight" && (
