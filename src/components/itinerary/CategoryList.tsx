@@ -39,7 +39,7 @@ export function CategoryList({
             : `No ${meta.label.toLowerCase()} items yet.`}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+        <div className="grid min-w-0 max-w-full gap-4 md:grid-cols-2 xl:grid-cols-1">
           {visibleItems.map((item) => (
             <ItemCard
               key={item.id}

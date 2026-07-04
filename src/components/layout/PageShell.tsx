@@ -1,11 +1,13 @@
 export function PageShell({
   eyebrow,
   title,
+  titleAction,
   toolbar,
   children,
 }: {
   eyebrow?: string;
   title: string;
+  titleAction?: React.ReactNode;
   toolbar?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -17,7 +19,10 @@ export function PageShell({
             {eyebrow}
           </p>
         )}
-        <h1 className="mt-1 font-serif text-3xl text-brand-deep">{title}</h1>
+        <div className="mt-1 flex items-start justify-between gap-3">
+          <h1 className="min-w-0 font-serif text-3xl text-brand-deep">{title}</h1>
+          {titleAction ? <div className="shrink-0">{titleAction}</div> : null}
+        </div>
         {toolbar ? <div className="mt-4">{toolbar}</div> : null}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto pt-4">{children}</div>

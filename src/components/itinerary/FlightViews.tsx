@@ -79,13 +79,13 @@ export function FlightItinerarySummary({
                 </p>
               ) : null}
               <p className="mt-1 text-sm leading-relaxed text-stone-800">
-                <span>{leg.departureLabel}</span>
-                <span className="text-stone-400"> · </span>
-                <span>{leg.arrivalLabel}</span>
+                <span className="max-md:block">{leg.departureLabel}</span>
+                <span className="text-stone-400 max-md:hidden"> · </span>
+                <span className="max-md:mt-0.5 max-md:block">{leg.arrivalLabel}</span>
                 {leg.flightTime ? (
                   <>
-                    <span className="text-stone-400"> · </span>
-                    <span className="text-stone-600">
+                    <span className="text-stone-400 max-md:hidden"> · </span>
+                    <span className="max-md:mt-0.5 max-md:block text-stone-600">
                       Flight time {leg.flightTime}
                     </span>
                   </>
@@ -94,7 +94,7 @@ export function FlightItinerarySummary({
             </div>
             {leg.transitAirport ? (
               <div className="flex items-center gap-2 px-1">
-                <span className="inline-flex flex-wrap items-center gap-x-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900">
+                <span className="inline-flex flex-wrap items-center gap-x-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900 max-md:whitespace-nowrap">
                   <span className="tracking-wide uppercase">
                     Transit {leg.transitAirport}
                   </span>

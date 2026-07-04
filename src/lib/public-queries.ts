@@ -6,7 +6,10 @@ import {
   type PublicInvitationEvent,
   type PublicScheduleItem,
 } from "@/lib/invitation-types";
-import { publicScheduleItems, weddingEvents } from "@/lib/schema";
+import type { SessionUser } from "@/lib/permissions";
+import { isAdminSession } from "@/lib/role-levels";
+import { travellerMatchesUsername } from "@/lib/item-travellers";
+import { guestMembers, guests, publicScheduleItems, weddingEvents } from "@/lib/schema";
 
 function parseCardFront(value: unknown): InvitationCardFront {
   if (!value || typeof value !== "object") return DEFAULT_CARD_FRONT;
@@ -116,6 +119,55 @@ export async function getInvitationEventsWithSchedules(): Promise<
     ...event,
     schedule: scheduleByEventId.get(event.id) ?? [],
   }));
+}
+
+export async function getInvitationEventsForUser(
+  user: SessionUser,
+): Promise<Array<PublicInvitationEvent & { schedule: PublicScheduleItem[] }>> {
+  const events = await getInvitationEventsWithSchedules();
+  if (user.isAdmin || isAdminSession(user.roleLevel)) return events;
+  if (events.length === 0) return [];
+
+  const eventIds = events.map((event) => event.id);
+  const guestRows = await db
+    .select({
+      eventId: guests.eventId,
+      label: guests.label,
+      guestId: guests.id,
+    })
+    .from(guests)
+    .where(inArray(guests.eventId, eventIds));
+
+  const guestIds = guestRows.map((row) => row.guestId);
+  const memberRows =
+    guestIds.length > 0
+      ? await db
+          .select({
+            guestId: guestMembers.guestId,
+            name: guestMembers.name,
+          })
+          .from(guestMembers)
+          .where(inArray(guestMembers.guestId, guestIds))
+      : [];
+
+  const membersByGuestId = new Map<number, string[]>();
+  for (const member of memberRows) {
+    const names = membersByGuestId.get(member.guestId) ?? [];
+    names.push(member.name);
+    membersByGuestId.set(member.guestId, names);
+  }
+
+  const matchingEventIds = new Set<number>();
+  for (const guest of guestRows) {
+    const names = [guest.label, ...(membersByGuestId.get(guest.guestId) ?? [])];
+    if (
+      names.some((name) => travellerMatchesUsername(name, user.username))
+    ) {
+      matchingEventIds.add(guest.eventId);
+    }
+  }
+
+  return events.filter((event) => matchingEventIds.has(event.id));
 }
 
 export async function getAllInvitationEvents() {

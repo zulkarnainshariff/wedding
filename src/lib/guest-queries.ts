@@ -172,6 +172,7 @@ export async function canModerateGuestbookForEvent(
   eventId: number,
 ): Promise<boolean> {
   if (hasGlobalGuestListAccess(user)) return true;
+  if (await isWeddingCoordinatorForEvent(user, eventId)) return true;
   const [row] = await db
     .select({ canModerateGuestbook: guestListPermissions.canModerateGuestbook })
     .from(guestListPermissions)
@@ -216,6 +217,28 @@ export async function getWeddingCoordinatorUserIdsForEvent(
       ),
     );
   return [...new Set(rows.map((row) => row.userId))];
+}
+
+export async function getEventsMissingCoordinators(): Promise<
+  { id: number; name: string }[]
+> {
+  const events = await db
+    .select({ id: weddingEvents.id, name: weddingEvents.name })
+    .from(weddingEvents)
+    .orderBy(asc(weddingEvents.sortOrder), asc(weddingEvents.id));
+
+  const coordinatorRows = await db
+    .select({ eventId: guestListPermissions.eventId })
+    .from(guestListPermissions)
+    .where(eq(guestListPermissions.isWeddingCoordinator, true));
+
+  const eventsWithCoordinators = new Set(
+    coordinatorRows.map((row) => row.eventId),
+  );
+
+  return events
+    .filter((event) => !eventsWithCoordinators.has(event.id))
+    .map((event) => ({ id: event.id, name: event.name }));
 }
 
 export function isRsvpExpired(
