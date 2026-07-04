@@ -94,6 +94,18 @@ export const EVERYONE_TRAVELLER = "Everyone";
 
 export const SYSTEM_ACCOUNT_USERNAMES = new Set(["root", "admin"]);
 
+export function travellerOptionsFromNames(names: string[]): string[] {
+  const options = new Set<string>();
+
+  for (const name of names) {
+    const normalized = normalizeTravellerName(name).trim();
+    if (!normalized || normalized === EVERYONE_TRAVELLER) continue;
+    options.add(normalized);
+  }
+
+  return [...options].sort((left, right) => left.localeCompare(right));
+}
+
 export function travellerOptionsFromAccounts(
   accountUsernames: string[],
   existing: string[] = [],

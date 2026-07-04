@@ -11,6 +11,7 @@ import {
 } from "@/lib/booking-groups";
 import { airlineInfoFromFlightNumbers } from "@/lib/airlines";
 import { formatFlightNumberDisplay, parseLegacyFlightNumber } from "@/lib/flight-numbers";
+import { isFlightLegSegment, prunePlaceholderFlightSegments } from "@/lib/flight-segment-timing";
 import { buildLocationPayload, getItemLocation } from "@/lib/item-location";
 import { mergeItemPrivacyFields } from "@/lib/admin-item-privacy";
 import { extractItemAdditionalViewers } from "@/lib/item-viewers";
@@ -411,9 +412,10 @@ export function buildStructuredDetailsPayload(
     payload.checkInStatus = structured.checkInStatus;
     payload.scheduleSortBy =
       structured.simple.scheduleSortBy === "departure" ? "departure" : "arrival";
-    const filteredSegments = structured.segments
+    const filteredSegments = prunePlaceholderFlightSegments(structured.segments)
       .filter(
         (segment) =>
+          isFlightLegSegment(segment) ||
           segment.from ||
           segment.to ||
           segment.marketingFlightNumber ||

@@ -111,6 +111,41 @@ function normalizeSegmentIata(value?: string | null): string | null {
   return code && code.length === 3 ? code : null;
 }
 
+/** True for a real flight leg — excludes arrival-only stubs from "Add connecting segment". */
+export function isFlightLegSegment(segment: FlightSegment): boolean {
+  if (segment.transit) return false;
+
+  const hasOrigin = Boolean(segment.fromIata?.trim() || segment.from?.trim());
+  const hasDestination = Boolean(segment.toIata?.trim() || segment.to?.trim());
+  const hasFlightNumber = Boolean(
+    segment.marketingFlightNumber?.trim() ||
+      segment.operatingFlightNumber?.trim() ||
+      segment.flightNumber?.trim(),
+  );
+
+  return hasOrigin || (hasDestination && hasFlightNumber);
+}
+
+export function prunePlaceholderFlightSegments(
+  segments: FlightSegment[],
+): FlightSegment[] {
+  return segments.filter((segment) => segment.transit || isFlightLegSegment(segment));
+}
+
+/** Last segment that ends at a connection or destination — skips arrival-only stubs. */
+export function lastFlightLegDestination(
+  segments: FlightSegment[],
+): Pick<FlightSegment, "from" | "fromIata"> {
+  for (let index = segments.length - 1; index >= 0; index -= 1) {
+    const segment = segments[index];
+    if (!isFlightLegSegment(segment)) continue;
+    if (segment.toIata?.trim() || segment.to?.trim()) {
+      return { from: segment.to, fromIata: segment.toIata };
+    }
+  }
+  return {};
+}
+
 /**
  * When a multi-leg booking is split into segments, the first leg often still
  * carries the journey destination (JFK→MEL) instead of the connection airport
@@ -154,9 +189,7 @@ function flightSegmentsFromRawDetails(
   details: FlightDetails | null | undefined,
 ): FlightSegment[] {
   if (!details?.segments?.length) return [];
-  return details.segments.filter(
-    (segment) => !segment.transit && (segment.fromIata || segment.from),
-  );
+  return details.segments.filter(isFlightLegSegment);
 }
 
 export function flightSegmentsFromDetails(
@@ -171,14 +204,21 @@ export function normalizeFlightDetailsSegments(
 ): FlightDetails {
   if (!details.segments?.length) return details;
 
-  const flightSegments = flightSegmentsFromRawDetails(details);
-  if (flightSegments.length < 2) return details;
+  const prunedSegments = prunePlaceholderFlightSegments(details.segments);
+  const detailsWithPruned =
+    prunedSegments.length === details.segments.length
+      ? details
+      : { ...details, segments: prunedSegments };
+
+  const flightSegments = flightSegmentsFromRawDetails(detailsWithPruned);
+  if (flightSegments.length < 2) return detailsWithPruned;
 
   const normalized = normalizeConnectingFlightSegments(flightSegments);
   let flightIndex = 0;
+  const sourceSegments = detailsWithPruned.segments ?? [];
 
-  const segments = details.segments.map((segment) => {
-    if (segment.transit || !(segment.fromIata || segment.from)) {
+  const segments = sourceSegments.map((segment) => {
+    if (segment.transit || !isFlightLegSegment(segment)) {
       return segment;
     }
     const next = normalized[flightIndex];
@@ -186,7 +226,7 @@ export function normalizeFlightDetailsSegments(
     return next;
   });
 
-  return { ...details, segments };
+  return { ...detailsWithPruned, segments };
 }
 
 export function isMultiSegmentFlightDetails(

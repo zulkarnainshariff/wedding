@@ -1,4 +1,4 @@
-import { resolveAirportCitySync } from "@/lib/airport-cities";
+import { resolveAirportCity } from "@/lib/airport-cities";
 import {
   airlineInfoFromAirlabsLeg,
   airlineInfoFromFlightNumbers,
@@ -10,6 +10,7 @@ import {
   resolveFlightSchedule,
 } from "@/lib/flight-datetime";
 import {
+  airportCityLabel,
   type AirlabsLeg,
   routeFieldsFromLegChain,
   sliceLegsFromDeparture,
@@ -119,13 +120,11 @@ function enrichLookupFromRaw(
     fromIata,
     toIata,
     fromCity:
-      raw?.dep_city?.trim() ||
-      resolveAirportCitySync(fromIata) ||
+      airportCityLabel(raw?.dep_city, fromIata) ||
       mapped.fromCity ||
       null,
     toCity:
-      raw?.arr_city?.trim() ||
-      resolveAirportCitySync(toIata) ||
+      airportCityLabel(raw?.arr_city, toIata) ||
       mapped.toCity ||
       null,
     aircraft: raw?.aircraft_iata?.trim() || raw?.aircraft_icao?.trim() || mapped.aircraft || null,
@@ -141,6 +140,59 @@ function enrichLookupFromRaw(
     operatingAirlineName: airline.operatingAirlineName,
     marketingFlightNumber: airline.marketingFlightNumber,
     operatingFlightNumber: airline.operatingFlightNumber,
+  };
+}
+
+async function enrichLookupCities<
+  T extends {
+    fromIata?: string | null;
+    toIata?: string | null;
+    fromCity?: string | null;
+    toCity?: string | null;
+    segments?: FlightSegment[];
+  },
+>(mapped: T): Promise<T> {
+  let fromCity = mapped.fromCity;
+  let toCity = mapped.toCity;
+
+  if (!fromCity && mapped.fromIata) {
+    fromCity = await resolveAirportCity(mapped.fromIata);
+  }
+  if (!toCity && mapped.toIata) {
+    toCity = await resolveAirportCity(mapped.toIata);
+  }
+
+  let segments = mapped.segments;
+  if (segments?.length) {
+    segments = await Promise.all(
+      segments.map(async (segment) => {
+        let from = segment.from;
+        let to = segment.to;
+        if (!from && segment.fromIata) {
+          from = (await resolveAirportCity(segment.fromIata)) ?? undefined;
+        }
+        if (!to && segment.toIata) {
+          to = (await resolveAirportCity(segment.toIata)) ?? undefined;
+        }
+        if (from === segment.from && to === segment.to) return segment;
+        return { ...segment, from, to };
+      }),
+    );
+  }
+
+  if (
+    fromCity === mapped.fromCity &&
+    toCity === mapped.toCity &&
+    segments === mapped.segments
+  ) {
+    return mapped;
+  }
+
+  return {
+    ...mapped,
+    fromCity,
+    toCity,
+    segments,
   };
 }
 
@@ -288,8 +340,8 @@ export function aviationFlightToLookupResult(
   return {
     fromIata,
     toIata,
-    fromCity: resolveAirportCitySync(fromIata),
-    toCity: resolveAirportCitySync(toIata),
+    fromCity: airportCityLabel(null, fromIata),
+    toCity: airportCityLabel(null, toIata),
     departureDatetimeLocal: departure?.datetimeLocal,
     arrivalDatetimeLocal: arrival?.datetimeLocal,
     eventDate: departure?.date ?? flight.flight_date ?? null,
@@ -656,17 +708,19 @@ export async function lookupFlightSchedule(input: {
       };
     }
 
+    const withCities = await enrichLookupCities(withAirline);
+
     return {
       available: true,
       message:
-        withAirline.segments && withAirline.segments.length > 0
-          ? `Flight details loaded (${withAirline.segments.length} segments).`
-          : withAirline.operatingFlightNumber &&
-              withAirline.marketingFlightNumber &&
-              withAirline.operatingFlightNumber !== withAirline.marketingFlightNumber
-            ? `Flight details loaded (codeshare operated as ${withAirline.operatingFlightNumber}).`
+        withCities.segments && withCities.segments.length > 0
+          ? `Flight details loaded (${withCities.segments.length} segments).`
+          : withCities.operatingFlightNumber &&
+              withCities.marketingFlightNumber &&
+              withCities.operatingFlightNumber !== withCities.marketingFlightNumber
+            ? `Flight details loaded (codeshare operated as ${withCities.operatingFlightNumber}).`
             : "Flight details loaded from schedule API.",
-      ...withAirline,
+      ...withCities,
     };
   } catch (error) {
     return {
