@@ -422,12 +422,12 @@ export function BottomNav() {
   const { canView } = useAuth();
   const tabs = [
     { href: "/itinerary/activity", label: "Schedule", category: "activity" as const },
-    { href: "/itinerary", label: "All", category: "all" as const },
     { href: "/itinerary/flight", label: "Flights", category: "flights_hub" as const },
+    { href: "/invitation", label: "Invitation", category: "invitations" as const },
     { href: "/itinerary/accommodation", label: "Stay", category: "accommodation" as const },
     { href: "/itinerary/car_rental", label: "Cars", category: "car_rental" as const },
   ].filter((tab) => {
-    if (tab.category === "all") return true;
+    if (tab.category === "invitations") return true;
     if (tab.category === "flights_hub") {
       return canView("flight") || canView("pet_relocation");
     }
@@ -442,15 +442,15 @@ export function BottomNav() {
       >
         {tabs.map((tab) => {
           const active =
-            tab.category === "all"
-              ? pathname === "/itinerary"
+            tab.category === "invitations"
+              ? pathname.startsWith("/invitation")
               : tab.category === "flights_hub"
                 ? pathname.startsWith("/itinerary/flight") ||
                   pathname.startsWith("/itinerary/pet_relocation")
                 : pathname.startsWith(tab.href);
           const Icon =
-            tab.category === "all"
-              ? LayoutGrid
+            tab.category === "invitations"
+              ? Heart
               : tab.category === "flights_hub"
                 ? CATEGORY_ICONS.flight
                 : CATEGORY_ICONS[tab.category];

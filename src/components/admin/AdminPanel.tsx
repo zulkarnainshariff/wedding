@@ -18,6 +18,8 @@ import { TbcItemsPanel } from "./TbcItemsPanel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { GuestListClient } from "@/components/guests/GuestListClient";
 import { TaskPermissionsPanel } from "./TaskPermissionsPanel";
+import { AdminTabBarDesktop, AdminTabBarMobile } from "./AdminTabBar";
+import { SystemAdministrationPanel } from "./SystemAdministrationPanel";
 import { SystemDiagnosticsPanel } from "./SystemDiagnosticsPanel";
 import { UserManagement, type ManagedUser } from "./UserManagement";
 import {
@@ -58,7 +60,8 @@ type AdminTab =
   | "public"
   | "gallery"
   | "guestbook"
-  | "diagnostics";
+  | "diagnostics"
+  | "system";
 
 type EventWithSchedule = WeddingEvent & {
   schedule: PublicScheduleItemRow[];
@@ -87,6 +90,7 @@ export function AdminPanel({
   canEditItinerary = false,
   showDiagnostics = false,
   showSuperuserTools = false,
+  eventsMissingCoordinators = [],
   initialThemeId,
   initialFeatures = { guestbookEnabled: false, photoGalleryEnabled: false },
   tripStartDate = null,
@@ -104,6 +108,7 @@ export function AdminPanel({
   canEditItinerary?: boolean;
   showDiagnostics?: boolean;
   showSuperuserTools?: boolean;
+  eventsMissingCoordinators?: { id: number; name: string }[];
   initialThemeId: AppThemeId;
   initialFeatures?: { guestbookEnabled: boolean; photoGalleryEnabled: boolean };
   tripStartDate?: string | null;
@@ -173,6 +178,7 @@ export function AdminPanel({
         "guestbook",
         "users",
         "diagnostics",
+        "system",
       ].includes(requestedTab) &&
       (showFullAdmin ||
         requestedTab === "insurance" ||
@@ -206,7 +212,12 @@ export function AdminPanel({
         ["gallery", "Gallery"],
         ["guestbook", "Guestbook"],
         ...(showUserManagement ? ([["users", "Users"]] as const) : []),
-        ...(showDiagnostics ? ([["diagnostics", "Diagnostics"]] as const) : []),
+        ...(showDiagnostics
+          ? ([
+              ["diagnostics", "Diagnostics"],
+              ["system", "System Administration"],
+            ] as const)
+          : []),
       ]
     : canEditItinerary
       ? [["insurance", "Travel insurance"], ...itineraryExtraTabs]
@@ -417,24 +428,23 @@ export function AdminPanel({
     <>
       <PageShell
       eyebrow="Manage"
-      title="Edit Itinerary"
+      title="Trip management"
+      titleAction={
+        <div className="md:hidden">
+          <AdminTabBarMobile
+            tabs={tabs}
+            activeTab={tab}
+            onChange={(value) => switchTab(value as AdminTab)}
+          />
+        </div>
+      }
       toolbar={
-        <div className="flex gap-2 border-b border-stone-200">
-          {tabs.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => switchTab(value)}
-              className={[
-                "cursor-pointer border-b-2 px-4 py-2 text-sm font-medium",
-                tab === value
-                  ? "border-brand-deep text-brand-deep"
-                  : "border-transparent text-stone-500 hover:text-stone-700",
-              ].join(" ")}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="hidden md:block">
+          <AdminTabBarDesktop
+            tabs={tabs}
+            activeTab={tab}
+            onChange={(value) => switchTab(value as AdminTab)}
+          />
         </div>
       }
     >
@@ -504,7 +514,16 @@ export function AdminPanel({
 
       {tab === "diagnostics" && showDiagnostics && (
         <div className={TAB_CONTENT_CLASS}>
-          <SystemDiagnosticsPanel showSuperuserTools={showSuperuserTools} />
+          <SystemDiagnosticsPanel
+            showSuperuserTools={showSuperuserTools}
+            eventsMissingCoordinators={eventsMissingCoordinators}
+          />
+        </div>
+      )}
+
+      {tab === "system" && showDiagnostics && (
+        <div className={TAB_CONTENT_CLASS}>
+          <SystemAdministrationPanel />
         </div>
       )}
 

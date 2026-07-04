@@ -109,6 +109,40 @@ function InlineDetail({
   );
 }
 
+function StackedMobileDetail({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | null;
+}) {
+  if (!value) return null;
+  return (
+    <div className="text-xs text-stone-600 md:hidden">
+      <p className="font-medium text-stone-500">{label}:</p>
+      <p className="mt-0.5 whitespace-pre-line">{value}</p>
+    </div>
+  );
+}
+
+function ResponsiveInlineDetail({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | null;
+}) {
+  if (!value) return null;
+  return (
+    <>
+      <div className="hidden md:block">
+        <InlineDetail label={label} value={value} />
+      </div>
+      <StackedMobileDetail label={label} value={value} />
+    </>
+  );
+}
+
 function FlightDetailedPreview({
   item,
   details,
@@ -134,6 +168,18 @@ function FlightDetailedPreview({
           return `${formatTravellerLabel(name)}: ${formatBaggage(kg)}`;
         })
         .join(" · ")
+    : null;
+
+  const baggageStacked = details.baggage
+    ? Object.entries(details.baggage)
+        .map(([name, kg]) => {
+          const cargo = details.cargoParty?.includes(name);
+          if (cargo || kg == null) {
+            return `${formatTravellerLabel(name, cargo)}: N/A`;
+          }
+          return `${formatTravellerLabel(name)}: ${formatBaggage(kg)}`;
+        })
+        .join("\n")
     : null;
 
   const seatsSummary = formatFlightSeatsSummary(
@@ -169,13 +215,16 @@ function FlightDetailedPreview({
               : undefined
         }
       />
-      <InlineDetail label="Baggage" value={baggageSummary} />
-      <InlineDetail label="Booking ref" value={bookingRefs} />
+      <div className="hidden md:block">
+        <InlineDetail label="Baggage" value={baggageSummary} />
+      </div>
+      <StackedMobileDetail label="Baggage" value={baggageStacked} />
+      <ResponsiveInlineDetail label="Booking ref" value={bookingRefs} />
       <InlineDetail
         label="Aircraft"
         value={details.aircraft ?? firstSegment?.aircraft}
       />
-      <InlineDetail label="Seats" value={seatsSummary} />
+      <ResponsiveInlineDetail label="Seats" value={seatsSummary} />
     </div>
   );
 }
@@ -324,7 +373,7 @@ export function ItemCard({
   return (
     <div
       className={[
-        "group theme-card w-full rounded-2xl border bg-surface shadow-sm transition-all",
+        "group theme-card w-full max-w-full overflow-hidden rounded-2xl border bg-surface shadow-sm transition-all",
         "hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md",
         styles.border,
         completed
@@ -336,7 +385,23 @@ export function ItemCard({
             : "",
       ].join(" ")}
     >
-      <div className="flex items-start gap-1.5 p-4">
+      <div className="flex items-start gap-1.5 p-4 max-md:gap-2">
+        <div className="flex shrink-0 flex-col items-center gap-2 md:hidden">
+          <div
+            className={[
+              "flex h-11 w-11 items-center justify-center rounded-xl",
+              styles.bg,
+              styles.text,
+            ].join(" ")}
+          >
+            <Icon className="h-5 w-5" />
+          </div>
+          {category === "flight" ? (
+            <FlightCheckInToggle item={item} compact />
+          ) : null}
+          <ItemCompleteToggle item={item} compact accent={doneAccent} />
+        </div>
+
         <button
           type="button"
           onClick={() => openItem(item.id)}
@@ -344,7 +409,7 @@ export function ItemCard({
         >
         <div
           className={[
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+            "hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl md:flex",
             styles.bg,
             styles.text,
           ].join(" ")}
@@ -385,7 +450,7 @@ export function ItemCard({
               </div>
               <h3
                 className={[
-                  "mt-0.5 break-words font-medium group-hover:text-brand-deep",
+                  "mt-0.5 break-normal font-medium group-hover:text-brand-deep",
                   completed
                     ? doneAccent === "amber"
                       ? "text-stone-500 line-through decoration-amber-600/40"
@@ -413,7 +478,7 @@ export function ItemCard({
           {!limitedView && flightSummaryExtras.length > 0 ? (
             <div className="mt-1 space-y-0.5 text-sm text-stone-500">
               {flightSummaryExtras.map((part, index) => (
-                <p key={`${index}-${part}`} className="break-words">
+                <p key={`${index}-${part}`} className="break-normal">
                   {part}
                 </p>
               ))}
@@ -421,17 +486,17 @@ export function ItemCard({
           ) : accommodationLines.length > 0 ? (
             <div className="mt-1 space-y-0.5 text-sm text-stone-500">
               {accommodationLines.map((line, index) => (
-                <p key={`${index}-${line}`} className="break-words">
+                <p key={`${index}-${line}`} className="break-normal">
                   {line}
                 </p>
               ))}
             </div>
           ) : accommodationSummary ? (
-            <p className="mt-1 break-words text-sm text-stone-500">
+            <p className="mt-1 break-normal text-sm text-stone-500">
               {accommodationSummary}
             </p>
           ) : item.summary && category !== "flight" ? (
-            <p className="mt-1 break-words text-sm text-stone-500">{item.summary}</p>
+            <p className="mt-1 break-normal text-sm text-stone-500">{item.summary}</p>
           ) : null}
 
           {category !== "flight" &&
@@ -557,7 +622,7 @@ export function ItemCard({
         </div>
         </button>
 
-        <div className="flex shrink-0 items-center gap-1.5 self-start pt-0.5">
+        <div className="hidden shrink-0 items-center gap-1.5 self-start pt-0.5 md:flex">
           {category === "flight" && (
             <FlightCheckInToggle item={item} compact />
           )}

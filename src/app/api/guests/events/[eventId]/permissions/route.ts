@@ -50,6 +50,9 @@ export async function PUT(request: Request, { params }: Params) {
     .map((entry) => ({
       ...entry,
       canView: entry.isWeddingCoordinator ? true : entry.canView,
+      canModerateGuestbook: entry.isWeddingCoordinator
+        ? true
+        : entry.canModerateGuestbook,
     }))
     .filter(
       (entry) =>

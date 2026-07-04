@@ -5,6 +5,7 @@ import { AdminPanel } from "@/components/admin/AdminPanel";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canManageUsers, canEditItinerary, isSuperuser, normalizePermissions } from "@/lib/permissions";
+import { getEventsMissingCoordinators } from "@/lib/guest-queries";
 import { getDays, getAllItems } from "@/lib/queries";
 import { getAllInvitationEvents, getInvitationEventsWithSchedules, getScheduleItemsForEventAdmin } from "@/lib/public-queries";
 import { getAppSettings } from "@/lib/app-settings";
@@ -25,12 +26,14 @@ export default async function AdminPage() {
     redirect("/itinerary");
   }
 
-  const [days, items, invitationEvents, landingEvents, appSettings] = await Promise.all([
+  const [days, items, invitationEvents, landingEvents, appSettings, eventsMissingCoordinators] =
+    await Promise.all([
     getDays(),
     getAllItems(),
     getAllInvitationEvents(),
     getInvitationEventsWithSchedules(),
     getAppSettings(),
+    getEventsMissingCoordinators(),
   ]);
 
   const initialEvents = await Promise.all(
@@ -64,6 +67,7 @@ export default async function AdminPage() {
         canEditItinerary={canEditItinerary(sessionUser)}
         showDiagnostics={sessionUser.isAdmin}
         showSuperuserTools={isSuperuser(sessionUser)}
+        eventsMissingCoordinators={eventsMissingCoordinators}
         initialThemeId={appSettings.themeId}
         initialFeatures={{
           guestbookEnabled: Boolean(appSettings.features.guestbookEnabled),

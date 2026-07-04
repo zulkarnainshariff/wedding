@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { SectionShell } from "@/components/layout/PageShell";
 import { DatabaseOperationsPanel } from "@/components/admin/DatabaseOperationsPanel";
-import { NotificationsAdminPanel } from "@/components/admin/NotificationsAdminPanel";
 
 type LogKind = "login" | "audit" | "usage" | "errors";
 
@@ -39,8 +38,10 @@ const KIND_TABS: { id: LogKind; label: string }[] = [
 
 export function SystemDiagnosticsPanel({
   showSuperuserTools = false,
+  eventsMissingCoordinators = [],
 }: {
   showSuperuserTools?: boolean;
+  eventsMissingCoordinators?: { id: number; name: string }[];
 }) {
   const [kind, setKind] = useState<LogKind>("login");
   const [from, setFrom] = useState("");
@@ -151,6 +152,18 @@ export function SystemDiagnosticsPanel({
     <div className="space-y-6">
       {showSuperuserTools && <DatabaseOperationsPanel />}
 
+      {eventsMissingCoordinators.length > 0 ? (
+        <SectionShell title="Event coordinators">
+          <ul className="space-y-1 text-sm">
+            {eventsMissingCoordinators.map((event) => (
+              <li key={event.id} className="text-red-600">
+                Event coordinator is not set for {event.name}
+              </li>
+            ))}
+          </ul>
+        </SectionShell>
+      ) : null}
+
       <SectionShell title="Active now">
         <p className="mb-3 text-sm text-stone-500">
           Users with activity in the last 15 minutes.
@@ -180,7 +193,25 @@ export function SystemDiagnosticsPanel({
             ? "Failed database operations (items, days, tasks, guests). Filter by operation (create, update, delete), resource type, user, or date."
             : "Login events, data changes, and usage sessions. Detailed page views are recorded in development only."}
         </p>
-        <div className="mb-4 flex flex-wrap gap-2">
+
+        <div className="mb-4 md:hidden">
+          <label className="block text-sm">
+            <span className="mb-1 block text-stone-500">Log type</span>
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as LogKind)}
+              className="w-full rounded-lg border border-stone-200 px-3 py-2"
+            >
+              {KIND_TABS.map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="mb-4 hidden flex-wrap gap-2 md:flex">
           {KIND_TABS.map((tab) => (
             <button
               key={tab.id}
@@ -328,108 +359,6 @@ export function SystemDiagnosticsPanel({
           </table>
         </div>
       </SectionShell>
-
-      <NotificationsAdminPanel />
-
-      <AdminAccountsPanel />
     </div>
-  );
-}
-
-function AdminAccountsPanel() {
-  const [admins, setAdmins] = useState<
-    { id: number; username: string; roleLevel: number }[]
-  >([]);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
-
-  async function refresh() {
-    const response = await fetch("/api/system/admins");
-    if (response.ok) {
-      setAdmins(await response.json());
-    }
-  }
-
-  useEffect(() => {
-    void refresh();
-  }, []);
-
-  async function grantAdmin() {
-    setStatus(null);
-    const response = await fetch("/api/system/admins", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password: password || undefined }),
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      setStatus(payload.error ?? "Could not grant admin access.");
-      return;
-    }
-    setUsername("");
-    setPassword("");
-    setStatus("Admin access updated.");
-    await refresh();
-  }
-
-  async function revokeAdmin(id: number) {
-    if (!confirm("Remove admin access for this user?")) return;
-    const response = await fetch(`/api/system/admins/${id}`, { method: "DELETE" });
-    if (!response.ok) {
-      setStatus("Could not remove admin access.");
-      return;
-    }
-    setStatus("Admin access removed.");
-    await refresh();
-  }
-
-  return (
-    <SectionShell title="Admin accounts">
-      <p className="mb-4 text-sm text-stone-500">
-        Level 1 admins can manage itinerary content and regular users. Only platform
-        operators can change this list.
-      </p>
-      <div className="mb-4 grid gap-3 sm:grid-cols-2">
-        <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="Username"
-          className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="New password (optional when promoting)"
-          className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
-        />
-      </div>
-      <button
-        type="button"
-        onClick={() => void grantAdmin()}
-        className="mb-4 rounded-lg bg-brand-deep px-4 py-2 text-sm text-white"
-      >
-        Grant admin access
-      </button>
-      {status && <p className="mb-3 text-sm text-stone-600">{status}</p>}
-      <ul className="space-y-2">
-        {admins.map((admin) => (
-          <li
-            key={admin.id}
-            className="flex items-center justify-between rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm"
-          >
-            <span className="font-medium">{admin.username}</span>
-            <button
-              type="button"
-              onClick={() => void revokeAdmin(admin.id)}
-              className="text-red-600 hover:underline"
-            >
-              Remove admin
-            </button>
-          </li>
-        ))}
-      </ul>
-    </SectionShell>
   );
 }
