@@ -95,11 +95,10 @@ export async function canEditGuestList(
       and(
         eq(guestListPermissions.userId, user.id),
         eq(guestListPermissions.eventId, eventId),
-        eq(guestListPermissions.canEdit, true),
       ),
     )
     .limit(1);
-  return Boolean(row);
+  return Boolean(row?.canEdit || row?.isWeddingCoordinator);
 }
 
 export async function getGuestsForEvent(eventId: number) {
