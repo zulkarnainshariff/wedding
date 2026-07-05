@@ -55,7 +55,11 @@ export async function POST(request: Request, { params }: Params) {
 
   try {
     const body = await request.json();
-    const members: { name: string }[] = Array.isArray(body.members) ? body.members : [];
+    const members: {
+      name: string;
+      under13?: boolean;
+      attending?: boolean;
+    }[] = Array.isArray(body.members) ? body.members : [];
 
     const [created] = await db
       .insert(guests)
@@ -66,6 +70,15 @@ export async function POST(request: Request, { params }: Params) {
         allowIncludeFamily: Boolean(body.allowIncludeFamily),
         expectedHeadcount: Math.max(1, Number(body.expectedHeadcount) || 1),
         rsvpStatus: isRsvpStatus(body.rsvpStatus) ? body.rsvpStatus : "not_responded",
+        rsvpAttendingCount:
+          isRsvpStatus(body.rsvpStatus) && body.rsvpStatus === "attending"
+            ? Math.max(
+                1,
+                members.filter((m) => m.name?.trim() && m.attending !== false).length ||
+                  Number(body.expectedHeadcount) ||
+                  1,
+              )
+            : null,
         adminNotes: body.adminNotes ?? null,
         contactEmail: body.contactEmail ?? null,
         sortOrder: Number(body.sortOrder) || 0,
@@ -77,6 +90,8 @@ export async function POST(request: Request, { params }: Params) {
         members.map((member, index) => ({
           guestId: created.id,
           name: member.name,
+          under13: Boolean(member.under13),
+          attending: member.attending !== false,
           sortOrder: index,
         })),
       );

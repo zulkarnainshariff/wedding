@@ -35,6 +35,8 @@ export type GuestListAccess = {
 export type GuestMemberInput = {
   id?: number;
   name: string;
+  under13?: boolean;
+  attending?: boolean;
   sortOrder?: number;
 };
 

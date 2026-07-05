@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Plus, Save, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -13,6 +13,14 @@ import {
   type GuestListAccess,
   type RsvpStatus,
 } from "@/lib/guest-list-types";
+import {
+  applyGuestMemberDefaults,
+  emptyGuestInviteForm,
+  guestInviteFormFromGuest,
+  guestMembersForSave,
+  inviteLabelOptions,
+  type GuestInviteForm,
+} from "@/lib/guest-invite-form";
 import type { Guest, GuestMember, WeddingEvent } from "@/lib/schema";
 
 type GuestWithMembers = Guest & { members: GuestMember[] };
@@ -28,16 +36,14 @@ type PermissionRow = {
 
 type PanelTab = "summary" | "invitations" | "settings";
 
-const EMPTY_GUEST = {
-  label: "",
-  allowIncludeFamily: false,
-  expectedHeadcount: 1,
-  rsvpStatus: "not_responded" as RsvpStatus,
-  rsvpAttendingCount: 1,
-  adminNotes: "",
-  contactEmail: "",
-  memberNames: [] as string[],
-};
+const EMPTY_GUEST = emptyGuestInviteForm();
+
+function formatMemberSummary(member: GuestMember) {
+  const parts = [member.name];
+  if (member.under13) parts.push("child");
+  if (member.attending === false) parts.push("not attending");
+  return parts.join(" · ");
+}
 
 export function GuestListPanel({
   events,
@@ -256,16 +262,18 @@ export function GuestListPanel({
   }
 
   async function addGuest() {
-    if (!selectedId || !newGuest.label.trim()) return;
+    const members = guestMembersForSave(newGuest.members);
+    if (!selectedId || members.length === 0 || !newGuest.label.trim()) {
+      setError("Add at least one guest name and choose an invite label.");
+      return;
+    }
     setBusy(true);
     const response = await fetch(`/api/guests/events/${selectedId}/guests`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...newGuest,
-        members: newGuest.memberNames
-          .filter(Boolean)
-          .map((name) => ({ name })),
+        members,
       }),
     });
     setBusy(false);
@@ -281,32 +289,31 @@ export function GuestListPanel({
 
   function startEdit(guest: GuestWithMembers) {
     setEditingId(guest.id);
-    setEditForm({
-      label: guest.label,
-      allowIncludeFamily: guest.allowIncludeFamily,
-      expectedHeadcount: guest.expectedHeadcount,
-      rsvpStatus: guest.rsvpStatus as RsvpStatus,
-      rsvpAttendingCount: guest.rsvpAttendingCount ?? guest.expectedHeadcount,
-      adminNotes: guest.adminNotes ?? "",
-      contactEmail: guest.contactEmail ?? "",
-      memberNames: guest.members.map((member) => member.name),
-    });
+    setEditForm(guestInviteFormFromGuest(guest));
   }
 
-  async function saveGuest() {
-    if (!editingId) return;
+  async function persistGuest(
+    guestId: number,
+    form: GuestInviteForm,
+    options?: { successMessage?: string },
+  ) {
+    const members = guestMembersForSave(form.members);
+    if (members.length === 0 || !form.label.trim()) {
+      setError("Add at least one guest name and choose an invite label.");
+      return false;
+    }
     setBusy(true);
     const payload = {
-      ...editForm,
-      members: editForm.memberNames.filter(Boolean).map((name) => ({ name })),
-      ...(editForm.rsvpStatus === "attending"
+      ...form,
+      members,
+      ...(form.rsvpStatus === "attending"
         ? {
             rsvpAttendingCount:
-              editForm.rsvpAttendingCount || editForm.expectedHeadcount,
+              form.rsvpAttendingCount || form.expectedHeadcount,
           }
         : { rsvpAttendingCount: null }),
     };
-    const response = await fetch(`/api/guests/${editingId}`, {
+    const response = await fetch(`/api/guests/${guestId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -317,15 +324,37 @@ export function GuestListPanel({
       const message = data.error ?? "Failed to save guest.";
       setError(message);
       toast.error(message);
-      return;
+      return false;
     }
-    const updated = await response.json();
+    const updated = (await response.json()) as GuestWithMembers;
     setGuests((current) =>
-      current.map((guest) => (guest.id === editingId ? updated : guest)),
+      current.map((guest) => (guest.id === guestId ? updated : guest)),
     );
-    setEditingId(null);
-    setStatus("Guest saved.");
-    toast.success("Guest saved.");
+    const message = options?.successMessage ?? "Guest saved.";
+    setStatus(message);
+    toast.success(message);
+    return true;
+  }
+
+  async function saveGuest() {
+    if (!editingId) return;
+    const ok = await persistGuest(editingId, editForm);
+    if (ok) setEditingId(null);
+  }
+
+  async function updateGuestRsvp(guest: GuestWithMembers, rsvpStatus: RsvpStatus) {
+    const form = applyGuestMemberDefaults({
+      ...guestInviteFormFromGuest(guest),
+      rsvpStatus,
+      members:
+        rsvpStatus === "attending"
+          ? guestInviteFormFromGuest(guest).members.map((member) => ({
+              ...member,
+              attending: true,
+            }))
+          : guestInviteFormFromGuest(guest).members,
+    });
+    await persistGuest(guest.id, form, { successMessage: "RSVP status updated." });
   }
 
   async function deleteGuest(id: number) {
@@ -474,11 +503,32 @@ export function GuestListPanel({
                         Expected {guest.expectedHeadcount}
                         {guest.allowIncludeFamily ? " · family allowed" : ""}
                         {guest.members.length > 0
-                          ? ` · ${guest.members.map((m) => m.name).join(", ")}`
+                          ? ` · ${guest.members.map((m) => formatMemberSummary(m)).join(", ")}`
                           : ""}
                       </p>
                       <p className="mt-1 text-sm">
-                        RSVP: {RSVP_STATUS_LABELS[guest.rsvpStatus as RsvpStatus]}
+                        RSVP:{" "}
+                        {canManageGuests ? (
+                          <select
+                            value={guest.rsvpStatus}
+                            disabled={busy || editingId === guest.id}
+                            onChange={(e) =>
+                              void updateGuestRsvp(
+                                guest,
+                                e.target.value as RsvpStatus,
+                              )
+                            }
+                            className="ml-1 rounded border border-stone-200 px-2 py-0.5 text-sm"
+                          >
+                            {RSVP_STATUSES.map((status) => (
+                              <option key={status} value={status}>
+                                {RSVP_STATUS_LABELS[status]}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          RSVP_STATUS_LABELS[guest.rsvpStatus as RsvpStatus]
+                        )}
                         {guest.rsvpAttendingCount != null
                           ? ` · ${guest.rsvpAttendingCount} guest${guest.rsvpAttendingCount === 1 ? "" : "s"}`
                           : ""}
@@ -789,50 +839,180 @@ function GuestForm({
   busy,
   submitLabel = "Save guest",
 }: {
-  value: typeof EMPTY_GUEST;
-  onChange: (value: typeof EMPTY_GUEST) => void;
+  value: GuestInviteForm;
+  onChange: (value: GuestInviteForm) => void;
   onSave: () => void;
   onCancel?: () => void;
   busy: boolean;
   submitLabel?: string;
 }) {
+  const nameInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const labelOptions = inviteLabelOptions(value.members, value.label);
+
+  function updateForm(next: GuestInviteForm, syncMembers = false) {
+    onChange(syncMembers ? applyGuestMemberDefaults(next) : next);
+  }
+
+  function updateMember(
+    index: number,
+    patch: Partial<GuestInviteForm["members"][number]>,
+  ) {
+    const members = value.members.map((member, memberIndex) =>
+      memberIndex === index ? { ...member, ...patch } : member,
+    );
+    updateForm({ ...value, members }, true);
+  }
+
+  function addMemberRow(focusIndex?: number) {
+    const members = [...value.members, { name: "", under13: false, attending: true }];
+    updateForm({ ...value, members });
+    const nextIndex = focusIndex ?? members.length - 1;
+    requestAnimationFrame(() => {
+      nameInputRefs.current[nextIndex]?.focus();
+    });
+  }
+
+  function removeMemberRow(index: number) {
+    if (value.members.length <= 1) return;
+    const members = value.members.filter((_, memberIndex) => memberIndex !== index);
+    updateForm({ ...value, members }, true);
+  }
+
+  function handleNameKeyDown(
+    event: KeyboardEvent<HTMLInputElement>,
+    index: number,
+  ) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    if (index === value.members.length - 1) {
+      addMemberRow(index + 1);
+      return;
+    }
+    nameInputRefs.current[index + 1]?.focus();
+  }
+
   return (
     <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-3 sm:col-span-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-stone-700">
+            Named guests <span className="text-red-600">*</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => addMemberRow()}
+            className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-50"
+          >
+            Add row
+          </button>
+        </div>
+        {value.members.map((member, index) => (
+          <div
+            key={index}
+            className="grid gap-3 rounded-lg border border-stone-200 bg-stone-50/70 p-3 sm:grid-cols-[1fr_auto_auto_auto]"
+          >
+            <label className="block text-sm">
+              <span className="mb-1 block text-stone-500">Name</span>
+              <input
+                ref={(element) => {
+                  nameInputRefs.current[index] = element;
+                }}
+                value={member.name}
+                onChange={(e) => updateMember(index, { name: e.target.value })}
+                onKeyDown={(e) => handleNameKeyDown(e, index)}
+                placeholder="Bob Smith"
+                className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2"
+              />
+            </label>
+            <label className="flex items-end gap-2 pb-2 text-sm text-stone-600">
+              <input
+                type="checkbox"
+                checked={member.under13}
+                onChange={(e) => updateMember(index, { under13: e.target.checked })}
+              />
+              Child
+            </label>
+            {value.rsvpStatus === "attending" && member.name.trim() ? (
+              <label className="flex items-end gap-2 pb-2 text-sm text-stone-600">
+                <input
+                  type="checkbox"
+                  checked={member.attending}
+                  onChange={(e) =>
+                    updateMember(index, { attending: e.target.checked })
+                  }
+                />
+                Attending
+              </label>
+            ) : (
+              <div className="hidden sm:block" />
+            )}
+            <div className="flex items-end pb-1">
+              <button
+                type="button"
+                onClick={() => removeMemberRow(index)}
+                disabled={value.members.length <= 1}
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm text-stone-600 disabled:opacity-40"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <label className="block text-sm sm:col-span-2">
         <span className="mb-1 block text-stone-500">Invite label</span>
-        <input
+        <select
           value={value.label}
           onChange={(e) => onChange({ ...value, label: e.target.value })}
-          placeholder='e.g. "Bob and family" or "Jack, Jill & Rob"'
+          disabled={labelOptions.length === 0}
           className="w-full rounded-lg border border-stone-200 px-3 py-2"
-        />
+        >
+          {labelOptions.length === 0 ? (
+            <option value="">Add guest names first</option>
+          ) : (
+            labelOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))
+          )}
+        </select>
       </label>
+
       <label className="block text-sm">
         <span className="mb-1 block text-stone-500">Expected headcount</span>
         <input
           type="number"
           min={1}
           value={value.expectedHeadcount}
-          onChange={(e) =>
-            onChange({ ...value, expectedHeadcount: Number(e.target.value) || 1 })
-          }
-          className="w-full rounded-lg border border-stone-200 px-3 py-2"
+          readOnly
+          className="w-full rounded-lg border border-stone-200 bg-stone-100 px-3 py-2 text-stone-600"
         />
       </label>
+
       <label className="block text-sm">
         <span className="mb-1 block text-stone-500">RSVP status</span>
         <select
           value={value.rsvpStatus}
           onChange={(e) => {
             const rsvpStatus = e.target.value as RsvpStatus;
-            onChange({
-              ...value,
-              rsvpStatus,
-              rsvpAttendingCount:
-                rsvpStatus === "attending"
-                  ? value.rsvpAttendingCount || value.expectedHeadcount
-                  : value.rsvpAttendingCount,
-            });
+            const members =
+              rsvpStatus === "attending"
+                ? value.members.map((member) => ({
+                    ...member,
+                    attending: member.name.trim() ? true : member.attending,
+                  }))
+                : value.members;
+            updateForm(
+              {
+                ...value,
+                rsvpStatus,
+                members,
+                rsvpAttendingCount: value.expectedHeadcount,
+              },
+              true,
+            );
           }}
           className="w-full rounded-lg border border-stone-200 px-3 py-2"
         >
@@ -843,6 +1023,7 @@ function GuestForm({
           ))}
         </select>
       </label>
+
       {value.rsvpStatus === "attending" && (
         <label className="block text-sm">
           <span className="mb-1 block text-stone-500">Attending count</span>
@@ -850,16 +1031,12 @@ function GuestForm({
             type="number"
             min={1}
             value={value.rsvpAttendingCount}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                rsvpAttendingCount: Number(e.target.value) || 1,
-              })
-            }
-            className="w-full rounded-lg border border-stone-200 px-3 py-2"
+            readOnly
+            className="w-full rounded-lg border border-stone-200 bg-stone-100 px-3 py-2 text-stone-600"
           />
         </label>
       )}
+
       <label className="flex items-center gap-2 text-sm sm:col-span-2">
         <input
           type="checkbox"
@@ -870,23 +1047,7 @@ function GuestForm({
         />
         Allow family members on RSVP (guest can enter headcount and names)
       </label>
-      <label className="block text-sm sm:col-span-2">
-        <span className="mb-1 block text-stone-500">
-          Named members (one per line, optional)
-        </span>
-        <textarea
-          value={value.memberNames.join("\n")}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              memberNames: e.target.value.split("\n"),
-            })
-          }
-          rows={3}
-          placeholder={"Jack\nJill\nRob"}
-          className="w-full rounded-lg border border-stone-200 px-3 py-2"
-        />
-      </label>
+
       <label className="block text-sm sm:col-span-2">
         <span className="mb-1 block text-stone-500">Admin notes</span>
         <input
@@ -895,6 +1056,7 @@ function GuestForm({
           className="w-full rounded-lg border border-stone-200 px-3 py-2"
         />
       </label>
+
       <div className="flex gap-2 sm:col-span-2">
         <button
           type="button"
