@@ -168,6 +168,13 @@ export async function archiveNotificationAdmin(id: number) {
     .where(eq(notifications.id, id));
 }
 
+export async function unarchiveNotificationAdmin(id: number) {
+  await db
+    .update(notifications)
+    .set({ archivedAt: null })
+    .where(eq(notifications.id, id));
+}
+
 export async function setNotificationReadAdmin(id: number, read: boolean) {
   await db
     .update(notifications)

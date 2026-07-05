@@ -52,7 +52,12 @@ export async function PUT(request: Request, { params }: Params) {
   const active = entries
     .map((entry) => ({
       ...entry,
-      canView: entry.isWeddingCoordinator ? true : entry.canView,
+      canView:
+        entry.isWeddingCoordinator ||
+        entry.canEdit ||
+        entry.canModerateGuestbook
+          ? true
+          : entry.canView,
       canEdit: entry.isWeddingCoordinator ? true : entry.canEdit,
       canModerateGuestbook: entry.isWeddingCoordinator
         ? true

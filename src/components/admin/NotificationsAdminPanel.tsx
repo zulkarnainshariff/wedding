@@ -4,13 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Archive,
+  ArchiveRestore,
   Mail,
   MailOpen,
   Trash2,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SectionShell } from "@/components/layout/PageShell";
-import { SYSTEM_ACCOUNT_USERNAMES } from "@/lib/item-travellers";
 
 type AdminNotification = {
   id: number;
@@ -52,11 +52,13 @@ function NotificationActions({
   item,
   onSetReadState,
   onArchive,
+  onUnarchive,
   onDelete,
 }: {
   item: AdminNotification;
   onSetReadState: (id: number, read: boolean) => void;
   onArchive: (id: number) => void;
+  onUnarchive: (id: number) => void;
   onDelete: (id: number) => void;
 }) {
   const isRead = Boolean(item.readAt);
@@ -76,7 +78,17 @@ function NotificationActions({
           <ReadIcon className="h-4 w-4" />
         </button>
       ) : null}
-      {!item.archivedAt ? (
+      {item.archivedAt ? (
+        <button
+          type="button"
+          onClick={() => onUnarchive(item.id)}
+          className="inline-flex items-center justify-center rounded-lg border border-stone-200 p-1.5 hover:bg-stone-50"
+          title="Unarchive"
+          aria-label="Unarchive"
+        >
+          <ArchiveRestore className="h-4 w-4" />
+        </button>
+      ) : (
         <button
           type="button"
           onClick={() => onArchive(item.id)}
@@ -86,7 +98,7 @@ function NotificationActions({
         >
           <Archive className="h-4 w-4" />
         </button>
-      ) : null}
+      )}
       <button
         type="button"
         onClick={() => onDelete(item.id)}
@@ -186,9 +198,7 @@ export function NotificationsAdminPanel() {
       .then((response) => (response.ok ? response.json() : []))
       .then((users: BriefUser[]) => {
         setUserOptions(
-          users.filter(
-            (user) => !SYSTEM_ACCOUNT_USERNAMES.has(user.username.toLowerCase()),
-          ),
+          [...users].sort((a, b) => a.username.localeCompare(b.username)),
         );
       })
       .catch(() => setUserOptions([]));
@@ -219,6 +229,19 @@ export function NotificationsAdminPanel() {
     });
     if (!response.ok) {
       setStatus("Could not archive notification.");
+      return;
+    }
+    await load();
+  }
+
+  async function unarchive(id: number) {
+    const response = await fetch("/api/system/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, archive: false }),
+    });
+    if (!response.ok) {
+      setStatus("Could not unarchive notification.");
       return;
     }
     await load();
@@ -275,9 +298,9 @@ export function NotificationsAdminPanel() {
     <>
       <SectionShell title="All user notifications">
         <p className="mb-4 text-sm text-stone-500">
-          View, archive, or delete notifications for any user. Click a notification
-          to open its linked item or task. Archived notifications are hidden from
-          user bell menus but remain here when included.
+          View, archive, unarchive, or delete notifications for any user. Click a
+          notification to open its linked item or task. Archived notifications are
+          hidden from user bell menus but remain here when included.
         </p>
 
         <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -362,6 +385,7 @@ export function NotificationsAdminPanel() {
                 item={item}
                 onSetReadState={(id, read) => void setReadState(id, read)}
                 onArchive={(id) => void archive(id)}
+                onUnarchive={(id) => void unarchive(id)}
                 onDelete={(id) => setPendingDeleteIds([id])}
               />
             </div>
@@ -421,6 +445,7 @@ export function NotificationsAdminPanel() {
                       item={item}
                       onSetReadState={(id, read) => void setReadState(id, read)}
                       onArchive={(id) => void archive(id)}
+                      onUnarchive={(id) => void unarchive(id)}
                       onDelete={(id) => setPendingDeleteIds([id])}
                     />
                   </td>
