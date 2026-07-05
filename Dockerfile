@@ -44,6 +44,7 @@ ENV HOSTNAME=0.0.0.0
 CMD ["node", "server.js"]
 
 FROM base AS migrator
+RUN apk add --no-cache postgresql-client
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .

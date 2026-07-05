@@ -20,6 +20,8 @@ services:
       SESSION_SECRET: ${SESSION_SECRET}
       AVIATIONSTACK_ACCESS_KEY: ${AVIATIONSTACK_ACCESS_KEY:-}
       AIRLABS_API_KEY: ${AIRLABS_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - wedding-uploads:/app/data/uploads
       - wedding-dumps:/app/data/dumps
@@ -33,10 +35,13 @@ services:
       target: migrator
     profiles:
       - tools
+    # Host network so localhost in DATABASE_URL reaches Postgres on the DO host.
+    network_mode: host
     env_file:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      MIGRATE_HOST_NETWORK: "1"
 
 volumes:
   wedding-uploads:
