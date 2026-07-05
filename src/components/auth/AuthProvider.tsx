@@ -26,8 +26,13 @@ type AuthContextValue = {
   taskPermissions: TaskPermissionAccess[];
   guestbookEnabled: boolean;
   loading: boolean;
+  elevatedAdmin: boolean;
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
+  elevateAdmin: (
+    password: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
+  dropAdminElevation: () => Promise<void>;
   canView: (category: Category) => boolean;
   canEdit: boolean;
   canManageUsers: boolean;
@@ -110,6 +115,28 @@ export function AuthProvider({
     router.refresh();
   }, [router]);
 
+  const elevateAdmin = useCallback(async (password: string) => {
+    const response = await fetch("/api/auth/elevate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return {
+        ok: false,
+        error: typeof data.error === "string" ? data.error : "Invalid admin password",
+      };
+    }
+    await refreshUser();
+    return { ok: true };
+  }, [refreshUser]);
+
+  const dropAdminElevation = useCallback(async () => {
+    await fetch("/api/auth/de-elevate", { method: "POST" });
+    await refreshUser();
+  }, [refreshUser]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -117,15 +144,28 @@ export function AuthProvider({
       taskPermissions,
       guestbookEnabled,
       loading,
+      elevatedAdmin: Boolean(user?.elevatedAdmin),
       refreshUser,
       logout,
+      elevateAdmin,
+      dropAdminElevation,
       canView: (category) => (user ? canViewCategory(user, category) : false),
       canEdit: user ? canEditItinerary(user) : false,
       canManageUsers: user ? userCanManageUsers(user) : false,
       isAdmin: user?.isAdmin ?? false,
       canAccessDiagnostics: user ? isSuperuser(user) : false,
     }),
-    [user, guestListAccess, taskPermissions, guestbookEnabled, loading, refreshUser, logout],
+    [
+      user,
+      guestListAccess,
+      taskPermissions,
+      guestbookEnabled,
+      loading,
+      refreshUser,
+      logout,
+      elevateAdmin,
+      dropAdminElevation,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

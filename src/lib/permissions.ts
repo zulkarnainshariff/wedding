@@ -36,6 +36,8 @@ export type SessionUser = {
   preferences: UserPreferences;
   /** Lowercase usernames this user is a designated guardian for. */
   guardianForUsernames?: string[];
+  /** Temporary admin privileges via admin password (Linux su-style). */
+  elevatedAdmin?: boolean;
 };
 
 export const DEFAULT_PERMISSIONS: UserPermissions = {

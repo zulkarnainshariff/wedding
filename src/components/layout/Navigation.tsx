@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { AppMark } from "@/components/ui/AppMark";
 import { SidebarSyncIconButton } from "@/components/auth/SidebarSyncIconButton";
+import { AdminElevationControl } from "@/components/auth/AdminElevationControl";
 import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigationGuard } from "@/components/layout/NavigationGuard";
@@ -210,7 +211,10 @@ function SignedInRow({ username }: { username: string }) {
           {formatUsername(username)}
         </span>
       </span>
-      <SidebarSyncIconButton />
+      <div className="flex shrink-0 items-center gap-1">
+        <AdminElevationControl />
+        <SidebarSyncIconButton />
+      </div>
     </div>
   );
 }
@@ -277,7 +281,8 @@ export function Sidebar({ compact = false }: { compact?: boolean }) {
         <DevModePanel compact={compact} />
         {!compact && user && <SignedInRow username={user.username} />}
         {compact && user && (
-          <div className="flex justify-center py-1">
+          <div className="flex flex-col items-center gap-1 py-1">
+            <AdminElevationControl compact />
             <SidebarSyncIconButton />
           </div>
         )}
