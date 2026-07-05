@@ -1,6 +1,7 @@
-import { and, desc, eq, inArray, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getWeddingCoordinatorUserIdsForEvent } from "@/lib/guest-queries";
+import { ROLE_ADMIN } from "@/lib/role-levels";
 import {
   notifications,
   taskReminders,
@@ -57,12 +58,23 @@ export async function notifyWeddingCoordinatorsOnGuestInvite(input: {
   guestId: number;
 }) {
   const coordinatorIds = await getWeddingCoordinatorUserIdsForEvent(input.eventId);
-
   if (!coordinatorIds.length) return;
 
+  const eligible = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(
+        inArray(users.id, coordinatorIds),
+        gt(users.roleLevel, ROLE_ADMIN),
+      ),
+    );
+
+  if (!eligible.length) return;
+
   await db.insert(notifications).values(
-    coordinatorIds.map((userId) => ({
-      userId,
+    eligible.map((row) => ({
+      userId: row.id,
       type: "guest_invited",
       title: "New guest invitation",
       body: input.guestLabel,

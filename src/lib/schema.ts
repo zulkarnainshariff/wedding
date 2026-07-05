@@ -188,6 +188,8 @@ export const guestMembers = pgTable("guest_members", {
     .notNull()
     .references(() => guests.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
+  under13: boolean("under_13").default(false).notNull(),
+  attending: boolean("attending").default(true).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
 });
 

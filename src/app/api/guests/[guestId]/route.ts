@@ -14,8 +14,13 @@ function resolveRsvpAttendingCount(
   body: Record<string, unknown>,
   existing: typeof guests.$inferSelect,
   expectedHeadcount: number,
+  attendingMemberCount?: number,
 ): number | null {
   if (rsvpStatus !== "attending") return null;
+
+  if (typeof attendingMemberCount === "number" && attendingMemberCount > 0) {
+    return attendingMemberCount;
+  }
 
   if (body.rsvpAttendingCount !== undefined && body.rsvpAttendingCount !== null) {
     return Math.max(1, Number(body.rsvpAttendingCount) || expectedHeadcount);
@@ -51,7 +56,11 @@ export async function PUT(request: Request, { params }: Params) {
 
   try {
     const body = await request.json();
-    const members: { name: string }[] = Array.isArray(body.members) ? body.members : [];
+    const members: {
+      name: string;
+      under13?: boolean;
+      attending?: boolean;
+    }[] = Array.isArray(body.members) ? body.members : [];
     const expectedHeadcount = Math.max(
       1,
       Number(body.expectedHeadcount) || existing.expectedHeadcount,
@@ -59,6 +68,19 @@ export async function PUT(request: Request, { params }: Params) {
     const rsvpStatus = isRsvpStatus(body.rsvpStatus)
       ? body.rsvpStatus
       : existing.rsvpStatus;
+    const savedMembers = members
+      .filter((member) => member.name?.trim())
+      .map((member, index) => ({
+        guestId,
+        name: member.name.trim(),
+        under13: Boolean(member.under13),
+        attending: member.attending !== false,
+        sortOrder: index,
+      }));
+    const attendingMemberCount =
+      rsvpStatus === "attending"
+        ? savedMembers.filter((member) => member.attending).length || expectedHeadcount
+        : undefined;
 
     await db
       .update(guests)
@@ -73,6 +95,7 @@ export async function PUT(request: Request, { params }: Params) {
           body,
           existing,
           expectedHeadcount,
+          attendingMemberCount,
         ),
         rsvpNotes:
           body.rsvpNotes !== undefined ? body.rsvpNotes : existing.rsvpNotes,
@@ -89,14 +112,8 @@ export async function PUT(request: Request, { params }: Params) {
       .where(eq(guests.id, guestId));
 
     await db.delete(guestMembers).where(eq(guestMembers.guestId, guestId));
-    if (members.length > 0) {
-      await db.insert(guestMembers).values(
-        members.map((member, index) => ({
-          guestId,
-          name: member.name,
-          sortOrder: index,
-        })),
-      );
+    if (savedMembers.length > 0) {
+      await db.insert(guestMembers).values(savedMembers);
     }
 
     const full = await getGuestsForEvent(existing.eventId);
