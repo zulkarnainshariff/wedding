@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { resolveDatabaseUrl } from "./runtime-env";
+import { resolveDatabaseUrl } from "./database-url";
 import * as schema from "./schema";
 
 const globalForDb = globalThis as unknown as {

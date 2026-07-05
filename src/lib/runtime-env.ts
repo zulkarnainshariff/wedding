@@ -1,5 +1,12 @@
 import { existsSync } from "node:fs";
 
+import {
+  rewriteLocalhostForDockerReachability,
+  resolveDatabaseUrl,
+} from "./database-url";
+
+export { resolveDatabaseUrl };
+
 export function isRunningInContainer(): boolean {
   if (process.env.RUNNING_IN_CONTAINER === "1") return true;
   return existsSync("/.dockerenv");
@@ -13,19 +20,8 @@ export function isDockerCliAvailable(): boolean {
   );
 }
 
-function rewriteLocalhostForDockerReachability(databaseUrl: string): string {
-  if (databaseUrl.includes("@localhost")) {
-    return databaseUrl.replace("@localhost", "@host.docker.internal");
-  }
-  if (databaseUrl.includes("127.0.0.1")) {
-    return databaseUrl.replace("127.0.0.1", "host.docker.internal");
-  }
-  return databaseUrl;
-}
-
-/** Resolve DATABASE_URL for app/CLI use inside or via Docker. */
-export function resolveDatabaseUrl(databaseUrl: string): string {
-  // migrate service uses network_mode: host — localhost is the host Postgres.
+/** CLI dump/restore: also rewrite when host tools talk to Dockerized Postgres. */
+export function resolveDatabaseUrlForCli(databaseUrl: string): string {
   if (process.env.MIGRATE_HOST_NETWORK === "1") {
     return databaseUrl;
   }
@@ -33,11 +29,6 @@ export function resolveDatabaseUrl(databaseUrl: string): string {
     return rewriteLocalhostForDockerReachability(databaseUrl);
   }
   return databaseUrl;
-}
-
-/** @deprecated Use resolveDatabaseUrl */
-export function resolveDatabaseUrlForCli(databaseUrl: string): string {
-  return resolveDatabaseUrl(databaseUrl);
 }
 
 export function defaultDumpDirectory(): string {
