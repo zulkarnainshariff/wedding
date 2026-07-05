@@ -22,9 +22,6 @@ export function isDockerCliAvailable(): boolean {
 
 /** CLI dump/restore: also rewrite when host tools talk to Dockerized Postgres. */
 export function resolveDatabaseUrlForCli(databaseUrl: string): string {
-  if (process.env.MIGRATE_HOST_NETWORK === "1") {
-    return databaseUrl;
-  }
   if (isRunningInContainer() || isDockerCliAvailable()) {
     return rewriteLocalhostForDockerReachability(databaseUrl);
   }

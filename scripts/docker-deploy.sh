@@ -28,8 +28,9 @@ echo "Building images..."
 docker compose build wedding
 docker compose --profile tools build migrate
 
-echo "Stopping existing containers (release DB connections before migrate)..."
-docker compose down --remove-orphans || true
+echo "Stopping app container (release DB connections before migrate)..."
+# Stop only the app — keep the compose network so DATABASE_URL hostnames (e.g. db) still resolve.
+docker compose stop wedding || true
 # Remove orphaned recreate stubs left by interrupted deploys (e.g. <hash>_wedding-app).
 if ids="$(docker ps -aq --filter "name=wedding-app" 2>/dev/null)"; then
   # shellcheck disable=SC2086
@@ -42,7 +43,7 @@ if ! docker compose --profile tools run --rm --no-deps --entrypoint sh migrate -
   if ! pg_isready -d "$DATABASE_URL" -t 15 >/dev/null 2>&1; then
     echo "Cannot reach Postgres (pg_isready failed)." >&2
     echo "DATABASE_URL host must be reachable from the migrate container." >&2
-    echo "For host Postgres, use localhost in .env — migrate runs with host networking." >&2
+    echo "Check DATABASE_URL and that Postgres is reachable on the compose network." >&2
     pg_isready -d "$DATABASE_URL" -t 3 || true
     exit 1
   fi
@@ -58,6 +59,7 @@ if ! docker compose --profile tools run --rm --no-deps migrate; then
 fi
 
 echo "Starting app on 127.0.0.1:3102..."
+docker compose down --remove-orphans || true
 docker compose up -d --remove-orphans
 
 echo "Done. Container status:"

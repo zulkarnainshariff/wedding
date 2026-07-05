@@ -35,13 +35,13 @@ services:
       target: migrator
     profiles:
       - tools
-    # Host network so localhost in DATABASE_URL reaches Postgres on the DO host.
-    network_mode: host
     env_file:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
-      MIGRATE_HOST_NETWORK: "1"
+      RUNNING_IN_CONTAINER: "1"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   wedding-uploads:

@@ -14,10 +14,6 @@ export function rewriteLocalhostForDockerReachability(
 
 /** Resolve DATABASE_URL for the app and migrate container. */
 export function resolveDatabaseUrl(databaseUrl: string): string {
-  // migrate service uses network_mode: host — localhost is the host Postgres.
-  if (process.env.MIGRATE_HOST_NETWORK === "1") {
-    return databaseUrl;
-  }
   if (process.env.RUNNING_IN_CONTAINER === "1") {
     return rewriteLocalhostForDockerReachability(databaseUrl);
   }
