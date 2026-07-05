@@ -41,6 +41,7 @@ export async function GET() {
       permissions: user.permissions,
       preferences: user.preferences,
       guardianForUsernames: user.guardianForUsernames ?? [],
+      elevatedAdmin: Boolean(user.elevatedAdmin),
       canAccessDiagnostics: isSuperuser(user),
       guestListAccess,
       taskPermissions,

@@ -8,6 +8,7 @@ import {
 } from "@/lib/invitation-types";
 import type { SessionUser } from "@/lib/permissions";
 import { isAdminSession } from "@/lib/role-levels";
+import { getGuestListAccessForUser } from "@/lib/guest-queries";
 import { travellerMatchesUsername } from "@/lib/item-travellers";
 import { guestMembers, guests, publicScheduleItems, weddingEvents } from "@/lib/schema";
 
@@ -158,6 +159,12 @@ export async function getInvitationEventsForUser(
   }
 
   const matchingEventIds = new Set<number>();
+
+  const guestListAccess = await getGuestListAccessForUser(user);
+  for (const entry of guestListAccess) {
+    matchingEventIds.add(entry.eventId);
+  }
+
   for (const guest of guestRows) {
     const names = [guest.label, ...(membersByGuestId.get(guest.guestId) ?? [])];
     if (

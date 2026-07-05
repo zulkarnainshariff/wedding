@@ -5,11 +5,16 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "./db";
 import {
+  ADMIN_PERMISSIONS,
   normalizePermissions,
   type SessionUser,
   type UserPermissions,
 } from "./permissions";
-import { isAdminSession, roleLevelFromDb } from "./role-levels";
+import {
+  isAdminSession,
+  roleLevelFromDb,
+  ROLE_ADMIN,
+} from "./role-levels";
 import { users } from "./schema";
 import { getWardUsernamesForGuardian } from "./user-guardians-server";
 import {
@@ -27,6 +32,11 @@ type SessionPayload = {
   permissions: UserPermissions;
   tokenVersion: number;
   preferences: UserPreferences;
+  adminElevated?: boolean;
+};
+
+export type SessionTokenOptions = {
+  adminElevated?: boolean;
 };
 
 function getSessionSecret() {
@@ -48,21 +58,46 @@ export async function verifyPassword(
   return bcrypt.compare(password, passwordHash);
 }
 
-export async function createSessionToken(user: {
-  id: number;
-  username: string;
-  isAdmin: boolean;
-  permissions: UserPermissions;
-  tokenVersion: number;
-  preferences: UserPreferences;
-}): Promise<string> {
-  return new SignJWT({
+export function applyAdminElevation(
+  user: SessionUser,
+  adminElevated: boolean,
+): SessionUser {
+  if (!adminElevated || isAdminSession(user.roleLevel)) {
+    return { ...user, elevatedAdmin: false };
+  }
+
+  return {
+    ...user,
+    isAdmin: true,
+    roleLevel: ROLE_ADMIN,
+    permissions: ADMIN_PERMISSIONS,
+    elevatedAdmin: true,
+  };
+}
+
+export async function createSessionToken(
+  user: {
+    id: number;
+    username: string;
+    isAdmin: boolean;
+    permissions: UserPermissions;
+    tokenVersion: number;
+    preferences: UserPreferences;
+  },
+  options?: SessionTokenOptions,
+): Promise<string> {
+  const payload: Omit<SessionPayload, "sub"> = {
     username: user.username,
     isAdmin: user.isAdmin,
     permissions: user.permissions,
     tokenVersion: user.tokenVersion,
     preferences: user.preferences,
-  } satisfies Omit<SessionPayload, "sub">)
+  };
+  if (options?.adminElevated) {
+    payload.adminElevated = true;
+  }
+
+  return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(String(user.id))
     .setIssuedAt()
@@ -115,16 +150,24 @@ export async function verifySessionToken(
 
     const roleLevel = roleLevelFromDb(row.roleLevel, row.isAdmin);
     const guardianForUsernames = await getWardUsernamesForGuardian(row.id);
+    const adminElevated = Boolean(payload.adminElevated);
 
-    return {
-      id: row.id,
-      username: row.username,
-      roleLevel,
-      isAdmin: isAdminSession(roleLevel),
-      permissions: normalizePermissions(row.permissions, row.isAdmin, row.username),
-      preferences: normalizeUserPreferences(row.preferences),
-      guardianForUsernames,
-    };
+    return applyAdminElevation(
+      {
+        id: row.id,
+        username: row.username,
+        roleLevel,
+        isAdmin: isAdminSession(roleLevel),
+        permissions: normalizePermissions(
+          row.permissions,
+          row.isAdmin,
+          row.username,
+        ),
+        preferences: normalizeUserPreferences(row.preferences),
+        guardianForUsernames,
+      },
+      adminElevated,
+    );
   } catch {
     return null;
   }
@@ -196,15 +239,23 @@ export async function authenticateUser(
 
 export async function issueSessionForUser(
   user: typeof users.$inferSelect,
+  options?: SessionTokenOptions,
 ): Promise<string> {
-  return createSessionToken({
-    id: user.id,
-    username: user.username,
-    isAdmin: user.isAdmin,
-    permissions: normalizePermissions(user.permissions, user.isAdmin, user.username),
-    tokenVersion: user.tokenVersion,
-    preferences: normalizeUserPreferences(user.preferences),
-  });
+  return createSessionToken(
+    {
+      id: user.id,
+      username: user.username,
+      isAdmin: user.isAdmin,
+      permissions: normalizePermissions(
+        user.permissions,
+        user.isAdmin,
+        user.username,
+      ),
+      tokenVersion: user.tokenVersion,
+      preferences: normalizeUserPreferences(user.preferences),
+    },
+    options,
+  );
 }
 
 export async function getUserById(id: number) {

@@ -81,17 +81,24 @@ export function GuestListPanel({
   const [busy, setBusy] = useState(false);
 
   const selectedAccess = access.find((entry) => entry.eventId === selectedId);
-  const canEdit = selectedAccess?.canEdit ?? false;
-  const canOpenSettings = canEdit || canManagePermissions;
+  const canViewGuests = Boolean(
+    selectedAccess?.canView ||
+      selectedAccess?.canEdit ||
+      selectedAccess?.isWeddingCoordinator,
+  );
+  const canManageGuests = Boolean(
+    selectedAccess?.canEdit || selectedAccess?.isWeddingCoordinator,
+  );
+  const canOpenSettings = canManageGuests || canManagePermissions;
 
   const tabs = useMemo(() => {
     const items: { id: PanelTab; label: string }[] = [
       { id: "summary", label: "Summary" },
     ];
-    if (canEdit) items.push({ id: "invitations", label: "Invitations" });
+    if (canViewGuests) items.push({ id: "invitations", label: "Invitations" });
     if (canOpenSettings) items.push({ id: "settings", label: "Settings" });
     return items;
-  }, [canEdit, canOpenSettings]);
+  }, [canViewGuests, canOpenSettings]);
 
   const summaryStats = useMemo(() => {
     const statusCounts = Object.fromEntries(
@@ -423,12 +430,12 @@ export function GuestListPanel({
         </>
       )}
 
-      {activeTab === "invitations" && canEdit && (
+      {activeTab === "invitations" && canViewGuests && (
         <>
           <div className="divide-y divide-stone-100">
             {guests.map((guest) => (
               <div key={guest.id} className="py-4">
-                {editingId === guest.id ? (
+                {canManageGuests && editingId === guest.id ? (
                   <GuestForm
                     value={editForm}
                     onChange={setEditForm}
@@ -457,52 +464,56 @@ export function GuestListPanel({
                         <p className="mt-1 text-sm text-stone-500">{guest.rsvpNotes}</p>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void copyRsvpLink(guest.inviteToken)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
-                      >
-                        <Copy className="h-4 w-4" />
-                        Copy RSVP link
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => startEdit(guest)}
-                        className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void deleteGuest(guest.id)}
-                        className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                    {canManageGuests ? (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void copyRsvpLink(guest.inviteToken)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
+                        >
+                          <Copy className="h-4 w-4" />
+                          Copy RSVP link
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(guest)}
+                          className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteGuest(guest.id)}
+                          className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </div>
             ))}
           </div>
 
-          <div className="mt-6 rounded-xl border border-dashed border-stone-300 p-4">
-            <p className="text-sm font-medium text-stone-600">Add guest invite</p>
-            <GuestForm
-              value={newGuest}
-              onChange={setNewGuest}
-              onSave={() => void addGuest()}
-              busy={busy}
-              submitLabel="Add guest"
-            />
-          </div>
+          {canManageGuests ? (
+            <div className="mt-6 rounded-xl border border-dashed border-stone-300 p-4">
+              <p className="text-sm font-medium text-stone-600">Add guest invite</p>
+              <GuestForm
+                value={newGuest}
+                onChange={setNewGuest}
+                onSave={() => void addGuest()}
+                busy={busy}
+                submitLabel="Add guest"
+              />
+            </div>
+          ) : null}
         </>
       )}
 
       {activeTab === "settings" && canOpenSettings && (
         <>
-          {canEdit && (
+          {canManageGuests && (
             <>
               <h3 className="text-sm font-semibold tracking-wide text-stone-600 uppercase">
                 RSVP settings
@@ -589,7 +600,7 @@ export function GuestListPanel({
           )}
 
           {canManagePermissions && (
-            <div className={canEdit ? "mt-8" : ""}>
+            <div className={canManageGuests ? "mt-8" : ""}>
               <h3 className="text-sm font-semibold tracking-wide text-stone-600 uppercase">
                 Guest list access
               </h3>
@@ -663,6 +674,10 @@ export function GuestListPanel({
                                     ...entry,
                                     isWeddingCoordinator: e.target.checked,
                                     canView: e.target.checked ? true : entry.canView,
+                                    canEdit: e.target.checked ? true : entry.canEdit,
+                                    canModerateGuestbook: e.target.checked
+                                      ? true
+                                      : entry.canModerateGuestbook,
                                   }
                                 : entry,
                             ),
