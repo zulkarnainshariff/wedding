@@ -23,7 +23,7 @@ export default async function GuestsPage() {
     <AppShell>
       <PageShell eyebrow="Celebrate" title="Guest lists">
         <div className="mx-auto flex w-full max-w-5xl flex-col">
-          <GuestListClient events={events} />
+          <GuestListClient events={events} initialAccess={access} />
         </div>
       </PageShell>
     </AppShell>
