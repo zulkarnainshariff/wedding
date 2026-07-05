@@ -31,8 +31,16 @@ docker compose --profile tools build migrate
 echo "Pushing database schema..."
 docker compose --profile tools run --rm migrate
 
+echo "Stopping existing containers..."
+docker compose down --remove-orphans || true
+# Remove orphaned recreate stubs left by interrupted deploys (e.g. <hash>_wedding-app).
+if ids="$(docker ps -aq --filter "name=wedding-app" 2>/dev/null)"; then
+  # shellcheck disable=SC2086
+  [ -n "$ids" ] && docker rm -f $ids >/dev/null 2>&1 || true
+fi
+
 echo "Starting app on 127.0.0.1:3102..."
-docker compose up -d
+docker compose up -d --remove-orphans
 
 echo "Done. Container status:"
 docker compose ps
