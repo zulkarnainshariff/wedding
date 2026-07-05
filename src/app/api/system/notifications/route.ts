@@ -6,6 +6,7 @@ import {
   deleteNotificationsAdmin,
   listAllNotifications,
   setNotificationReadAdmin,
+  unarchiveNotificationAdmin,
 } from "@/lib/notification-service";
 
 export async function GET(request: Request) {
@@ -33,8 +34,13 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Notification id is required." }, { status: 400 });
   }
 
-  if (body.archive) {
+  if (body.archive === true) {
     await archiveNotificationAdmin(body.id);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.archive === false) {
+    await unarchiveNotificationAdmin(body.id);
     return NextResponse.json({ ok: true });
   }
 

@@ -100,6 +100,13 @@ export function GuestListPanel({
     return items;
   }, [canViewGuests, canOpenSettings]);
 
+  const accessHint =
+    !canManageGuests && canViewGuests
+      ? "View-only access — you can see guest invites but cannot edit them or change RSVP settings."
+      : !canViewGuests && !canOpenSettings && selectedAccess
+        ? "Summary only — ask an admin to grant View, Edit, or Wedding coordinator access for this event."
+        : null;
+
   const summaryStats = useMemo(() => {
     const statusCounts = Object.fromEntries(
       RSVP_STATUSES.map((s) => [s, 0]),
@@ -125,6 +132,7 @@ export function GuestListPanel({
   async function loadEventData(eventId: number) {
     setBusy(true);
     setError(null);
+    setGuests([]);
     try {
       const [guestRes, settingsRes] = await Promise.all([
         fetch(`/api/guests/events/${eventId}/guests`),
@@ -132,6 +140,8 @@ export function GuestListPanel({
       ]);
       if (guestRes.ok) {
         setGuests(await guestRes.json());
+      } else if (guestRes.status === 403) {
+        setError("You do not have permission to view invitations for this event.");
       }
       if (settingsRes.ok) {
         const settings = await settingsRes.json();
@@ -177,6 +187,8 @@ export function GuestListPanel({
   function selectEvent(eventId: number) {
     setSelectedId(eventId);
     setEditingId(null);
+    setError(null);
+    setActiveTab("summary");
   }
 
   useEffect(() => {
@@ -381,6 +393,17 @@ export function GuestListPanel({
         </>
       }
     >
+
+      {accessHint ? (
+        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {accessHint}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
 
       {activeTab === "summary" && (
         <>
