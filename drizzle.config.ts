@@ -1,6 +1,6 @@
 import { defineConfig } from "drizzle-kit";
 import "dotenv/config";
-import { resolveDatabaseUrl } from "./src/lib/runtime-env";
+import { resolveDatabaseUrl } from "./src/lib/database-url";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
