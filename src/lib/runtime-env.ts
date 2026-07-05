@@ -13,12 +13,7 @@ export function isDockerCliAvailable(): boolean {
   );
 }
 
-/** When the app runs in Docker, use the service DATABASE_URL as-is. */
-export function resolveDatabaseUrlForCli(databaseUrl: string): string {
-  if (isRunningInContainer()) {
-    return databaseUrl;
-  }
-
+function rewriteLocalhostForDockerReachability(databaseUrl: string): string {
   if (databaseUrl.includes("@localhost")) {
     return databaseUrl.replace("@localhost", "@host.docker.internal");
   }
@@ -26,6 +21,23 @@ export function resolveDatabaseUrlForCli(databaseUrl: string): string {
     return databaseUrl.replace("127.0.0.1", "host.docker.internal");
   }
   return databaseUrl;
+}
+
+/** Resolve DATABASE_URL for app/CLI use inside or via Docker. */
+export function resolveDatabaseUrl(databaseUrl: string): string {
+  // migrate service uses network_mode: host — localhost is the host Postgres.
+  if (process.env.MIGRATE_HOST_NETWORK === "1") {
+    return databaseUrl;
+  }
+  if (isRunningInContainer() || isDockerCliAvailable()) {
+    return rewriteLocalhostForDockerReachability(databaseUrl);
+  }
+  return databaseUrl;
+}
+
+/** @deprecated Use resolveDatabaseUrl */
+export function resolveDatabaseUrlForCli(databaseUrl: string): string {
+  return resolveDatabaseUrl(databaseUrl);
 }
 
 export function defaultDumpDirectory(): string {
