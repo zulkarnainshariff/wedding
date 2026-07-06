@@ -181,6 +181,12 @@ export function ItineraryUIProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!selectedItemId || isClosingItem) {
       document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      for (const element of document.querySelectorAll<HTMLElement>(
+        "[data-page-scroll]",
+      )) {
+        element.style.overflow = "";
+      }
       return;
     }
 
@@ -189,10 +195,22 @@ export function ItineraryUIProvider({ children }: { children: React.ReactNode })
     };
 
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    for (const element of document.querySelectorAll<HTMLElement>(
+      "[data-page-scroll]",
+    )) {
+      element.style.overflow = "hidden";
+    }
     window.addEventListener("keydown", onKeyDown);
 
     return () => {
       document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      for (const element of document.querySelectorAll<HTMLElement>(
+        "[data-page-scroll]",
+      )) {
+        element.style.overflow = "";
+      }
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [selectedItemId, isClosingItem, closeItem]);
