@@ -15,8 +15,10 @@ import type { ItineraryItem } from "@/lib/schema";
 
 export function TravelInsurancePanel({
   initialItems,
+  embedded = false,
 }: {
   initialItems: ItineraryItem[];
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const existing = initialItems.find((item) => item.category === "travel_insurance");
@@ -70,11 +72,12 @@ export function TravelInsurancePanel({
     router.refresh();
   }
 
-  return (
-    <SectionShell title="Travel insurance">
+  const body = (
+    <>
       <p className="mb-4 text-sm text-stone-500">
-        Add or update the family travel insurance policy. This appears in the
-        itinerary for everyone who can view travel insurance.
+        {itemId
+          ? "Update the family travel insurance policy. Changes appear in the itinerary for everyone who can view travel insurance."
+          : "Add the family travel insurance policy. It will appear in the itinerary for everyone who can view travel insurance."}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -130,8 +133,14 @@ export function TravelInsurancePanel({
         className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
         <Save className="h-4 w-4" />
-        {itemId ? "Save changes" : "Create travel insurance item"}
+        {itemId ? "Save changes" : "Add travel insurance"}
       </button>
-    </SectionShell>
+    </>
   );
+
+  if (embedded) {
+    return body;
+  }
+
+  return <SectionShell title="Travel insurance">{body}</SectionShell>;
 }

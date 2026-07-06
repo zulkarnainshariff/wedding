@@ -4,7 +4,8 @@ import { FlightsPanel } from "@/components/itinerary/FlightsPanel";
 import { ScheduleByDate } from "@/components/itinerary/ScheduleByDate";
 import { getSessionUser } from "@/lib/auth";
 import { canViewCategory } from "@/lib/permissions";
-import { getItemsByCategory, getScheduleByDate } from "@/lib/queries";
+import { getItemsByCategory, getAllItems, getScheduleByDate } from "@/lib/queries";
+import { TravelInsuranceItinerary } from "@/components/itinerary/TravelInsuranceItinerary";
 import { isCategory } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,14 @@ export default async function CategoryPage({ params, searchParams }: Params & Se
         initialTab={initialTab}
       />
     );
+  }
+
+  if (category === "travel_insurance") {
+    const [items, allItems] = await Promise.all([
+      getItemsByCategory("travel_insurance"),
+      getAllItems(),
+    ]);
+    return <TravelInsuranceItinerary items={items} allItems={allItems} />;
   }
 
   const items = await getItemsByCategory(category);
