@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
+import { useCategories } from "@/components/categories/CategoriesProvider";
 import {
-  DOCUMENT_CATEGORIES,
-  defaultDocumentCategoryForItem,
   documentCategoryLabel,
+  defaultDocumentCategoryForItem,
   type DocumentCategory,
 } from "@/lib/document-categories";
 import {
@@ -77,9 +77,10 @@ export function DocumentEditForm({
   ) => Promise<void>;
   travellerEmptyMessage?: string;
 }) {
+  const { documentCategories } = useCategories();
   const [label, setLabel] = useState(doc.label);
   const [category, setCategory] = useState<DocumentCategory>(
-    defaultDocumentCategoryForItem(doc.category),
+    defaultDocumentCategoryForItem(doc.category, documentCategories),
   );
   const [coveredTravellers, setCoveredTravellers] = useState(() =>
     parseCoveredTravellers(doc),
@@ -122,9 +123,9 @@ export function DocumentEditForm({
           }
           className="w-full rounded-lg border border-stone-200 px-3 py-2"
         >
-          {DOCUMENT_CATEGORIES.map((entry) => (
-            <option key={entry} value={entry}>
-              {documentCategoryLabel(entry)}
+          {documentCategories.map((entry) => (
+            <option key={entry.slug} value={entry.slug}>
+              {documentCategoryLabel(entry.slug, documentCategories)}
             </option>
           ))}
         </select>

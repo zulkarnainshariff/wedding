@@ -4,13 +4,13 @@ import {
   defaultDocumentCategoryForItem,
   type DocumentCategory,
 } from "@/lib/document-categories";
+import { getDocumentCategories, getItemCategories } from "@/lib/app-categories";
 import { filterVisibleDocuments, canViewStandaloneDocument } from "@/lib/item-documents";
 import { isSharedDocument, parseCoveredTravellers, parseExtraViewers } from "@/lib/item-document-utils";
 import { filterItemsByPermission } from "@/lib/permissions";
 import type { SessionUser } from "@/lib/permissions";
 import { itemDocuments, itineraryItems } from "@/lib/schema";
 import type { Category } from "@/lib/types";
-import { isCategory } from "@/lib/types";
 
 export type DocumentListEntry = {
   id: number;
@@ -33,6 +33,8 @@ export type DocumentViewMode = "item_type" | "document_category" | "user";
 function toListEntry(
   doc: (typeof itemDocuments.$inferSelect),
   item: (typeof itineraryItems.$inferSelect) | null,
+  documentCategoryRows: Awaited<ReturnType<typeof getDocumentCategories>>,
+  itemCategorySlugs: Set<string>,
 ): DocumentListEntry {
   return {
     id: doc.id,
@@ -42,11 +44,14 @@ function toListEntry(
     createdAt: doc.createdAt.toISOString(),
     coversTravellers: parseCoveredTravellers(doc),
     extraViewers: parseExtraViewers(doc.extraViewers),
-    category: defaultDocumentCategoryForItem(doc.category),
+    category: defaultDocumentCategoryForItem(doc.category, documentCategoryRows),
     isShared: isSharedDocument(doc),
     itemId: item?.id ?? null,
     itemTitle: item?.title ?? null,
-    itemCategory: item && isCategory(item.category) ? item.category : null,
+    itemCategory:
+      item && itemCategorySlugs.has(item.category)
+        ? (item.category as Category)
+        : null,
     itemStartDatetime: item?.startDatetime
       ? item.startDatetime.toISOString()
       : null,
@@ -54,6 +59,11 @@ function toListEntry(
 }
 
 async function loadVisibleDocumentRows(user: SessionUser) {
+  const [documentCategoryRows, itemCategoryRows] = await Promise.all([
+    getDocumentCategories(),
+    getItemCategories(),
+  ]);
+  const itemCategorySlugs = new Set(itemCategoryRows.map((row) => row.slug));
   const docs = await db.select().from(itemDocuments);
   if (docs.length === 0) {
     return [] as DocumentListEntry[];
@@ -84,7 +94,7 @@ async function loadVisibleDocumentRows(user: SessionUser) {
   for (const doc of docs) {
     if (doc.itemId == null) {
       if (canViewStandaloneDocument(doc, user)) {
-        entries.push(toListEntry(doc, null));
+        entries.push(toListEntry(doc, null, documentCategoryRows, itemCategorySlugs));
       }
       continue;
     }
@@ -94,7 +104,7 @@ async function loadVisibleDocumentRows(user: SessionUser) {
 
     const visible = filterVisibleDocuments([doc], item, user);
     if (visible.length > 0) {
-      entries.push(toListEntry(doc, item));
+      entries.push(toListEntry(doc, item, documentCategoryRows, itemCategorySlugs));
     }
   }
 

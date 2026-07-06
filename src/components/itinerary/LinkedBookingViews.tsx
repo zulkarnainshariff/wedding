@@ -8,10 +8,10 @@ import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { useLinkedItem } from "@/hooks/useLinkedItem";
 import { formatBookingGroupsDisplay } from "@/lib/booking-groups";
 import {
-  CATEGORY_META,
   getAccommodationDetails,
   getCarRentalDetails,
   getFlightDetails,
+  getLegacyCategoryMeta,
   isCategory,
 } from "@/lib/types";
 import type { ItineraryItem } from "@/lib/schema";
@@ -146,7 +146,9 @@ export function LinkedBookingCardPreview({
   if (!linkedItem) return null;
 
   const category = isCategory(linkedItem.category) ? linkedItem.category : null;
-  const categoryLabel = category ? CATEGORY_META[category].label : "Booking";
+  const categoryLabel = category
+    ? (getLegacyCategoryMeta(category)?.label ?? category)
+    : "Booking";
 
   return (
     <div className="mt-3 border-t border-stone-100 pt-3">
@@ -182,7 +184,9 @@ export function LinkedBookingDetailSection({
   canEdit?: boolean;
 }) {
   const category = isCategory(linkedItem.category) ? linkedItem.category : null;
-  const categoryLabel = category ? CATEGORY_META[category].label : "Booking";
+  const categoryLabel = category
+    ? (getLegacyCategoryMeta(category)?.label ?? category)
+    : "Booking";
 
   return (
     <div className="border-t border-stone-100 pt-4">

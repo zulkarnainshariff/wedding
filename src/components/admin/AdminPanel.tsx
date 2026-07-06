@@ -15,6 +15,7 @@ import { GuestbookManagementPanel } from "./GuestbookManagementPanel";
 import { LandingPagePanel } from "./LandingPagePanel";
 import { TripDaysPanel } from "./TripDaysPanel";
 import { TbcItemsPanel } from "./TbcItemsPanel";
+import { CategoryManagementPanel } from "./CategoryManagementPanel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { GuestListClient } from "@/components/guests/GuestListClient";
 import { TaskPermissionsPanel } from "./TaskPermissionsPanel";
@@ -36,7 +37,7 @@ import { useUnsavedChangesGuard } from "@/components/layout/NavigationGuard";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { DocumentsPanelContent } from "@/components/itinerary/DocumentsPanel";
 import { PageShell, SectionShell } from "@/components/layout/PageShell";
-import { CATEGORY_META, CATEGORIES, type Category } from "@/lib/types";
+import { useCategories } from "@/components/categories/CategoriesProvider";
 import type { AppThemeId } from "@/lib/app-theme";
 import type {
   PublicInvitationEvent,
@@ -50,6 +51,7 @@ type AdminTab =
   | "items"
   | "documents"
   | "tbc"
+  | "categories"
   | "users"
   | "invitations"
   | "landing"
@@ -116,6 +118,7 @@ export function AdminPanel({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const { itemCategories, getMeta } = useCategories();
   const [tab, setTab] = useState<AdminTab>(showFullAdmin ? "days" : "insurance");
   const [days, setDays] = useState(initialDays);
   const assignableDays = useMemo(
@@ -167,6 +170,7 @@ export function AdminPanel({
         "items",
         "documents",
         "tbc",
+        "categories",
         "invitations",
         "landing",
         "guests",
@@ -202,6 +206,7 @@ export function AdminPanel({
         ["days", "All days"],
         ["items", "Items"],
         ...itineraryExtraTabs,
+        ["categories", "Categories"],
         ["invitations", "Invitations"],
         ["landing", "Landing page"],
         ["guests", "Guest lists"],
@@ -571,7 +576,7 @@ export function AdminPanel({
                   <select
                     value={itemForm.category}
                     onChange={(e) => {
-                      const category = e.target.value as Category;
+                      const category = e.target.value;
                       setItemForm({
                         ...itemForm,
                         category,
@@ -580,9 +585,9 @@ export function AdminPanel({
                     }}
                     className="w-full rounded-lg border border-stone-200 px-3 py-2"
                   >
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {CATEGORY_META[c].label}
+                    {itemCategories.map((c) => (
+                      <option key={c.slug} value={c.slug}>
+                        {c.label}
                       </option>
                     ))}
                   </select>
@@ -656,7 +661,7 @@ export function AdminPanel({
               </div>
 
               <h3 className="mt-6 text-sm font-semibold tracking-wide text-stone-600 uppercase">
-                {CATEGORY_META[itemForm.category].label} details
+                {getMeta(itemForm.category)?.label ?? itemForm.category} details
               </h3>
               <AdminItemDetailsForm
                 category={itemForm.category}
@@ -747,7 +752,7 @@ export function AdminPanel({
                   <div className="min-w-0">
                     <p className="truncate font-medium text-stone-800">{item.title}</p>
                     <p className="text-sm text-stone-500">
-                      {CATEGORY_META[item.category as Category]?.label ?? item.category}
+                      {getMeta(item.category)?.label ?? item.category}
                       {item.startDatetime
                         ? ` · ${new Date(item.startDatetime).toLocaleString()}`
                         : ""}
@@ -773,6 +778,12 @@ export function AdminPanel({
               ))}
             </div>
           </SectionShell>
+        </div>
+      )}
+
+      {tab === "categories" && showFullAdmin && (
+        <div className={TAB_CONTENT_CLASS}>
+          <CategoryManagementPanel />
         </div>
       )}
 

@@ -98,7 +98,7 @@ export function normalizePermissions(
       ? "all"
       : Array.isArray(value.viewCategories)
         ? value.viewCategories.filter((c): c is Category =>
-            CATEGORIES.includes(c as Category),
+            (CATEGORIES as readonly string[]).includes(c),
           )
         : DEFAULT_PERMISSIONS.viewCategories;
 

@@ -10,8 +10,8 @@ import { IconTooltip } from "@/components/ui/IconTooltip";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { documentCategoryLabel, type DocumentCategory } from "@/lib/document-categories";
-import { CATEGORY_META, type Category } from "@/lib/types";
-import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
+import { useCategories } from "@/components/categories/CategoriesProvider";
+import { getCategoryIcon, getCategoryStyles } from "@/lib/category-ui";
 import { ADDITIONAL_VIEWERS_LABEL } from "@/lib/item-document-utils";
 import { travellerOptionsFromAccounts } from "@/lib/item-travellers";
 import type { DocumentListEntry, DocumentViewMode } from "@/lib/document-queries";
@@ -51,12 +51,14 @@ function DocumentRow({
   ) => Promise<void>;
 }) {
   const { formatDateTime } = useDisplayFormat();
+  const { getMeta, documentCategories } = useCategories();
   const displayName = `${entry.label} · ${entry.fileName}`;
+  const itemMeta = entry.itemCategory ? getMeta(entry.itemCategory) : null;
   const itemStyles = entry.itemCategory
-    ? CATEGORY_STYLES[entry.itemCategory]
+    ? getCategoryStyles(entry.itemCategory, itemMeta?.color)
     : null;
   const ItemIcon = entry.itemCategory
-    ? getCategoryIcon(entry.itemCategory)
+    ? getCategoryIcon(entry.itemCategory, itemMeta?.icon)
     : FileText;
   const travellerOptions = useMemo(
     () => travellerOptionsFromAccounts(viewerOptions, entry.coversTravellers),
@@ -81,7 +83,7 @@ function DocumentRow({
               <ExternalLink className="h-3.5 w-3.5 shrink-0 text-stone-400" />
             </a>
             <span className="rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-stone-700 uppercase">
-              {documentCategoryLabel(entry.category)}
+              {documentCategoryLabel(entry.category, documentCategories)}
             </span>
             {entry.isShared ? <SharedBadge /> : null}
             {allowEdit && onToggleEdit && onDelete ? (
@@ -139,7 +141,7 @@ function DocumentRow({
             <span className="min-w-0">
               <span className="block text-[10px] font-semibold tracking-wide uppercase opacity-70">
                 {entry.itemCategory
-                  ? CATEGORY_META[entry.itemCategory].shortLabel
+                  ? getMeta(entry.itemCategory)?.shortLabel ?? "Item"
                   : "Item"}
               </span>
               <span className="block truncate font-medium">{entry.itemTitle}</span>
@@ -235,12 +237,13 @@ export function DocumentsPanelContent({
   manageMode?: boolean;
 }) {
   const { canEdit } = useAuth();
+  const { documentCategories, getMeta } = useCategories();
   const toast = useToast();
   const allowEdit = manageMode && canEdit;
   const [documents, setDocuments] = useState<DocumentListEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<DocumentViewMode>("item_type");
+  const [viewMode, setViewMode] = useState<DocumentViewMode>("document_category");
   const [showUpload, setShowUpload] = useState(false);
   const [editingDocId, setEditingDocId] = useState<number | null>(null);
   const [savingDocId, setSavingDocId] = useState<number | null>(null);
@@ -288,7 +291,7 @@ export function DocumentsPanelContent({
   async function handleSaveDocument(
     docId: number,
     docLabel: string,
-    docCategory: DocumentCategory,
+    docCategory: string,
     covers: string[],
     viewers: string[],
   ) {
@@ -449,13 +452,18 @@ export function DocumentsPanelContent({
           {[...groupedByItemType.entries()]
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([key, entries]) => {
-              const category = key === "standalone" ? null : (key as Category);
-              const styles = category ? CATEGORY_STYLES[category] : null;
-              const Icon = category ? getCategoryIcon(category) : FileText;
+              const category = key === "standalone" ? null : key;
+              const meta = category ? getMeta(category) : null;
+              const styles = category
+                ? getCategoryStyles(category, meta?.color)
+                : null;
+              const Icon = category
+                ? getCategoryIcon(category, meta?.icon)
+                : FileText;
               const title =
                 key === "standalone"
                   ? "Not linked to an item"
-                  : CATEGORY_META[category!].label;
+                  : meta?.label ?? category!;
 
               return (
                 <section key={key}>
@@ -485,12 +493,14 @@ export function DocumentsPanelContent({
         <div className="space-y-8">
           {[...groupedByCategory.entries()]
             .sort(([a], [b]) =>
-              documentCategoryLabel(a).localeCompare(documentCategoryLabel(b)),
+              documentCategoryLabel(a, documentCategories).localeCompare(
+                documentCategoryLabel(b, documentCategories),
+              ),
             )
             .map(([category, entries]) => (
               <section key={category}>
                 <SectionHeader
-                  title={documentCategoryLabel(category)}
+                  title={documentCategoryLabel(category, documentCategories)}
                   count={entries.length}
                 />
                 <ul className="space-y-2">

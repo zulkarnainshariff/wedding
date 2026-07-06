@@ -15,7 +15,7 @@ import {
   type ItemFormState,
 } from "@/lib/admin-item-form";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
-import { CATEGORY_META, CATEGORIES, type Category } from "@/lib/types";
+import { useCategories } from "@/components/categories/CategoriesProvider";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
 
 function ItemEditFormFields({
@@ -30,6 +30,7 @@ function ItemEditFormFields({
   allItems: ItineraryItem[];
 }) {
   const { formatDayOption } = useDisplayFormat();
+  const { itemCategories, getMeta } = useCategories();
   const assignableDays = useMemo(
     () =>
       [...days]
@@ -46,7 +47,7 @@ function ItemEditFormFields({
           <select
             value={form.category}
             onChange={(e) => {
-              const category = e.target.value as Category;
+              const category = e.target.value;
               setForm({
                 ...form,
                 category,
@@ -55,9 +56,9 @@ function ItemEditFormFields({
             }}
             className="w-full rounded-lg border border-stone-200 px-3 py-2"
           >
-            {CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {CATEGORY_META[category].label}
+            {itemCategories.map((category) => (
+              <option key={category.slug} value={category.slug}>
+                {getMeta(category.slug).label}
               </option>
             ))}
           </select>
@@ -130,7 +131,7 @@ function ItemEditFormFields({
       </div>
 
       <h3 className="mt-6 text-sm font-semibold tracking-wide text-stone-600 uppercase">
-        {CATEGORY_META[form.category].label} details
+        {getMeta(form.category).label} details
       </h3>
       <AdminItemDetailsForm
         category={form.category}

@@ -118,8 +118,8 @@ function parsePermissionsBody(
   const viewCategories: UserPermissions["viewCategories"] = viewAllCategories
     ? "all"
     : Array.isArray(value.viewCategories)
-      ? value.viewCategories.filter((c): c is Category =>
-          CATEGORIES.includes(c as Category),
+      ? value.viewCategories.filter(
+          (c): c is Category => typeof c === "string" && c.trim().length > 0,
         )
       : DEFAULT_PERMISSIONS.viewCategories;
 

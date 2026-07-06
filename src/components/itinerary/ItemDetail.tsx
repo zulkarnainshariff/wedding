@@ -29,7 +29,8 @@ import {
 } from "@/components/itinerary/BookingDetailViews";
 import { LinkedBookingDetailSection } from "@/components/itinerary/LinkedBookingViews";
 import { useLinkedItem } from "@/hooks/useLinkedItem";
-import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
+import { getCategoryIcon, getCategoryStyles } from "@/lib/category-ui";
+import { useCategories } from "@/components/categories/CategoriesProvider";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/activity-utils";
 import { getItemLocation } from "@/lib/item-location";
 import {
@@ -305,6 +306,7 @@ function ItemDetailHeader({
   onDelete?: () => void;
   onClose?: () => void;
 }) {
+  const { getMeta } = useCategories();
   const flightSchedule =
     category === "flight" ? formatFlightSchedule(item) : null;
   const showLocation = category !== "flight" && sharedLocation?.name;
@@ -335,7 +337,7 @@ function ItemDetailHeader({
   const categoryLabel =
     category === "activity" && activityType === "sub_item"
       ? "Sub-itinerary"
-      : CATEGORY_META[category as Category]?.label;
+      : getMeta(category)?.label ?? category;
 
   const mobileModalActions = modal ? (
       <div className="flex shrink-0 items-center gap-1.5">
@@ -634,9 +636,11 @@ export function ItemDetailView({
   onDelete?: () => void;
   canEdit?: boolean;
 }) {
-  const category = isCategory(item.category) ? item.category : "flight";
-  const styles = CATEGORY_STYLES[category];
-  const Icon = getCategoryIcon(category);
+  const { getMeta } = useCategories();
+  const category = item.category;
+  const categoryMeta = getMeta(category);
+  const styles = getCategoryStyles(category, categoryMeta?.color);
+  const Icon = getCategoryIcon(category, categoryMeta?.icon);
   const flightDetails = getFlightDetails(item.details);
   const petDetails = getPetRelocationDetails(item.details);
   const stayDetails = getAccommodationDetails(item.details);
@@ -702,7 +706,7 @@ export function ItemDetailView({
         className="mb-6 inline-flex items-center gap-2 text-sm text-stone-500 hover:text-brand-deep"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to {CATEGORY_META[category as Category]?.plural ?? "itinerary"}
+        Back to {getMeta(category)?.plural ?? "itinerary"}
       </Link>
 
       <div className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">

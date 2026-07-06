@@ -7,7 +7,7 @@ import { ScheduleToolbar } from "./ScheduleToolbar";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { PageShell } from "@/components/layout/PageShell";
 import { filterPastItems } from "@/lib/trip-time";
-import { CATEGORY_META, type Category } from "@/lib/types";
+import { useCategories } from "@/components/categories/CategoriesProvider";
 import type { ItineraryItem } from "@/lib/schema";
 
 export function CategoryList({
@@ -15,12 +15,26 @@ export function CategoryList({
   items,
   embedded = false,
 }: {
-  category: Category;
+  category: string;
   items: ItineraryItem[];
   embedded?: boolean;
 }) {
   const { effectiveDate, hidePast } = useTripTime();
-  const meta = CATEGORY_META[category];
+  const { getMeta } = useCategories();
+  const meta = getMeta(category) ?? {
+    slug: category,
+    label: category.replace(/_/g, " "),
+    plural: category.replace(/_/g, " "),
+    shortLabel: category,
+    icon: "layout-grid",
+    color: "stone",
+    sortOrder: 0,
+    forItems: true,
+    forDocuments: false,
+    pageBehavior: "list",
+    pageBehaviorConfig: {},
+    createdAt: new Date(),
+  };
   const showViewToggle =
     category === "flight" ||
     category === "accommodation" ||

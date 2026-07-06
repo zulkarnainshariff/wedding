@@ -5,12 +5,12 @@ import { FileText, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { DocumentEditForm } from "@/components/documents/DocumentEditForm";
 import { DocumentUploadForm } from "@/components/documents/DocumentUploadForm";
+import { useCategories } from "@/components/categories/CategoriesProvider";
 import { IconTooltip } from "@/components/ui/IconTooltip";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
   defaultDocumentCategoryForItem,
   documentCategoryLabel,
-  type DocumentCategory,
 } from "@/lib/document-categories";
 import {
   ADDITIONAL_VIEWERS_LABEL,
@@ -24,6 +24,7 @@ import type { ItemDocument, ItineraryItem } from "@/lib/schema";
 
 export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
   const { canEdit, user } = useAuth();
+  const { documentCategories } = useCategories();
   const toast = useToast();
   const [documents, setDocuments] = useState<ItemDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +71,7 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
   async function handleSaveDocument(
     docId: number,
     docLabel: string,
-    docCategory: DocumentCategory,
+    docCategory: string,
     covers: string[],
     viewers: string[],
   ) {
@@ -183,7 +184,11 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-stone-200/80 px-2 py-0.5 text-[11px] font-medium text-stone-600">
                         {documentCategoryLabel(
-                          defaultDocumentCategoryForItem(doc.category),
+                          defaultDocumentCategoryForItem(
+                            doc.category,
+                            documentCategories,
+                          ),
+                          documentCategories,
                         )}
                       </span>
                       {isSharedDocument(doc) && (

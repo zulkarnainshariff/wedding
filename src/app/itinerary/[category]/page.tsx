@@ -3,10 +3,10 @@ import { CategoryList } from "@/components/itinerary/CategoryList";
 import { FlightsPanel } from "@/components/itinerary/FlightsPanel";
 import { ScheduleByDate } from "@/components/itinerary/ScheduleByDate";
 import { getSessionUser } from "@/lib/auth";
+import { getItemCategories } from "@/lib/app-categories";
 import { canViewCategory } from "@/lib/permissions";
 import { getItemsByCategory, getAllItems, getScheduleByDate } from "@/lib/queries";
 import { TravelInsuranceItinerary } from "@/components/itinerary/TravelInsuranceItinerary";
-import { isCategory } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +16,21 @@ type Search = { searchParams: Promise<{ tab?: string }> };
 export default async function CategoryPage({ params, searchParams }: Params & Search) {
   const { category } = await params;
   const { tab } = await searchParams;
+  const itemCategories = await getItemCategories();
+  const categoryRow = itemCategories.find((entry) => entry.slug === category);
 
-  if (!isCategory(category)) {
+  if (!categoryRow) {
     notFound();
   }
 
-  if (category === "pet_relocation") {
-    redirect("/itinerary/flight?tab=pet_relocation");
+  const config = (categoryRow.pageBehaviorConfig ?? {}) as {
+    targetSlug?: string;
+    tab?: string;
+  };
+
+  if (categoryRow.pageBehavior === "redirect" && config.targetSlug) {
+    const query = config.tab ? `?tab=${config.tab}` : "";
+    redirect(`/itinerary/${config.targetSlug}${query}`);
   }
 
   const user = await getSessionUser();
@@ -34,12 +42,12 @@ export default async function CategoryPage({ params, searchParams }: Params & Se
     }
   }
 
-  if (category === "activity") {
+  if (categoryRow.pageBehavior === "schedule") {
     const days = await getScheduleByDate();
     return <ScheduleByDate days={days} />;
   }
 
-  if (category === "flight") {
+  if (categoryRow.pageBehavior === "flights_hub") {
     const [passengerItems, petItems] = await Promise.all([
       getItemsByCategory("flight"),
       getItemsByCategory("pet_relocation"),
@@ -60,7 +68,7 @@ export default async function CategoryPage({ params, searchParams }: Params & Se
     );
   }
 
-  if (category === "travel_insurance") {
+  if (categoryRow.pageBehavior === "travel_insurance") {
     const [items, allItems] = await Promise.all([
       getItemsByCategory("travel_insurance"),
       getAllItems(),

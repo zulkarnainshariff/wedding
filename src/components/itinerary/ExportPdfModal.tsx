@@ -10,7 +10,7 @@ import {
   type ExportOptions,
 } from "@/lib/pdf-export";
 import { DEFAULT_USER_PREFERENCES } from "@/lib/user-preferences";
-import { CATEGORIES, CATEGORY_META, type Category } from "@/lib/types";
+import { CATEGORIES, getLegacyCategoryMeta, type Category } from "@/lib/types";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
 
 type Props = {
@@ -180,7 +180,7 @@ export function ExportPdfModal({ open, onClose }: Props) {
                     className="h-4 w-4 rounded border-stone-300"
                   />
                   <span className="text-sm text-stone-800">
-                    {CATEGORY_META[category].plural}
+                    {getLegacyCategoryMeta(category)?.plural ?? category}
                   </span>
                 </label>
               ))}

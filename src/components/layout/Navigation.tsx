@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Heart,
   LayoutGrid,
@@ -20,54 +20,66 @@ import { AdminElevationControl } from "@/components/auth/AdminElevationControl";
 import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigationGuard } from "@/components/layout/NavigationGuard";
-import { CATEGORY_ICONS } from "@/lib/category-ui";
+import { getCategoryIconByName } from "@/lib/category-ui";
 import { ExportPdfPanel } from "@/components/itinerary/ExportPdfPanel";
 import { DevModePanel } from "@/components/itinerary/DevModePanel";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { CATEGORY_META, type Category } from "@/lib/types";
+import { useCategories } from "@/components/categories/CategoriesProvider";
 import { TaskIndicatorBadge, useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 
 const USERNAME_DISPLAY_MAX = 14;
 
-type NavCategory =
-  | Category
-  | "all"
-  | "guests"
-  | "invitations"
-  | "tasks"
-  | "flights_hub";
+type NavCategory = string | "all" | "guests" | "invitations" | "tasks" | "flights_hub";
 
-const BASE_NAV_ITEMS: {
+type NavItem = {
   href: string;
   label: string;
   category?: NavCategory;
-}[] = [
-  {
-    href: "/itinerary/activity",
-    label: CATEGORY_META.activity.label,
-    category: "activity",
-  },
-  { href: "/itinerary", label: "View All", category: "all" },
-  { href: "/itinerary/flight", label: "Flights", category: "flights_hub" },
-  {
-    href: "/itinerary/accommodation",
-    label: CATEGORY_META.accommodation.label,
-    category: "accommodation",
-  },
-  {
-    href: "/itinerary/car_rental",
-    label: CATEGORY_META.car_rental.label,
-    category: "car_rental",
-  },
-  {
-    href: "/itinerary/travel_insurance",
-    label: CATEGORY_META.travel_insurance.label,
-    category: "travel_insurance",
-  },
+  icon?: string;
+};
+
+const STATIC_NAV_TAIL: NavItem[] = [
   { href: "/invitation", label: "Invitations", category: "invitations" },
   { href: "/guests", label: "Guest lists", category: "guests" },
   { href: "/tasks", label: "Tasks", category: "tasks" },
 ];
+
+function buildCategoryNavItems(
+  itemCategories: ReturnType<typeof useCategories>["itemCategories"],
+) {
+  const sorted = [...itemCategories]
+    .filter((row) => row.pageBehavior !== "redirect")
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.slug.localeCompare(b.slug));
+
+  const activity =
+    sorted.find((row) => row.slug === "activity") ??
+    sorted.find((row) => row.pageBehavior === "schedule");
+  const rest = sorted.filter((row) => row !== activity);
+
+  const items: NavItem[] = [];
+
+  if (activity) {
+    items.push({
+      href: `/itinerary/${activity.slug}`,
+      label: activity.label,
+      category: activity.slug,
+      icon: activity.icon,
+    });
+  }
+
+  items.push({ href: "/itinerary", label: "View All", category: "all" });
+
+  for (const row of rest) {
+    items.push({
+      href: `/itinerary/${row.slug}`,
+      label: row.label,
+      category: row.pageBehavior === "flights_hub" ? "flights_hub" : row.slug,
+      icon: row.icon,
+    });
+  }
+
+  return items;
+}
 
 function formatUsername(username: string): string {
   if (username.length <= USERNAME_DISPLAY_MAX) return username;
@@ -84,11 +96,17 @@ function useNavItems() {
     guestListAccess,
     loading,
   } = useAuth();
+  const { itemCategories, loading: categoriesLoading } = useCategories();
 
-  if (loading) return null;
+  const baseNavItems = useMemo(
+    () => [...buildCategoryNavItems(itemCategories), ...STATIC_NAV_TAIL],
+    [itemCategories],
+  );
 
-  return BASE_NAV_ITEMS.filter((item) => {
-    if (!user) return false;
+  if (loading || categoriesLoading) return null;
+  if (!user) return null;
+
+  return baseNavItems.filter((item) => {
     if (item.category === "invitations") return true;
     if (item.category === "guests") {
       return isAdmin || (guestListAccess?.length ?? 0) > 0;
@@ -114,6 +132,7 @@ function NavLink({
   onNavigate,
   compact,
   badgeCount = 0,
+  iconName,
 }: {
   href: string;
   label: string;
@@ -121,6 +140,7 @@ function NavLink({
   onNavigate?: () => void;
   compact?: boolean;
   badgeCount?: number;
+  iconName?: string;
 }) {
   const pathname = usePathname();
   const guard = useNavigationGuard();
@@ -150,14 +170,10 @@ function NavLink({
             ? Pencil
             : href === "/settings"
               ? Settings
-              : category === "flights_hub"
-                ? CATEGORY_ICONS.flight
-                : category &&
-                    category !== "all" &&
-                    category !== "guests" &&
-                    category !== "invitations" &&
-                    category !== "tasks"
-                  ? CATEGORY_ICONS[category as Category]
+              : iconName
+                ? getCategoryIconByName(iconName)
+                : category === "flights_hub"
+                  ? getCategoryIconByName("plane")
                   : LayoutGrid;
 
   return (
@@ -268,7 +284,10 @@ export function Sidebar({ compact = false }: { compact?: boolean }) {
           navItems.map((item) => (
             <NavLink
               key={item.href}
-              {...item}
+              href={item.href}
+              label={item.label}
+              category={item.category}
+              iconName={item.icon}
               compact={compact}
               badgeCount={item.category === "tasks" ? openTaskCount : 0}
             />
@@ -391,7 +410,10 @@ export function MobileDrawer({
             navItems.map((item) => (
               <NavLink
                 key={item.href}
-                {...item}
+                href={item.href}
+                label={item.label}
+                category={item.category}
+                iconName={item.icon}
                 onNavigate={onClose}
                 badgeCount={item.category === "tasks" ? openTaskCount : 0}
               />
@@ -425,19 +447,63 @@ export function MobileDrawer({
 export function BottomNav() {
   const pathname = usePathname();
   const { canView } = useAuth();
+  const { itemCategories } = useCategories();
+
+  const activity =
+    itemCategories.find((row) => row.slug === "activity") ??
+    itemCategories.find((row) => row.pageBehavior === "schedule");
+  const flights = itemCategories.find((row) => row.pageBehavior === "flights_hub");
+  const accommodation = itemCategories.find((row) => row.slug === "accommodation");
+  const carRental = itemCategories.find((row) => row.slug === "car_rental");
+
   const tabs = [
-    { href: "/itinerary/activity", label: "Schedule", category: "activity" as const },
-    { href: "/itinerary/flight", label: "Flights", category: "flights_hub" as const },
-    { href: "/invitation", label: "Invitation", category: "invitations" as const },
-    { href: "/itinerary/accommodation", label: "Stay", category: "accommodation" as const },
-    { href: "/itinerary/car_rental", label: "Cars", category: "car_rental" as const },
-  ].filter((tab) => {
-    if (tab.category === "invitations") return true;
-    if (tab.category === "flights_hub") {
-      return canView("flight") || canView("pet_relocation");
-    }
-    return canView(tab.category);
-  });
+    activity
+      ? {
+          href: `/itinerary/${activity.slug}`,
+          label: activity.shortLabel,
+          category: activity.slug,
+          icon: activity.icon,
+        }
+      : null,
+    flights
+      ? {
+          href: `/itinerary/${flights.slug}`,
+          label: flights.shortLabel,
+          category: "flights_hub" as const,
+          icon: flights.icon,
+        }
+      : null,
+    {
+      href: "/invitation",
+      label: "Invitation",
+      category: "invitations" as const,
+      icon: "heart",
+    },
+    accommodation
+      ? {
+          href: `/itinerary/${accommodation.slug}`,
+          label: accommodation.shortLabel,
+          category: accommodation.slug,
+          icon: accommodation.icon,
+        }
+      : null,
+    carRental
+      ? {
+          href: `/itinerary/${carRental.slug}`,
+          label: carRental.shortLabel,
+          category: carRental.slug,
+          icon: carRental.icon,
+        }
+      : null,
+  ]
+    .filter((tab): tab is NonNullable<typeof tab> => tab !== null)
+    .filter((tab) => {
+      if (tab.category === "invitations") return true;
+      if (tab.category === "flights_hub") {
+        return canView("flight") || canView("pet_relocation");
+      }
+      return canView(tab.category);
+    });
 
   return (
     <nav className="fixed right-0 bottom-0 left-0 z-30 border-t border-border bg-surface/95 backdrop-blur md:hidden">
@@ -456,9 +522,7 @@ export function BottomNav() {
           const Icon =
             tab.category === "invitations"
               ? Heart
-              : tab.category === "flights_hub"
-                ? CATEGORY_ICONS.flight
-                : CATEGORY_ICONS[tab.category];
+              : getCategoryIconByName(tab.icon);
 
           return (
             <Link
