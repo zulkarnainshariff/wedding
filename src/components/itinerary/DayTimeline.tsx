@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { DayBannerHeader } from "./DayBannerHeader";
 import { ItemCard } from "./ItemCard";
 import { TripProgressIndicator } from "./TripProgressIndicator";
 import { sortDayItems } from "@/lib/day-item-sort";
@@ -10,7 +11,6 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { useDayVisibility } from "@/hooks/useDayVisibility";
 import { getDayDisplayTitle, hasRestrictedTravellerView } from "@/lib/day-display";
-import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { itemSectionId } from "@/lib/day-jump";
 import { isDayToday } from "@/lib/trip-time";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
@@ -21,7 +21,6 @@ type DayWithItems = ItineraryDay & { items: ItineraryItemWithSubItems[] };
 export function DayTimeline({ days }: { days: DayWithItems[] }) {
   const { user } = useAuth();
   const { effectiveDate, hidePast, hideFreeDays, hideUntouchedDays } = useTripTime();
-  const { formatDateOnlyWithWeekday } = useDisplayFormat();
   const restrictedView = hasRestrictedTravellerView(user);
   const { visibleDays } = useDayVisibility(days);
   const sortedVisibleDays = useMemo(
@@ -66,39 +65,13 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
               id={`day-${day.dayNumber}`}
               className="scroll-mt-3"
             >
-              <div
-                className={[
-                  "sticky top-0 z-20 -mt-px mb-3 flex items-center gap-3 border-b border-border/60 py-2",
-                  isToday
-                    ? "rounded-b-2xl border-x border-accent/40 border-t-0 bg-surface-soft px-3 shadow-sm"
-                    : "bg-background px-0 shadow-sm",
-                ].join(" ")}
-              >
-                <div
-                  className={[
-                    "flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold",
-                    isToday
-                      ? "bg-accent text-brand-deep ring-2 ring-accent/40 ring-offset-2"
-                      : "bg-brand-deep text-accent",
-                  ].join(" ")}
-                >
-                  {day.dayNumber}
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-serif text-xl text-brand-deep">
-                      {dayTitle}
-                    </h2>
-                    {isToday && (
-                      <span className="rounded-full bg-brand-deep px-2 py-0.5 text-[10px] font-semibold tracking-wide text-accent uppercase">
-                        Today
-                      </span>
-                    )}
-                    <TaskIndicatorBadge count={dayCounts[day.id] ?? 0} />
-                  </div>
-                  <p className="text-sm text-stone-500">{formatDateOnlyWithWeekday(day.date)}</p>
-                </div>
-              </div>
+              <DayBannerHeader
+                dayNumber={day.dayNumber}
+                date={day.date}
+                title={dayTitle}
+                isToday={isToday}
+                trailing={<TaskIndicatorBadge count={dayCounts[day.id] ?? 0} />}
+              />
 
               {day.notes && day.items.length > 0 && (
                 <p className="mb-4 text-sm text-stone-500">{day.notes}</p>

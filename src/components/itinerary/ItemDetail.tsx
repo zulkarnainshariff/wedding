@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink, MapPin, Pencil, Trash2, X } from "lucide-react";
 import { ItemDocumentsSection } from "@/components/itinerary/ItemDocumentsSection";
@@ -52,6 +52,7 @@ import {
   type TravelInsuranceDetails,
 } from "@/lib/types";
 import { formatJourneyFlightLabel } from "@/lib/flight-numbers";
+import { FormattedItemNotes, ItemNotesSection } from "@/components/itinerary/FormattedItemNotes";
 import type { ItineraryItemWithSubItems } from "@/lib/item-subitem-utils";
 import type { ItineraryItem } from "@/lib/schema";
 
@@ -62,25 +63,7 @@ function NotesBlock({
   title?: string;
   notes?: string[] | string | null;
 }) {
-  const lines = Array.isArray(notes)
-    ? notes
-    : notes
-      ? notes.split("\n").map((line) => line.trim()).filter(Boolean)
-      : [];
-  if (lines.length === 0) return null;
-
-  return (
-    <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
-      <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
-        {title}
-      </h3>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-700">
-        {lines.map((note) => (
-          <li key={note}>{note}</li>
-        ))}
-      </ul>
-    </div>
-  );
+  return <ItemNotesSection notes={notes} title={title} variant="card" />;
 }
 
 function DescriptionBlock({ description }: { description?: string | null }) {
@@ -102,9 +85,9 @@ function DetailRow({
   value,
 }: {
   label: string;
-  value?: string | null;
+  value?: ReactNode;
 }) {
-  if (!value) return null;
+  if (value == null || value === "") return null;
   return (
     <div className="grid gap-1 border-b border-stone-100 py-3 last:border-0 sm:grid-cols-[10rem_1fr]">
       <dt className="text-sm font-medium text-stone-500">{label}</dt>
@@ -202,10 +185,6 @@ function ActivityDetail({
 }
 
 function InsuranceDetail({ details }: { details: TravelInsuranceDetails }) {
-  const notesText = Array.isArray(details.notes)
-    ? details.notes.join("\n")
-    : details.notes;
-
   return (
     <div className="space-y-4">
       <dl>
@@ -234,7 +213,10 @@ function InsuranceDetail({ details }: { details: TravelInsuranceDetails }) {
           }
         />
         <DetailRow label="Emergency" value={details.emergencyPhone} />
-        <DetailRow label="Notes" value={notesText} />
+        <DetailRow
+          label="Notes"
+          value={<FormattedItemNotes notes={details.notes} />}
+        />
       </dl>
       {details.autoInsuranceIncluded && (
         <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
