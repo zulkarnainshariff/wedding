@@ -182,13 +182,34 @@ a[href],
 
 .invitation-card-face {
   border: 1px solid color-mix(in srgb, var(--invitation-border) 35%, transparent);
-  background: linear-gradient(
+  background-color: var(--invitation-from);
+  background-image: linear-gradient(
     to bottom right,
     var(--invitation-from),
     var(--invitation-via),
     var(--invitation-to)
   );
   color: var(--invitation-title);
+}
+
+.invitation-card-back {
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  color: var(--foreground);
+}
+
+.invitation-flip-scene {
+  perspective: 1200px;
+}
+
+.invitation-flip-inner {
+  transform-style: preserve-3d;
+}
+
+.invitation-flip-face {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
 }
 
 .invitation-card-frame {

@@ -59,18 +59,18 @@ export function FlipInvitationCard({
   const mapsUrl = cardFront.mapsUrl;
 
   return (
-    <div className="group relative mx-auto w-full max-w-md text-left">
-      <div className="[perspective:1200px]">
+    <div className="group relative z-10 mx-auto w-full max-w-md text-left">
+      <div className="invitation-flip-scene overflow-hidden rounded-3xl">
         <div
           className={[
-            "relative min-h-[28rem] w-full transition-transform duration-700 [transform-style:preserve-3d]",
+            "invitation-flip-inner relative min-h-[28rem] w-full transition-transform duration-700",
             flipped ? "[transform:rotateY(180deg)]" : "",
           ].join(" ")}
         >
           <div
             className={[
-              "absolute inset-0 flex cursor-pointer flex-col items-center justify-center rounded-3xl invitation-card-face p-8 text-center shadow-xl [backface-visibility:hidden]",
-              flipped ? "pointer-events-none" : "",
+              "invitation-flip-face invitation-card-face absolute inset-0 flex cursor-pointer flex-col items-center justify-center p-8 text-center shadow-xl [transform:rotateY(0deg)_translateZ(1px)]",
+              flipped ? "pointer-events-none invisible" : "",
             ].join(" ")}
             aria-hidden={flipped}
             onClick={flipped ? undefined : onFlip}
@@ -130,8 +130,8 @@ export function FlipInvitationCard({
 
           <div
             className={[
-              "absolute inset-0 flex cursor-pointer flex-col rounded-3xl border border-border bg-surface p-8 text-left theme-card shadow-xl [backface-visibility:hidden] [transform:rotateY(180deg)]",
-              flipped ? "" : "pointer-events-none",
+              "invitation-flip-face invitation-card-back absolute inset-0 flex cursor-pointer flex-col p-8 text-left shadow-xl [transform:rotateY(180deg)_translateZ(1px)]",
+              flipped ? "" : "pointer-events-none invisible",
             ].join(" ")}
             aria-hidden={!flipped}
             onClick={flipped ? onFlip : undefined}

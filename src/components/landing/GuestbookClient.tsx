@@ -150,7 +150,7 @@ export function GuestbookClient({
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <PublicHeader />
-        <main className="mx-auto w-full max-w-3xl px-4 py-24 text-center">
+        <main className="mx-auto w-full max-w-3xl px-4 py-6 text-center">
           <p className="text-stone-600">The guestbook is not open right now.</p>
         </main>
       </div>
@@ -160,7 +160,7 @@ export function GuestbookClient({
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <PublicHeader />
-      <main className="mx-auto w-full max-w-3xl px-4 py-24">
+      <main className="mx-auto w-full max-w-3xl px-4 py-6">
         <h1 className="font-serif text-3xl text-brand-deep">Guestbook</h1>
         <p className="mt-2 text-sm text-stone-500">
           Leave a note for Natalie &amp; Zulkarnain. Your email is optional and
