@@ -112,6 +112,23 @@ export const appSettings = pgTable("app_settings", {
     .notNull(),
 });
 
+export const appCategories = pgTable("app_categories", {
+  slug: text("slug").primaryKey(),
+  label: text("label").notNull(),
+  plural: text("plural").notNull(),
+  shortLabel: text("short_label").notNull(),
+  icon: text("icon").notNull().default("layout-grid"),
+  color: text("color").notNull().default("stone"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  forItems: boolean("for_items").notNull().default(false),
+  forDocuments: boolean("for_documents").notNull().default(false),
+  pageBehavior: text("page_behavior").notNull().default("list"),
+  pageBehaviorConfig: jsonb("page_behavior_config").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 export const weddingEvents = pgTable("wedding_events", {
   id: serial("id").primaryKey(),
   slug: text("slug").notNull().unique(),
@@ -412,6 +429,8 @@ export type NewUser = typeof users.$inferInsert;
 export type UserGuardian = typeof userGuardians.$inferSelect;
 export type SyncMetadata = typeof syncMetadata.$inferSelect;
 export type AppSettingsRow = typeof appSettings.$inferSelect;
+export type AppCategoryRow = typeof appCategories.$inferSelect;
+export type NewAppCategoryRow = typeof appCategories.$inferInsert;
 export type WeddingEvent = typeof weddingEvents.$inferSelect;
 export type NewWeddingEvent = typeof weddingEvents.$inferInsert;
 export type PublicScheduleItemRow = typeof publicScheduleItems.$inferSelect;

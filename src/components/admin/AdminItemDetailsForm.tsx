@@ -37,6 +37,7 @@ import {
 import { listUnlinkedSuggestedCarRentalBookings } from "@/lib/car-rental-booking";
 import { parseStoredClockTime } from "@/lib/flight-datetime";
 import { lastFlightLegDestination } from "@/lib/flight-segment-timing";
+import { resolveAirportCitySync } from "@/lib/airport-cities";
 
 function segmentClockValue(value?: string | null): string {
   return parseStoredClockTime(value)?.clock ?? value?.trim().slice(0, 5) ?? "";
@@ -79,11 +80,15 @@ function TextInput({
   label,
   value,
   onChange,
+  onBlur,
+  maxLength,
   type = "text",
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
+  maxLength?: number;
   type?: string;
 }) {
   return (
@@ -93,6 +98,8 @@ function TextInput({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        maxLength={maxLength}
         className="w-full rounded-lg border border-stone-200 px-3 py-2"
       />
     </label>
@@ -588,6 +595,26 @@ function FlightSegmentsEditor({
   travellers: string[];
   onChange: (segments: FlightSegment[]) => void;
 }) {
+  const resolveSegmentIata = (
+    index: number,
+    endpoint: "from" | "to",
+  ) => {
+    const segment = segments[index];
+    if (!segment) return;
+
+    const iataKey = endpoint === "from" ? "fromIata" : "toIata";
+    const cityKey = endpoint === "from" ? "from" : "to";
+    const code = segment[iataKey]?.trim().toUpperCase();
+    if (!code || code.length !== 3) return;
+
+    const city = resolveAirportCitySync(code);
+    if (!city) return;
+
+    const next = [...segments];
+    next[index] = { ...segment, [cityKey]: city };
+    onChange(next);
+  };
+
   return (
     <div className="sm:col-span-2">
       <div className="mb-2 flex items-center justify-between">
@@ -632,7 +659,18 @@ function FlightSegmentsEditor({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <TextInput
-                label="From"
+                label="From airport (IATA)"
+                value={segment.fromIata ?? ""}
+                maxLength={3}
+                onChange={(value) => {
+                  const next = [...segments];
+                  next[index] = { ...segment, fromIata: value.toUpperCase() };
+                  onChange(next);
+                }}
+                onBlur={() => resolveSegmentIata(index, "from")}
+              />
+              <TextInput
+                label="From (city)"
                 value={segment.from ?? ""}
                 onChange={(value) => {
                   const next = [...segments];
@@ -641,7 +679,18 @@ function FlightSegmentsEditor({
                 }}
               />
               <TextInput
-                label="To"
+                label="To airport (IATA)"
+                value={segment.toIata ?? ""}
+                maxLength={3}
+                onChange={(value) => {
+                  const next = [...segments];
+                  next[index] = { ...segment, toIata: value.toUpperCase() };
+                  onChange(next);
+                }}
+                onBlur={() => resolveSegmentIata(index, "to")}
+              />
+              <TextInput
+                label="To (city)"
                 value={segment.to ?? ""}
                 onChange={(value) => {
                   const next = [...segments];
@@ -650,25 +699,7 @@ function FlightSegmentsEditor({
                 }}
               />
               <TextInput
-                label="From airport (IATA)"
-                value={segment.fromIata ?? ""}
-                onChange={(value) => {
-                  const next = [...segments];
-                  next[index] = { ...segment, fromIata: value.toUpperCase() };
-                  onChange(next);
-                }}
-              />
-              <TextInput
-                label="To airport (IATA)"
-                value={segment.toIata ?? ""}
-                onChange={(value) => {
-                  const next = [...segments];
-                  next[index] = { ...segment, toIata: value.toUpperCase() };
-                  onChange(next);
-                }}
-              />
-              <TextInput
-                label="Ticket / marketed flight no."
+                label="Codeshare flight no"
                 value={segment.marketingFlightNumber ?? segment.flightNumber ?? ""}
                 onChange={(value) => {
                   const next = [...segments];
@@ -687,7 +718,7 @@ function FlightSegmentsEditor({
               />
               <p className="sm:col-span-2 text-xs text-stone-500">
                 Example: ticket shows QF4716 but AA3164 operates the aircraft —
-                put QF4716 as marketed and AA3164 as operating. Same number on
+                put QF4716 as codeshare and AA3164 as operating. Same number on
                 both for a non-codeshare leg like QF93.
               </p>
               <TimeInput

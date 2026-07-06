@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { formatBookingGroupsDisplay } from "@/lib/booking-groups";
-import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
+import { getCategoryIcon, getCategoryStyles } from "@/lib/category-ui";
+import { useCategories } from "@/components/categories/CategoriesProvider";
 import { formatFlightSeatsSummary } from "@/lib/flight-seats";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/activity-utils";
 import { FlightItinerarySummary } from "@/components/itinerary/FlightViews";
@@ -257,9 +258,11 @@ export function ItemCard({
     formatStayDateTime,
     preferences,
   } = useDisplayFormat();
-  const category = isCategory(item.category) ? item.category : "flight";
-  const styles = CATEGORY_STYLES[category];
-  const Icon = getCategoryIcon(category);
+  const { getMeta } = useCategories();
+  const category = item.category;
+  const categoryMeta = getMeta(category);
+  const styles = getCategoryStyles(category, categoryMeta?.color);
+  const Icon = getCategoryIcon(category, categoryMeta?.icon);
   const flightDetails = getFlightDetails(item.details);
   const petDetails = getPetRelocationDetails(item.details);
   const stayDetails = getAccommodationDetails(item.details);
@@ -281,7 +284,7 @@ export function ItemCard({
         "Schedule"
       : category === "pet_relocation"
         ? "Pet Relocation (cargo)"
-        : CATEGORY_META[category as Category]?.label ?? item.category;
+        : categoryMeta?.label ?? item.category;
 
   const subItems = item.subItems ?? [];
   const limitedView = Boolean(item.limitedView);

@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { CATEGORY_META, type Category } from "@/lib/types";
-import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
+import { getLegacyCategoryMeta } from "@/lib/types";
+import { getCategoryIcon, getCategoryStyles } from "@/lib/category-ui";
 import { getItemTbcReason } from "@/lib/item-tbc";
 import { getItemSortTime } from "@/lib/item-schedule-datetime";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
@@ -45,9 +45,10 @@ export function TbcItemsPanel({
   return (
     <div className="divide-y divide-stone-100 rounded-2xl border border-stone-200 bg-white">
       {sortedItems.map((item) => {
-        const category = item.category as Category;
-        const styles = CATEGORY_STYLES[category] ?? CATEGORY_STYLES.activity;
-        const Icon = getCategoryIcon(category);
+        const category = item.category;
+        const meta = getLegacyCategoryMeta(category);
+        const styles = getCategoryStyles(category, meta?.color);
+        const Icon = getCategoryIcon(category, meta?.icon);
         const reason = getItemTbcReason(item);
         const day = item.dayId ? dayById.get(item.dayId) : undefined;
         const dateLabel =
@@ -73,7 +74,7 @@ export function TbcItemsPanel({
               <div className="min-w-0">
                 <p className="truncate font-medium text-stone-800">{item.title}</p>
                 <p className="mt-0.5 text-sm text-stone-500">
-                  {CATEGORY_META[category]?.label ?? item.category}
+                  {getLegacyCategoryMeta(category)?.label ?? item.category}
                   {dateLabel ? ` · ${dateLabel}` : ""}
                   {item.startDatetime
                     ? ` · ${formatWallClockDateTime(item.startDatetime)}`

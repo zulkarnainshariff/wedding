@@ -4,7 +4,8 @@ import {
 } from "./user-preferences";
 import { formatDateOnlyWithPrefs } from "./display-format";
 
-export const CATEGORIES = [
+/** Built-in item category slugs — kept for legacy fallbacks and specialized forms. */
+export const LEGACY_CATEGORIES = [
   "activity",
   "flight",
   "pet_relocation",
@@ -13,7 +14,13 @@ export const CATEGORIES = [
   "travel_insurance",
 ] as const;
 
-export type Category = (typeof CATEGORIES)[number];
+/** @deprecated Prefer DB-backed categories via app-categories / useCategories(). */
+export const CATEGORIES = LEGACY_CATEGORIES;
+
+export type LegacyCategory = (typeof LEGACY_CATEGORIES)[number];
+
+/** Item category slug — may be a built-in or custom DB category. */
+export type Category = string;
 
 export type FlightSegment = {
   /** Booked / airport display flight (e.g. QF1234). */
@@ -182,8 +189,9 @@ export type ItemDetails =
   | CarRentalDetails
   | TravelInsuranceDetails;
 
+/** @deprecated Prefer getCategoryMeta() / useCategories().getMeta(). */
 export const CATEGORY_META: Record<
-  Category,
+  string,
   { label: string; plural: string; shortLabel: string; icon: string; color: string }
 > = {
   activity: {
@@ -230,8 +238,18 @@ export const CATEGORY_META: Record<
   },
 };
 
-export function isCategory(value: string): value is Category {
-  return CATEGORIES.includes(value as Category);
+export function getLegacyCategoryMeta(
+  slug: string,
+): (typeof CATEGORY_META)[LegacyCategory] | undefined {
+  return CATEGORY_META[slug as LegacyCategory];
+}
+
+export function isCategory(
+  value: string,
+  slugs?: readonly string[],
+): value is Category {
+  const list = slugs ?? LEGACY_CATEGORIES;
+  return (list as readonly string[]).includes(value);
 }
 
 export function isPetRelocationItem(item: {

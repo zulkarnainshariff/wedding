@@ -6,7 +6,7 @@ import { Save, Trash2 } from "lucide-react";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { SectionShell } from "@/components/layout/PageShell";
 import { adminUserRowId, scrollToElementById } from "@/lib/day-jump";
-import { CATEGORIES, CATEGORY_META, type Category } from "@/lib/types";
+import { CATEGORIES, getLegacyCategoryMeta, type Category } from "@/lib/types";
 import type { UserPermissions } from "@/lib/permissions";
 
 export type ManagedUser = {
@@ -343,7 +343,7 @@ export function UserManagement({
                           checked={form.viewCategories.includes(category)}
                           onChange={() => toggleCategory(category)}
                         />
-                        {CATEGORY_META[category].label}
+                        {getLegacyCategoryMeta(category)?.label ?? category}
                       </label>
                     ))}
                   </div>
@@ -475,7 +475,7 @@ export function UserManagement({
                       user.permissions.viewCategories === "all"
                         ? "All categories"
                         : `Categories: ${user.permissions.viewCategories
-                            .map((c) => CATEGORY_META[c].label)
+                            .map((c) => getLegacyCategoryMeta(c)?.label ?? c)
                             .join(", ")}`,
                       `Itineraries: ${formatTravellerAccess(user.permissions)}`,
                       user.permissions.canEdit ? "Can edit" : "Read only",

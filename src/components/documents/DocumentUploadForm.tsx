@@ -3,11 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Upload, X } from "lucide-react";
 import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
+import { useCategories } from "@/components/categories/CategoriesProvider";
 import {
-  DOCUMENT_CATEGORIES,
   documentCategoryLabel,
   defaultDocumentCategoryForItem,
-  type DocumentCategory,
 } from "@/lib/document-categories";
 import {
   ADDITIONAL_VIEWERS_LABEL,
@@ -66,12 +65,13 @@ export function DocumentUploadForm({
   onCancel?: () => void;
 }) {
   const toast = useToast();
+  const { documentCategories } = useCategories();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputId = `document-upload-${item?.id ?? "standalone"}`;
   const [viewerOptions, setViewerOptions] = useState<string[]>([]);
   const [travellerOptions, setTravellerOptions] = useState<string[]>([]);
-  const [category, setCategory] = useState<DocumentCategory>(
-    defaultDocumentCategoryForItem(item?.category),
+  const [category, setCategory] = useState(() =>
+    defaultDocumentCategoryForItem(item?.category, documentCategories),
   );
   const [label, setLabel] = useState("");
   const [coveredTravellers, setCoveredTravellers] = useState<string[]>([]);
@@ -186,14 +186,12 @@ export function DocumentUploadForm({
         <span className="mb-1 block text-stone-500">Category</span>
         <select
           value={category}
-          onChange={(event) =>
-            setCategory(event.target.value as DocumentCategory)
-          }
+          onChange={(event) => setCategory(event.target.value)}
           className="w-full rounded-lg border border-stone-200 px-3 py-2"
         >
-          {DOCUMENT_CATEGORIES.map((entry) => (
-            <option key={entry} value={entry}>
-              {documentCategoryLabel(entry)}
+          {documentCategories.map((entry) => (
+            <option key={entry.slug} value={entry.slug}>
+              {documentCategoryLabel(entry.slug, documentCategories)}
             </option>
           ))}
         </select>
