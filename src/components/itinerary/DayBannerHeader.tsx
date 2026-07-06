@@ -29,20 +29,20 @@ export function DayBannerHeader({
     >
       <div
         className={[
-          "flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-full font-bold leading-none",
+          "flex h-12 w-12 shrink-0 flex-col items-center justify-center gap-0 rounded-full font-bold leading-none",
           isToday
             ? "bg-accent text-brand-deep ring-2 ring-accent/40 ring-offset-2"
             : "bg-brand-deep text-accent",
         ].join(" ")}
       >
-        <span className="text-lg">{day}</span>
-        <span className="mt-0.5 text-[10px] font-semibold tracking-wide uppercase">
+        <span className="text-xl leading-none">{day}</span>
+        <span className="-mt-0.5 text-[10px] font-semibold tracking-wide uppercase leading-none">
           {month}
         </span>
       </div>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="font-serif text-xl text-brand-deep">{title}</h2>
+          <h2 className="font-serif text-xl font-bold text-brand-deep">{title}</h2>
           {isToday ? (
             <span className="rounded-full bg-brand-deep px-2 py-0.5 text-[10px] font-semibold tracking-wide text-accent uppercase">
               Today
@@ -50,7 +50,9 @@ export function DayBannerHeader({
           ) : null}
           {trailing}
         </div>
-        <p className="text-sm font-medium text-accent">Day {dayNumber}</p>
+        <p className="text-sm font-medium text-accent">
+          Day <span className="font-bold">{dayNumber}</span>
+        </p>
       </div>
     </div>
   );
