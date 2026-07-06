@@ -12,7 +12,7 @@ import {
 import {
   BUILTIN_CATEGORY_SEEDS,
   type CategoryMeta,
-} from "@/lib/app-categories";
+} from "@/lib/category-seeds";
 import type { AppCategoryRow } from "@/lib/schema";
 
 type CategoriesContextValue = {

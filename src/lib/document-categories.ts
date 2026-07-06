@@ -47,9 +47,3 @@ export function defaultDocumentCategoryForItem(
   }
   return STANDALONE_DOCUMENT_CATEGORY;
 }
-
-export async function getDocumentCategorySlugs(): Promise<string[]> {
-  const { getDocumentCategories } = await import("@/lib/app-categories");
-  const rows = await getDocumentCategories();
-  return rows.map((row) => row.slug);
-}

@@ -10,7 +10,7 @@ import {
   getCategoryIconByName,
   getCategoryStylesByColor,
 } from "@/lib/category-ui";
-import { slugifyCategoryLabel } from "@/lib/app-categories";
+import { slugifyCategoryLabel } from "@/lib/category-seeds";
 import type { AppCategoryRow } from "@/lib/schema";
 
 type UsageCounts = Record<string, { items: number; documents: number }>;
