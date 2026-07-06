@@ -15,6 +15,11 @@ import {
   parseCoveredTravellers,
   parseExtraViewers,
 } from "@/lib/item-document-utils";
+import {
+  bindNativeFilePickerCloseListeners,
+  clearNativeFilePickerOpen,
+  markNativeFilePickerOpen,
+} from "@/lib/native-file-picker";
 import { canSeeItemAdditionalViewers } from "@/lib/item-viewers";
 import type { ItemDocument, ItineraryItem } from "@/lib/schema";
 
@@ -269,6 +274,8 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => bindNativeFilePickerCloseListeners(), []);
 
   function toggleTraveller(name: string) {
     setCoveredTravellers((current) =>
@@ -554,8 +561,12 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
             </div>
             <div className="text-sm sm:col-span-2">
               <span className="mb-1 block text-stone-500">File (PDF or image)</span>
-              <label
-                htmlFor={`document-file-${item.id}`}
+              <button
+                type="button"
+                onClick={() => {
+                  markNativeFilePickerOpen();
+                  fileInputRef.current?.click();
+                }}
                 className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-left text-sm transition hover:border-brand/30 hover:bg-accent-pearl/30"
               >
                 <span className="inline-flex min-w-0 items-center gap-2 text-stone-700">
@@ -565,9 +576,17 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                   </span>
                 </span>
                 {selectedFileName && (
-                  <button
-                    type="button"
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                      setSelectedFileName(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
                       event.preventDefault();
                       event.stopPropagation();
                       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -577,9 +596,9 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                     aria-label="Clear selected file"
                   >
                     <X className="h-4 w-4" />
-                  </button>
+                  </span>
                 )}
-              </label>
+              </button>
               <input
                 ref={fileInputRef}
                 id={`document-file-${item.id}`}
@@ -588,7 +607,10 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                 accept=".pdf,image/jpeg,image/png,image/webp"
                 className="sr-only"
                 required
-                onChange={handleFileChange}
+                onChange={(event) => {
+                  handleFileChange(event);
+                  clearNativeFilePickerOpen();
+                }}
               />
             </div>
           </div>

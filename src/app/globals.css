@@ -286,3 +286,8 @@ a[href],
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Native file pickers render behind high z-index modals unless the overlay is hidden. */
+html[data-native-file-picker-open] [data-item-detail-modal] {
+  visibility: hidden;
+}

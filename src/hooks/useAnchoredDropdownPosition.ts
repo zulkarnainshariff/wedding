@@ -5,12 +5,13 @@ import { useEffect, useState, type CSSProperties, type RefObject } from "react";
 export function useAnchoredDropdownPosition(
   open: boolean,
   anchorRef: RefObject<HTMLElement | null>,
-  options?: { minWidth?: number; maxHeight?: number; gap?: number },
+  options?: { minWidth?: number; maxHeight?: number; gap?: number; zIndex?: number },
 ) {
   const [style, setStyle] = useState<CSSProperties>({ visibility: "hidden" });
   const minWidth = options?.minWidth ?? 288;
   const maxHeight = options?.maxHeight ?? 320;
   const gap = options?.gap ?? 4;
+  const zIndex = options?.zIndex ?? 50;
 
   useEffect(() => {
     if (!open) return;
@@ -40,7 +41,7 @@ export function useAnchoredDropdownPosition(
         left,
         width,
         maxHeight: Math.min(maxHeight, Math.max(spaceBelow, 120)),
-        zIndex: 50,
+        zIndex,
         visibility: "visible",
       });
     }
@@ -52,7 +53,7 @@ export function useAnchoredDropdownPosition(
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [open, anchorRef, gap, maxHeight, minWidth]);
+  }, [open, anchorRef, gap, maxHeight, minWidth, zIndex]);
 
   return style;
 }

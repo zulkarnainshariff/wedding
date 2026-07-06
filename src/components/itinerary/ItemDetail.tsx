@@ -683,7 +683,7 @@ export function ItemDetailView({
 
   if (modal) {
     return (
-      <div className="flex h-full max-h-[min(92dvh,100%)] w-full max-w-full flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-xl sm:rounded-3xl">
+      <div className="flex max-h-[min(92dvh,100%)] w-full max-w-full flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-xl sm:rounded-3xl">
         <div className="shrink-0 border-b border-stone-100 bg-gradient-to-r from-surface-soft to-white px-6 py-6 sm:px-8">
           {header}
         </div>
