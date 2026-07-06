@@ -62,7 +62,7 @@ export function scrollToElementById(sectionId: string): void {
   }
 
   if (scrollParent) {
-    const offset = 96;
+    const offset = 12;
     const parentTop = scrollParent.getBoundingClientRect().top;
     const elementTop = element.getBoundingClientRect().top;
     scrollParent.scrollTo({

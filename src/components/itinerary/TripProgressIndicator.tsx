@@ -48,7 +48,7 @@ export function TripProgressIndicator({
   })();
 
   return (
-    <section className="theme-card mb-8 overflow-hidden rounded-2xl border bg-white">
+    <section className="theme-card mb-4 overflow-hidden rounded-2xl border bg-white">
       <div className="theme-gradient-header border-b border-border/60 px-5 py-4 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

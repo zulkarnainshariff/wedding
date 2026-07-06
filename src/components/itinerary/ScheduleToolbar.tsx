@@ -24,7 +24,7 @@ export function ScheduleToolbar({
   showDayFilterOptions?: boolean;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       <ViewModeToggle />
       {jumpDays && jumpVariant ? (
         <DayJumpSelector days={jumpDays} variant={jumpVariant} />

@@ -64,11 +64,11 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
             <section
               key={day.id}
               id={`day-${day.dayNumber}`}
-              className="scroll-mt-24"
+              className="scroll-mt-3"
             >
               <div
                 className={[
-                  "sticky top-0 z-10 mb-4 flex items-center gap-3 py-2 backdrop-blur",
+                  "sticky top-0 z-10 mb-3 flex items-center gap-3 py-1.5 backdrop-blur",
                   isToday
                     ? "rounded-2xl border border-accent/40 bg-surface-soft/95 px-3"
                     : "bg-background/90",
