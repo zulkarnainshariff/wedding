@@ -40,9 +40,10 @@ export const itineraryItems = pgTable("itinerary_items", {
 
 export const itemDocuments = pgTable("item_documents", {
   id: serial("id").primaryKey(),
-  itemId: integer("item_id")
-    .notNull()
-    .references(() => itineraryItems.id, { onDelete: "cascade" }),
+  itemId: integer("item_id").references(() => itineraryItems.id, {
+    onDelete: "cascade",
+  }),
+  category: text("category").notNull().default("general"),
   travellerName: text("traveller_name").notNull(),
   coversTravellers: jsonb("covers_travellers").notNull().default([]),
   label: text("label").notNull(),

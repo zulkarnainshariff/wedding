@@ -1,7 +1,11 @@
-import { inArray } from "drizzle-orm";
+import { inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { filterVisibleDocuments } from "@/lib/item-documents";
-import { parseCoveredTravellers } from "@/lib/item-document-utils";
+import {
+  defaultDocumentCategoryForItem,
+  type DocumentCategory,
+} from "@/lib/document-categories";
+import { filterVisibleDocuments, canViewStandaloneDocument } from "@/lib/item-documents";
+import { isSharedDocument, parseCoveredTravellers } from "@/lib/item-document-utils";
 import { filterItemsByPermission } from "@/lib/permissions";
 import type { SessionUser } from "@/lib/permissions";
 import { itemDocuments, itineraryItems } from "@/lib/schema";
@@ -15,43 +19,123 @@ export type DocumentListEntry = {
   mimeType: string | null;
   createdAt: string;
   coversTravellers: string[];
-  itemId: number;
-  itemTitle: string;
-  itemCategory: Category;
+  category: DocumentCategory;
+  isShared: boolean;
+  itemId: number | null;
+  itemTitle: string | null;
+  itemCategory: Category | null;
   itemStartDatetime: string | null;
 };
 
-async function loadAuthorizedItemDocs(user: SessionUser) {
+export type DocumentViewMode = "item_type" | "document_category" | "user";
+
+function toListEntry(
+  doc: (typeof itemDocuments.$inferSelect),
+  item: (typeof itineraryItems.$inferSelect) | null,
+): DocumentListEntry {
+  return {
+    id: doc.id,
+    label: doc.label,
+    fileName: doc.fileName,
+    mimeType: doc.mimeType,
+    createdAt: doc.createdAt.toISOString(),
+    coversTravellers: parseCoveredTravellers(doc),
+    category: defaultDocumentCategoryForItem(doc.category),
+    isShared: isSharedDocument(doc),
+    itemId: item?.id ?? null,
+    itemTitle: item?.title ?? null,
+    itemCategory: item && isCategory(item.category) ? item.category : null,
+    itemStartDatetime: item?.startDatetime
+      ? item.startDatetime.toISOString()
+      : null,
+  };
+}
+
+async function loadVisibleDocumentRows(user: SessionUser) {
   const docs = await db.select().from(itemDocuments);
   if (docs.length === 0) {
-    return {
-      authorizedItems: [] as (typeof itineraryItems.$inferSelect)[],
-      docsByItem: new Map<number, typeof docs>(),
-    };
+    return [] as DocumentListEntry[];
   }
 
-  const itemIds = [...new Set(docs.map((doc) => doc.itemId))];
-  const items = await db
-    .select()
-    .from(itineraryItems)
-    .where(inArray(itineraryItems.id, itemIds));
+  const linkedItemIds = [
+    ...new Set(
+      docs
+        .map((doc) => doc.itemId)
+        .filter((itemId): itemId is number => itemId != null),
+    ),
+  ];
+
+  const items =
+    linkedItemIds.length > 0
+      ? await db
+          .select()
+          .from(itineraryItems)
+          .where(inArray(itineraryItems.id, linkedItemIds))
+      : [];
+
+  const authorizedItems = filterItemsByPermission(items, user);
+  const authorizedItemIds = new Set(authorizedItems.map((item) => item.id));
+  const itemById = new Map(authorizedItems.map((item) => [item.id, item]));
+
+  const entries: DocumentListEntry[] = [];
+
+  for (const doc of docs) {
+    if (doc.itemId == null) {
+      if (canViewStandaloneDocument(doc, user)) {
+        entries.push(toListEntry(doc, null));
+      }
+      continue;
+    }
+
+    const item = itemById.get(doc.itemId);
+    if (!item || !authorizedItemIds.has(doc.itemId)) continue;
+
+    const visible = filterVisibleDocuments([doc], item, user);
+    if (visible.length > 0) {
+      entries.push(toListEntry(doc, item));
+    }
+  }
+
+  entries.sort((a, b) => {
+    const timeDiff =
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (timeDiff !== 0) return timeDiff;
+    return a.label.localeCompare(b.label);
+  });
+
+  return entries;
+}
+
+export async function getDocumentIndicators(user: SessionUser) {
+  const docs = await db.select().from(itemDocuments);
+  const counts: Record<number, number> = {};
+
+  const linkedItemIds = [
+    ...new Set(
+      docs
+        .map((doc) => doc.itemId)
+        .filter((itemId): itemId is number => itemId != null),
+    ),
+  ];
+
+  const items =
+    linkedItemIds.length > 0
+      ? await db
+          .select()
+          .from(itineraryItems)
+          .where(inArray(itineraryItems.id, linkedItemIds))
+      : [];
 
   const authorizedItems = filterItemsByPermission(items, user);
   const docsByItem = new Map<number, typeof docs>();
 
   for (const doc of docs) {
+    if (doc.itemId == null) continue;
     const list = docsByItem.get(doc.itemId) ?? [];
     list.push(doc);
     docsByItem.set(doc.itemId, list);
   }
 
-  return { authorizedItems, docsByItem };
-}
-
-export async function getDocumentIndicators(user: SessionUser) {
-  const { authorizedItems, docsByItem } = await loadAuthorizedItemDocs(user);
-
-  const counts: Record<number, number> = {};
   for (const item of authorizedItems) {
     const itemDocs = docsByItem.get(item.id) ?? [];
     const visible = filterVisibleDocuments(itemDocs, item, user);
@@ -66,39 +150,13 @@ export async function getDocumentIndicators(user: SessionUser) {
 export async function getAllVisibleDocuments(
   user: SessionUser,
 ): Promise<DocumentListEntry[]> {
-  const { authorizedItems, docsByItem } = await loadAuthorizedItemDocs(user);
-  const entries: DocumentListEntry[] = [];
+  return loadVisibleDocumentRows(user);
+}
 
-  for (const item of authorizedItems) {
-    if (!isCategory(item.category)) continue;
-
-    const itemDocs = docsByItem.get(item.id) ?? [];
-    const visible = filterVisibleDocuments(itemDocs, item, user);
-
-    for (const doc of visible) {
-      entries.push({
-        id: doc.id,
-        label: doc.label,
-        fileName: doc.fileName,
-        mimeType: doc.mimeType,
-        createdAt: doc.createdAt.toISOString(),
-        coversTravellers: parseCoveredTravellers(doc),
-        itemId: item.id,
-        itemTitle: item.title,
-        itemCategory: item.category,
-        itemStartDatetime: item.startDatetime
-          ? item.startDatetime.toISOString()
-          : null,
-      });
-    }
-  }
-
-  entries.sort((a, b) => {
-    const timeDiff =
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    if (timeDiff !== 0) return timeDiff;
-    return a.label.localeCompare(b.label);
-  });
-
-  return entries;
+export async function countStandaloneDocuments(): Promise<number> {
+  const rows = await db
+    .select({ id: itemDocuments.id })
+    .from(itemDocuments)
+    .where(isNull(itemDocuments.itemId));
+  return rows.length;
 }

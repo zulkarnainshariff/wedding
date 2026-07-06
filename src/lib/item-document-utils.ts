@@ -58,3 +58,11 @@ export function parseExtraViewersInput(raw: string): string[] {
       .filter(Boolean),
   );
 }
+
+export function isSharedDocument(
+  doc: Pick<ItemDocument, "travellerName" | "coversTravellers" | "extraViewers">,
+): boolean {
+  const covered = parseCoveredTravellers(doc);
+  const extra = parseExtraViewers(doc.extraViewers);
+  return covered.length > 1 || extra.length > 0;
+}
