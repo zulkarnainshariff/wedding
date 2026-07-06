@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useDiscardConfirm } from "@/hooks/useDiscardConfirm";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
+import { PortaledFileInput } from "@/components/ui/PortaledFileInput";
 import { IconTooltip } from "@/components/ui/IconTooltip";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
@@ -561,12 +562,9 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
             </div>
             <div className="text-sm sm:col-span-2">
               <span className="mb-1 block text-stone-500">File (PDF or image)</span>
-              <button
-                type="button"
-                onClick={() => {
-                  markNativeFilePickerOpen();
-                  fileInputRef.current?.click();
-                }}
+              <label
+                htmlFor={`document-file-${item.id}`}
+                onMouseDown={() => markNativeFilePickerOpen()}
                 className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-left text-sm transition hover:border-brand/30 hover:bg-accent-pearl/30"
               >
                 <span className="inline-flex min-w-0 items-center gap-2 text-stone-700">
@@ -575,38 +573,24 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                     {selectedFileName ?? "Choose PDF or image…"}
                   </span>
                 </span>
-                {selectedFileName && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                      setSelectedFileName(null);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                      setSelectedFileName(null);
-                    }}
-                    className="shrink-0 cursor-pointer rounded p-0.5 text-stone-400 hover:text-stone-600"
-                    aria-label="Clear selected file"
-                  >
-                    <X className="h-4 w-4" />
-                  </span>
-                )}
-              </button>
-              <input
-                ref={fileInputRef}
+              </label>
+              {selectedFileName ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                    setSelectedFileName(null);
+                  }}
+                  className="mt-2 text-sm text-stone-500 hover:text-stone-700"
+                >
+                  Clear selected file
+                </button>
+              ) : null}
+              <PortaledFileInput
+                inputRef={fileInputRef}
                 id={`document-file-${item.id}`}
                 name="file"
-                type="file"
                 accept=".pdf,image/jpeg,image/png,image/webp"
-                className="sr-only"
-                required
                 onChange={(event) => {
                   handleFileChange(event);
                   clearNativeFilePickerOpen();

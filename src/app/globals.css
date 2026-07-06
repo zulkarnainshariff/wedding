@@ -287,7 +287,7 @@ a[href],
   display: none;
 }
 
-/* Native file pickers render behind high z-index modals unless the overlay is hidden. */
-html[data-native-file-picker-open] [data-item-detail-modal] {
+/* Hide only the modal backdrop while the native file picker is open. */
+html[data-native-file-picker-open] [data-item-detail-modal-backdrop] {
   visibility: hidden;
 }
