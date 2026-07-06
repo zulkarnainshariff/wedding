@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Maximize2, Pencil, Trash2, X } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
@@ -140,6 +140,67 @@ function GalleryPhotoEditDialog({
   );
 }
 
+function GalleryPhotoLightbox({
+  photo,
+  onClose,
+}: {
+  photo: GalleryPhoto;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      role="presentation"
+    >
+      <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm" />
+      <div
+        className="relative flex max-h-[92vh] w-full max-w-5xl flex-col"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={photo.caption ?? photo.eventName}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-2 right-2 z-10 rounded-full bg-stone-900/70 p-2 text-white shadow-sm transition hover:bg-stone-900"
+          aria-label="Close"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={photo.url}
+          alt={photo.caption ?? photo.eventName}
+          className="max-h-[78vh] w-full rounded-2xl bg-stone-900 object-contain shadow-2xl"
+        />
+        <div className="mt-3 rounded-xl bg-white/95 px-4 py-3 text-sm shadow-lg">
+          {photo.caption ? (
+            <p className="font-medium text-stone-800">{photo.caption}</p>
+          ) : null}
+          <p className="text-stone-500">{photo.eventName}</p>
+          {photo.tags.length > 0 ? (
+            <p className="mt-1 text-stone-500">
+              {photo.tags.map((tag) => tag.guestName).join(", ")}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function GalleryPhotoCard({
   photo,
   editable = false,
@@ -153,50 +214,69 @@ export function GalleryPhotoCard({
   onEdit?: () => void;
   onDelete?: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <figure className="group overflow-hidden rounded-xl border border-stone-200 bg-white">
-      <div className="relative aspect-[4/3] overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={photo.url}
-          alt={photo.caption ?? photo.eventName}
-          className="h-full w-full object-cover"
-        />
-        {editable && (
-          <div className="pointer-events-none absolute inset-0 flex items-start justify-end gap-1 bg-stone-900/0 p-2 opacity-0 transition group-hover:bg-stone-900/45 group-hover:opacity-100 group-focus-within:bg-stone-900/45 group-focus-within:opacity-100">
+    <>
+      <figure className="group overflow-hidden rounded-xl border border-stone-200 bg-white">
+        <div className="relative aspect-[4/3] overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photo.url}
+            alt={photo.caption ?? photo.eventName}
+            className="h-full w-full object-cover"
+          />
+          <div className="pointer-events-none absolute inset-0 bg-stone-900/0 opacity-0 transition group-hover:bg-stone-900/35 group-hover:opacity-100 group-focus-within:bg-stone-900/35 group-focus-within:opacity-100">
             <button
               type="button"
               disabled={busy}
-              onClick={onEdit}
-              className="pointer-events-auto rounded-lg bg-white/95 p-2 text-stone-700 shadow-sm hover:bg-white disabled:opacity-50"
-              aria-label="Edit photo"
+              onClick={() => setExpanded(true)}
+              className="pointer-events-auto absolute top-2 right-2 rounded-lg bg-white/95 p-2 text-stone-700 shadow-sm transition hover:bg-white disabled:opacity-50"
+              aria-label="View larger"
             >
-              <Pencil className="h-4 w-4" />
+              <Maximize2 className="h-4 w-4" />
             </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onDelete}
-              className="pointer-events-auto rounded-lg bg-white/95 p-2 text-red-600 shadow-sm hover:bg-white disabled:opacity-50"
-              aria-label="Delete photo"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            {editable ? (
+              <div className="absolute top-2 left-2 flex gap-1">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onEdit}
+                  className="pointer-events-auto rounded-lg bg-white/95 p-2 text-stone-700 shadow-sm hover:bg-white disabled:opacity-50"
+                  aria-label="Edit photo"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onDelete}
+                  className="pointer-events-auto rounded-lg bg-white/95 p-2 text-red-600 shadow-sm hover:bg-white disabled:opacity-50"
+                  aria-label="Delete photo"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ) : null}
           </div>
-        )}
-      </div>
-      <figcaption className="px-3 py-2 text-sm">
-        {photo.caption && (
-          <p className="font-medium text-stone-800">{photo.caption}</p>
-        )}
-        <p className="text-xs text-stone-400">{photo.eventName}</p>
-        {photo.tags.length > 0 && (
-          <p className="mt-1 text-xs text-stone-500">
-            {photo.tags.map((tag) => tag.guestName).join(", ")}
-          </p>
-        )}
-      </figcaption>
-    </figure>
+        </div>
+        <figcaption className="px-3 py-2 text-sm">
+          {photo.caption && (
+            <p className="font-medium text-stone-800">{photo.caption}</p>
+          )}
+          <p className="text-xs text-stone-400">{photo.eventName}</p>
+          {photo.tags.length > 0 && (
+            <p className="mt-1 text-xs text-stone-500">
+              {photo.tags.map((tag) => tag.guestName).join(", ")}
+            </p>
+          )}
+        </figcaption>
+      </figure>
+
+      {expanded ? (
+        <GalleryPhotoLightbox photo={photo} onClose={() => setExpanded(false)} />
+      ) : null}
+    </>
   );
 }
 
