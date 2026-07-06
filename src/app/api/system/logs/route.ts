@@ -22,7 +22,17 @@ export async function GET(request: Request) {
   const kind = searchParams.get("kind") ?? "login";
   const from = searchParams.get("from");
   const to = searchParams.get("to");
-  const username = searchParams.get("username") ?? undefined;
+  const usernamesParam = searchParams.get("usernames");
+  const usernames = usernamesParam
+    ? usernamesParam
+        .split(",")
+        .map((entry) => entry.trim().toLowerCase())
+        .filter(Boolean)
+    : undefined;
+  const username =
+    usernames && usernames.length > 0
+      ? undefined
+      : (searchParams.get("username") ?? undefined);
   const resourceType = searchParams.get("resourceType") ?? undefined;
   const operation = searchParams.get("operation") ?? undefined;
   const eventType = searchParams.get("eventType") ?? undefined;
@@ -47,6 +57,7 @@ export async function GET(request: Request) {
     from: from ? new Date(from) : undefined,
     to: to ? new Date(to) : undefined,
     username,
+    usernames,
     limit: 1000,
   };
 

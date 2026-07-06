@@ -45,6 +45,7 @@ export async function listErrorLogs(filters: {
   from?: Date;
   to?: Date;
   username?: string;
+  usernames?: string[];
   operation?: string;
   resourceType?: string;
   limit?: number;
@@ -52,7 +53,14 @@ export async function listErrorLogs(filters: {
   const conditions = [];
   if (filters.from) conditions.push(gte(errorLogs.createdAt, filters.from));
   if (filters.to) conditions.push(lte(errorLogs.createdAt, filters.to));
-  if (filters.username) {
+  if (filters.usernames && filters.usernames.length > 0) {
+    conditions.push(
+      inArray(
+        errorLogs.username,
+        filters.usernames.map((entry) => entry.toLowerCase()),
+      ),
+    );
+  } else if (filters.username) {
     conditions.push(eq(errorLogs.username, filters.username.toLowerCase()));
   }
   if (filters.operation) {

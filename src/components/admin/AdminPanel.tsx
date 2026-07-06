@@ -786,8 +786,7 @@ export function AdminPanel({
             <DocumentsPanelContent
               manageMode
               onOpenLinkedItem={(itemId) => {
-                const item = items.find((entry) => entry.id === itemId);
-                if (item) startEditItem(item);
+                router.push(`/itinerary?item=${itemId}`);
               }}
             />
           </SectionShell>

@@ -1,14 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, FileText, Plus, Users } from "lucide-react";
+import { ExternalLink, FileText, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { DocumentEditForm } from "@/components/documents/DocumentEditForm";
 import { DocumentUploadForm } from "@/components/documents/DocumentUploadForm";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useItineraryUI } from "@/components/itinerary/ItineraryUIContext";
 import { IconTooltip } from "@/components/ui/IconTooltip";
+import { useToast } from "@/components/ui/ToastProvider";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
-import { documentCategoryLabel } from "@/lib/document-categories";
+import { documentCategoryLabel, type DocumentCategory } from "@/lib/document-categories";
 import { CATEGORY_META, type Category } from "@/lib/types";
 import { CATEGORY_STYLES, getCategoryIcon } from "@/lib/category-ui";
+import { ADDITIONAL_VIEWERS_LABEL } from "@/lib/item-document-utils";
+import { travellerOptionsFromAccounts } from "@/lib/item-travellers";
 import type { DocumentListEntry, DocumentViewMode } from "@/lib/document-queries";
 
 function SharedBadge() {
@@ -22,9 +27,28 @@ function SharedBadge() {
 function DocumentRow({
   entry,
   onOpenLinkedItem,
+  allowEdit = false,
+  isEditing = false,
+  saving = false,
+  viewerOptions,
+  onToggleEdit,
+  onDelete,
+  onSave,
 }: {
   entry: DocumentListEntry;
   onOpenLinkedItem?: (itemId: number) => void;
+  allowEdit?: boolean;
+  isEditing?: boolean;
+  saving?: boolean;
+  viewerOptions: string[];
+  onToggleEdit?: () => void;
+  onDelete?: () => void;
+  onSave?: (
+    label: string,
+    category: DocumentCategory,
+    coversTravellers: string[],
+    extraViewers: string[],
+  ) => Promise<void>;
 }) {
   const { formatDateTime } = useDisplayFormat();
   const displayName = `${entry.label} · ${entry.fileName}`;
@@ -34,6 +58,10 @@ function DocumentRow({
   const ItemIcon = entry.itemCategory
     ? getCategoryIcon(entry.itemCategory)
     : FileText;
+  const travellerOptions = useMemo(
+    () => travellerOptionsFromAccounts(viewerOptions, entry.coversTravellers),
+    [viewerOptions, entry.coversTravellers],
+  );
 
   return (
     <li className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3">
@@ -56,10 +84,35 @@ function DocumentRow({
               {documentCategoryLabel(entry.category)}
             </span>
             {entry.isShared ? <SharedBadge /> : null}
+            {allowEdit && onToggleEdit && onDelete ? (
+              <div className="ml-auto flex shrink-0 gap-1 sm:ml-0">
+                <button
+                  type="button"
+                  onClick={onToggleEdit}
+                  className="rounded-lg border border-stone-200 bg-white p-1.5 text-stone-600 hover:bg-stone-50"
+                  aria-label="Edit document settings"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="rounded-lg border border-red-200 bg-white p-1.5 text-red-600 hover:bg-red-50"
+                  aria-label="Delete document"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ) : null}
           </div>
           <p className="mt-1 text-xs text-stone-500">
             Linked to: {entry.coversTravellers.join(", ")}
           </p>
+          {entry.extraViewers.length > 0 ? (
+            <p className="mt-0.5 text-xs text-stone-500">
+              {ADDITIONAL_VIEWERS_LABEL}: {entry.extraViewers.join(", ")}
+            </p>
+          ) : null}
           <p className="mt-0.5 text-xs text-stone-400">
             Uploaded {formatDateTime(entry.createdAt)}
           </p>
@@ -98,6 +151,24 @@ function DocumentRow({
           </div>
         )}
       </div>
+
+      {allowEdit && isEditing && onSave ? (
+        <DocumentEditForm
+          key={entry.id}
+          doc={{
+            label: entry.label,
+            category: entry.category,
+            travellerName: entry.coversTravellers[0] ?? "",
+            coversTravellers: entry.coversTravellers,
+            extraViewers: entry.extraViewers,
+          }}
+          travellerOptions={travellerOptions}
+          viewerOptions={viewerOptions}
+          busy={saving}
+          onCancel={() => onToggleEdit?.()}
+          onSave={onSave}
+        />
+      ) : null}
     </li>
   );
 }
@@ -163,11 +234,17 @@ export function DocumentsPanelContent({
   onOpenLinkedItem?: (itemId: number) => void;
   manageMode?: boolean;
 }) {
+  const { canEdit } = useAuth();
+  const toast = useToast();
+  const allowEdit = manageMode && canEdit;
   const [documents, setDocuments] = useState<DocumentListEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<DocumentViewMode>("item_type");
   const [showUpload, setShowUpload] = useState(false);
+  const [editingDocId, setEditingDocId] = useState<number | null>(null);
+  const [savingDocId, setSavingDocId] = useState<number | null>(null);
+  const [viewerOptions, setViewerOptions] = useState<string[]>([]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -193,6 +270,104 @@ export function DocumentsPanelContent({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!allowEdit) return;
+    void fetch("/api/users/brief")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((rows: { username: string }[]) => {
+        setViewerOptions(
+          rows
+            .map((row) => row.username)
+            .sort((a, b) => a.localeCompare(b)),
+        );
+      })
+      .catch(() => undefined);
+  }, [allowEdit]);
+
+  async function handleSaveDocument(
+    docId: number,
+    docLabel: string,
+    docCategory: DocumentCategory,
+    covers: string[],
+    viewers: string[],
+  ) {
+    setSavingDocId(docId);
+    const response = await fetch(`/api/items/documents/${docId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        label: docLabel,
+        category: docCategory,
+        coversTravellers: covers,
+        extraViewers: viewers,
+      }),
+    });
+    setSavingDocId(null);
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      toast.error(payload.error ?? "Could not save document settings.");
+      return;
+    }
+
+    toast.success("Document settings saved.");
+    setEditingDocId(null);
+    await refresh();
+  }
+
+  async function handleDeleteDocument(docId: number) {
+    if (!confirm("Delete this document?")) return;
+    const response = await fetch(`/api/items/documents/${docId}`, {
+      method: "DELETE",
+    });
+    if (response.ok) {
+      toast.success("Document deleted.");
+      if (editingDocId === docId) setEditingDocId(null);
+      await refresh();
+    } else {
+      toast.error("Could not delete document.");
+    }
+  }
+
+  function renderDocumentRow(entry: DocumentListEntry, key?: string) {
+    return (
+      <DocumentRow
+        key={key ?? entry.id}
+        entry={entry}
+        onOpenLinkedItem={onOpenLinkedItem}
+        allowEdit={allowEdit}
+        isEditing={editingDocId === entry.id}
+        saving={savingDocId === entry.id}
+        viewerOptions={viewerOptions}
+        onToggleEdit={
+          allowEdit
+            ? () =>
+                setEditingDocId((current) =>
+                  current === entry.id ? null : entry.id,
+                )
+            : undefined
+        }
+        onDelete={
+          allowEdit ? () => void handleDeleteDocument(entry.id) : undefined
+        }
+        onSave={
+          allowEdit
+            ? (docLabel, docCategory, covers, viewers) =>
+                handleSaveDocument(
+                  entry.id,
+                  docLabel,
+                  docCategory,
+                  covers,
+                  viewers,
+                )
+            : undefined
+        }
+      />
+    );
+  }
 
   const groupedByItemType = useMemo(() => {
     const map = new Map<string, DocumentListEntry[]>();
@@ -300,13 +475,7 @@ export function DocumentsPanelContent({
                     }
                   />
                   <ul className="space-y-2">
-                    {entries.map((entry) => (
-                      <DocumentRow
-                        key={entry.id}
-                        entry={entry}
-                        onOpenLinkedItem={onOpenLinkedItem}
-                      />
-                    ))}
+                    {entries.map((entry) => renderDocumentRow(entry))}
                   </ul>
                 </section>
               );
@@ -325,13 +494,7 @@ export function DocumentsPanelContent({
                   count={entries.length}
                 />
                 <ul className="space-y-2">
-                  {entries.map((entry) => (
-                    <DocumentRow
-                      key={entry.id}
-                      entry={entry}
-                      onOpenLinkedItem={onOpenLinkedItem}
-                    />
-                  ))}
+                  {entries.map((entry) => renderDocumentRow(entry))}
                 </ul>
               </section>
             ))}
@@ -346,13 +509,9 @@ export function DocumentsPanelContent({
                 icon={<Users className="h-5 w-5 text-stone-500" />}
               />
               <ul className="space-y-2">
-                {entries.map((entry) => (
-                  <DocumentRow
-                    key={`${username}-${entry.id}`}
-                    entry={entry}
-                    onOpenLinkedItem={onOpenLinkedItem}
-                  />
-                ))}
+                {entries.map((entry) =>
+                  renderDocumentRow(entry, `${username}-${entry.id}`),
+                )}
               </ul>
             </section>
           ))}

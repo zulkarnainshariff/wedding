@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql, type SQL } from "drizzle-orm";
 import {
   isPostgresUniqueViolation,
   resetApplicationSequences,
@@ -214,18 +214,34 @@ export async function logAuditEvent(input: {
   });
 }
 
+function buildUsernameFilter(
+  column: Parameters<typeof eq>[0],
+  filters: { username?: string; usernames?: string[] },
+): SQL | undefined {
+  if (filters.usernames && filters.usernames.length > 0) {
+    return inArray(
+      column,
+      filters.usernames.map((entry) => entry.toLowerCase()),
+    );
+  }
+  if (filters.username) {
+    return eq(column, filters.username.toLowerCase());
+  }
+  return undefined;
+}
+
 export async function listLoginLogs(filters: {
   from?: Date;
   to?: Date;
   username?: string;
+  usernames?: string[];
   limit?: number;
 }) {
   const conditions = [];
   if (filters.from) conditions.push(gte(loginLogs.createdAt, filters.from));
   if (filters.to) conditions.push(lte(loginLogs.createdAt, filters.to));
-  if (filters.username) {
-    conditions.push(eq(loginLogs.username, filters.username.toLowerCase()));
-  }
+  const usernameFilter = buildUsernameFilter(loginLogs.username, filters);
+  if (usernameFilter) conditions.push(usernameFilter);
 
   let query = db.select().from(loginLogs).orderBy(desc(loginLogs.createdAt));
   if (conditions.length === 1) {
@@ -240,15 +256,15 @@ export async function listAuditLogs(filters: {
   from?: Date;
   to?: Date;
   username?: string;
+  usernames?: string[];
   resourceType?: string;
   limit?: number;
 }) {
   const conditions = [];
   if (filters.from) conditions.push(gte(auditLogs.createdAt, filters.from));
   if (filters.to) conditions.push(lte(auditLogs.createdAt, filters.to));
-  if (filters.username) {
-    conditions.push(eq(auditLogs.username, filters.username.toLowerCase()));
-  }
+  const usernameFilter = buildUsernameFilter(auditLogs.username, filters);
+  if (usernameFilter) conditions.push(usernameFilter);
   if (filters.resourceType) {
     conditions.push(eq(auditLogs.resourceType, filters.resourceType));
   }
@@ -266,15 +282,15 @@ export async function listUsageLogs(filters: {
   from?: Date;
   to?: Date;
   username?: string;
+  usernames?: string[];
   eventType?: string;
   limit?: number;
 }) {
   const conditions = [];
   if (filters.from) conditions.push(gte(usageLogs.createdAt, filters.from));
   if (filters.to) conditions.push(lte(usageLogs.createdAt, filters.to));
-  if (filters.username) {
-    conditions.push(eq(usageLogs.username, filters.username.toLowerCase()));
-  }
+  const usernameFilter = buildUsernameFilter(usageLogs.username, filters);
+  if (usernameFilter) conditions.push(usernameFilter);
   if (filters.eventType) {
     conditions.push(eq(usageLogs.eventType, filters.eventType));
   }
