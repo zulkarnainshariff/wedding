@@ -185,17 +185,23 @@ function ActivityDetail({
 }
 
 function InsuranceDetail({ details }: { details: TravelInsuranceDetails }) {
+  const { formatDateOnly, formatDateRange } = useDisplayFormat();
+  const policyPeriod =
+    details.policyStartDate && details.policyEndDate
+      ? formatDateRange(details.policyStartDate, details.policyEndDate)
+      : details.policyStartDate
+        ? formatDateRange(details.policyStartDate, undefined)
+        : details.policyEndDate
+          ? formatDateOnly(details.policyEndDate)
+          : undefined;
+
   return (
     <div className="space-y-4">
       <dl>
         <DetailRow label="Provider" value={details.provider} />
         <DetailRow label="Policy number" value={details.policyNumber} />
         <DetailRow label="Coverage" value={details.coverage} />
-        <DetailRow label="Policy period" value={
-          details.policyStartDate || details.policyEndDate
-            ? [details.policyStartDate, details.policyEndDate].filter(Boolean).join(" – ")
-            : undefined
-        } />
+        <DetailRow label="Policy period" value={policyPeriod ?? undefined} />
         <DetailRow
           label="Countries"
           value={
