@@ -8,6 +8,10 @@ import {
   parseExtraViewers,
   readDocumentFile,
 } from "@/lib/item-documents";
+import {
+  defaultDocumentCategoryForItem,
+  isDocumentCategory,
+} from "@/lib/document-categories";
 import { normalizeTravellerName } from "@/lib/travellers";
 import { filterItemsByPermission } from "@/lib/permissions";
 import { itemDocuments, itineraryItems } from "@/lib/schema";
@@ -30,18 +34,24 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const [item] = await db
-    .select()
-    .from(itineraryItems)
-    .where(eq(itineraryItems.id, doc.itemId))
-    .limit(1);
+  const [item] = doc.itemId
+    ? await db
+        .select()
+        .from(itineraryItems)
+        .where(eq(itineraryItems.id, doc.itemId))
+        .limit(1)
+    : [null];
 
-  if (!item) {
+  if (doc.itemId && !item) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const [authorized] = filterItemsByPermission([item], user);
-  if (!authorized || !canViewDocument(doc, item, user)) {
+  if (doc.itemId && item) {
+    const [authorized] = filterItemsByPermission([item], user);
+    if (!authorized || !canViewDocument(doc, item, user)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  } else if (!canViewDocument(doc, null, user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -100,6 +110,7 @@ export async function PATCH(request: Request, { params }: Params) {
     label?: unknown;
     coversTravellers?: unknown;
     extraViewers?: unknown;
+    category?: unknown;
   };
 
   const label =
@@ -142,10 +153,20 @@ export async function PATCH(request: Request, { params }: Params) {
           .filter(Boolean),
   );
 
+  const categoryRaw =
+    typeof body.category === "string" ? body.category.trim() : undefined;
+  const category =
+    categoryRaw && isDocumentCategory(categoryRaw)
+      ? categoryRaw
+      : categoryRaw
+        ? defaultDocumentCategoryForItem(categoryRaw)
+        : undefined;
+
   const [updated] = await db
     .update(itemDocuments)
     .set({
       ...(label !== undefined ? { label } : {}),
+      ...(category !== undefined ? { category } : {}),
       travellerName: coversTravellers[0],
       coversTravellers,
       extraViewers,

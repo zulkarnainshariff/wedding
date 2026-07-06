@@ -780,9 +780,11 @@ export function AdminPanel({
         <div className={TAB_CONTENT_CLASS}>
           <SectionShell title="Documents">
             <p className="mb-4 text-sm text-stone-500">
-              All documents you can access, grouped by itinerary item type.
+              Browse documents by item type, document category, or traveller.
+              Upload shared documents that are not linked to a specific item.
             </p>
             <DocumentsPanelContent
+              manageMode
               onOpenLinkedItem={(itemId) => {
                 const item = items.find((entry) => entry.id === itemId);
                 if (item) startEditItem(item);

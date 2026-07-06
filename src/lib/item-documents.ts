@@ -53,11 +53,38 @@ export function userInTravellingParty(
   return party.some((member) => travellerMatchesUsername(member, user.username));
 }
 
-export function canViewDocument(
+export function canViewStandaloneDocument(
   doc: ItemDocument,
-  item: ItineraryItem,
   user: SessionUser,
 ): boolean {
+  if (user.isAdmin) return true;
+  if (doc.uploadedByUserId === user.id) return true;
+
+  const coveredTravellers = parseCoveredTravellers(doc);
+  if (
+    coveredTravellers.some((name) =>
+      travellerMatchesUsername(name, user.username),
+    )
+  ) {
+    return true;
+  }
+
+  if (userIsGuardianOfTravellers(user, coveredTravellers)) {
+    return true;
+  }
+
+  const extraViewers = parseExtraViewers(doc.extraViewers);
+  return extraViewers.includes(user.username.toLowerCase());
+}
+
+export function canViewDocument(
+  doc: ItemDocument,
+  item: ItineraryItem | null,
+  user: SessionUser,
+): boolean {
+  if (!item) {
+    return canViewStandaloneDocument(doc, user);
+  }
   if (user.isAdmin) return true;
   if (doc.uploadedByUserId === user.id) return true;
 
@@ -92,7 +119,7 @@ export function canViewDocument(
 
 export function filterVisibleDocuments(
   docs: ItemDocument[],
-  item: ItineraryItem,
+  item: ItineraryItem | null,
   user: SessionUser,
 ): ItemDocument[] {
   return docs.filter((doc) => canViewDocument(doc, item, user));
@@ -145,8 +172,12 @@ export async function ensureUploadDir(): Promise<void> {
   await mkdir(UPLOAD_ROOT, { recursive: true });
 }
 
-export function buildStorageKey(itemId: number, fileName: string): string {
-  return `${itemId}/${randomUUID()}-${sanitizeFileName(fileName)}`;
+export function buildStorageKey(
+  itemId: number | null,
+  fileName: string,
+): string {
+  const prefix = itemId == null ? "standalone" : String(itemId);
+  return `${prefix}/${randomUUID()}-${sanitizeFileName(fileName)}`;
 }
 
 export function resolveStoragePath(storageKey: string): string {
