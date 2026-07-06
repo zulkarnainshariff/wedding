@@ -105,6 +105,7 @@ export function ItemDetailModal() {
   return (
     <>
       <div
+        data-item-detail-modal
         className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden p-0 sm:items-center sm:p-4"
         role="presentation"
       >
