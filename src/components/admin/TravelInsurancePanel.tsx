@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Save } from "lucide-react";
-import { AdminItemDetailsForm } from "@/components/admin/AdminItemDetailsForm";
+import { Pencil, Plus } from "lucide-react";
 import {
-  buildItemApiPayload,
-  emptyItemForm,
-  itemToForm,
-  type ItemFormState,
-} from "@/lib/admin-item-form";
+  TravelInsuranceForm,
+  travelInsurancePolicySummary,
+} from "@/components/admin/TravelInsuranceForm";
 import { SectionShell } from "@/components/layout/PageShell";
 import type { ItineraryItem } from "@/lib/schema";
+
+type FormMode = "new" | number;
 
 export function TravelInsurancePanel({
   initialItems,
@@ -21,120 +20,94 @@ export function TravelInsurancePanel({
   embedded?: boolean;
 }) {
   const router = useRouter();
-  const existing = initialItems.find((item) => item.category === "travel_insurance");
-  const [itemId, setItemId] = useState<number | null>(existing?.id ?? null);
-  const [form, setForm] = useState<ItemFormState>(() =>
-    existing ? itemToForm(existing) : emptyItemForm("travel_insurance"),
+  const policies = useMemo(
+    () =>
+      initialItems
+        .filter((item) => item.category === "travel_insurance")
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id),
+    [initialItems],
   );
-  const [busy, setBusy] = useState(false);
+  const [formMode, setFormMode] = useState<FormMode | null>(
+    policies.length === 0 ? "new" : null,
+  );
   const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (existing) {
-      setItemId(existing.id);
-      setForm(itemToForm(existing));
-    }
-  }, [existing]);
+  const editingItem =
+    typeof formMode === "number"
+      ? policies.find((policy) => policy.id === formMode) ?? null
+      : null;
 
-  async function save() {
-    if (!form.title.trim()) {
-      setError("Policy title is required.");
-      return;
-    }
-
-    setBusy(true);
-    setError(null);
-    const payload = buildItemApiPayload({
-      ...form,
-      category: "travel_insurance",
-    });
-
-    const response = await fetch(
-      itemId ? `/api/items/${itemId}` : "/api/items",
-      {
-        method: itemId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      },
-    );
-
-    setBusy(false);
-    if (!response.ok) {
-      setError("Could not save travel insurance details.");
-      return;
-    }
-
-    const saved = await response.json();
-    setItemId(saved.id);
-    setForm(itemToForm(saved));
-    setStatus("Travel insurance details saved.");
+  function handleSaved() {
+    setStatus("Travel insurance saved.");
+    setFormMode(null);
     router.refresh();
   }
 
   const body = (
     <>
       <p className="mb-4 text-sm text-stone-500">
-        {itemId
-          ? "Update the family travel insurance policy. Changes appear in the itinerary for everyone who can view travel insurance."
-          : "Add the family travel insurance policy. It will appear in the itinerary for everyone who can view travel insurance."}
+        Add and manage travel insurance policies. Each policy appears as its own
+        card in the itinerary for everyone who can view travel insurance.
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block text-sm sm:col-span-2">
-          <span className="mb-1 block text-stone-500">Title</span>
-          <input
-            value={form.title}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, title: event.target.value }))
-            }
-            placeholder="Family travel insurance"
-            className="w-full rounded-lg border border-stone-200 px-3 py-2"
-          />
-        </label>
-        <label className="block text-sm sm:col-span-2">
-          <span className="mb-1 block text-stone-500">Summary</span>
-          <input
-            value={form.summary}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, summary: event.target.value }))
-            }
-            placeholder="Optional short summary"
-            className="w-full rounded-lg border border-stone-200 px-3 py-2"
-          />
-        </label>
-      </div>
+      {policies.length > 0 ? (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold tracking-wide text-stone-600 uppercase">
+            Policies
+          </h3>
+          <ul className="space-y-2">
+            {policies.map((policy) => (
+              <li
+                key={policy.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-stone-800">
+                    {policy.title}
+                  </p>
+                  <p className="truncate text-sm text-stone-500">
+                    {travelInsurancePolicySummary(policy)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormMode(policy.id)}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-100"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
-      <h3 className="mt-6 text-sm font-semibold tracking-wide text-stone-600 uppercase">
-        Policy details
-      </h3>
-      <AdminItemDetailsForm
-        category="travel_insurance"
-        structured={form.structured}
-        allItems={initialItems}
-        onChange={(structured) => setForm((current) => ({ ...current, structured }))}
-      />
-
-      {error && (
-        <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
+      {formMode === null ? (
+        <button
+          type="button"
+          onClick={() => setFormMode("new")}
+          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-brand/20 bg-white px-4 py-2 text-sm font-medium text-brand-deep hover:bg-accent-pearl/40"
+        >
+          <Plus className="h-4 w-4" />
+          Add policy
+        </button>
+      ) : (
+        <div className={policies.length > 0 ? "mt-4" : ""}>
+          <TravelInsuranceForm
+            initialItems={initialItems}
+            item={formMode === "new" ? null : editingItem}
+            onCancel={() => setFormMode(null)}
+            onSaved={handleSaved}
+          />
+        </div>
       )}
-      {status && (
+
+      {status ? (
         <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           {status}
         </p>
-      )}
-
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void save()}
-        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
-        <Save className="h-4 w-4" />
-        {itemId ? "Save changes" : "Add travel insurance"}
-      </button>
+      ) : null}
     </>
   );
 
