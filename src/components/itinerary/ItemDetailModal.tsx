@@ -109,7 +109,10 @@ export function ItemDetailModal() {
         className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden p-0 sm:items-center sm:p-4"
         role="presentation"
       >
-        <div className="absolute inset-0 bg-stone-900/45 backdrop-blur-[2px]" />
+        <div
+          data-item-detail-modal-backdrop
+          className="absolute inset-0 bg-stone-900/45 backdrop-blur-[2px]"
+        />
 
         <div
           className="relative flex max-h-[min(92dvh,100%)] w-full max-w-3xl flex-col overflow-hidden"
