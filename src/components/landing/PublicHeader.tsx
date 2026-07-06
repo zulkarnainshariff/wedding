@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CalendarDays, LogIn } from "lucide-react";
+import { CalendarDays, KeyRound } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoginModal } from "@/components/auth/LoginModal";
 import { AppMark } from "@/components/ui/AppMark";
@@ -56,10 +56,11 @@ export function PublicHeader() {
             <button
               type="button"
               onClick={() => setLoginOpen(true)}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-brand/20 bg-surface/85 text-brand-deep shadow-sm backdrop-blur-sm transition hover:bg-accent-pearl/50"
+              className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-surface/85 px-4 py-2 text-sm font-medium text-brand-deep shadow-sm backdrop-blur-sm transition hover:bg-accent-pearl/50"
               aria-label="Sign in"
             >
-              <LogIn className="h-5 w-5" />
+              <KeyRound className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">Sign in</span>
             </button>
           )}
         </div>

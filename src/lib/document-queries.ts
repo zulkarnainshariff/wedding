@@ -5,7 +5,7 @@ import {
   type DocumentCategory,
 } from "@/lib/document-categories";
 import { filterVisibleDocuments, canViewStandaloneDocument } from "@/lib/item-documents";
-import { isSharedDocument, parseCoveredTravellers } from "@/lib/item-document-utils";
+import { isSharedDocument, parseCoveredTravellers, parseExtraViewers } from "@/lib/item-document-utils";
 import { filterItemsByPermission } from "@/lib/permissions";
 import type { SessionUser } from "@/lib/permissions";
 import { itemDocuments, itineraryItems } from "@/lib/schema";
@@ -19,6 +19,7 @@ export type DocumentListEntry = {
   mimeType: string | null;
   createdAt: string;
   coversTravellers: string[];
+  extraViewers: string[];
   category: DocumentCategory;
   isShared: boolean;
   itemId: number | null;
@@ -40,6 +41,7 @@ function toListEntry(
     mimeType: doc.mimeType,
     createdAt: doc.createdAt.toISOString(),
     coversTravellers: parseCoveredTravellers(doc),
+    extraViewers: parseExtraViewers(doc.extraViewers),
     category: defaultDocumentCategoryForItem(doc.category),
     isShared: isSharedDocument(doc),
     itemId: item?.id ?? null,

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Database, Download, Upload } from "lucide-react";
 import { SectionShell } from "@/components/layout/PageShell";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type SeedFileInfo = {
   filename: string;
@@ -26,12 +27,15 @@ function formatBytes(bytes: number): string {
 }
 
 export function DatabaseOperationsPanel() {
+  const toast = useToast();
   const [meta, setMeta] = useState<SeedFilesPayload | null>(null);
   const [selectedSeed, setSelectedSeed] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+  const [downloadStatus, setDownloadStatus] = useState<string | null>(null);
   const [dumpDialogOpen, setDumpDialogOpen] = useState(false);
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const loadMeta = useCallback(async () => {
     const response = await fetch("/api/system/seed-files");
@@ -49,17 +53,36 @@ export function DatabaseOperationsPanel() {
   }, [loadMeta]);
 
   async function runDumpDownload() {
-    setBusy(true);
-    setStatus(null);
+    setDownloading(true);
+    setDownloadStatus(null);
     try {
       const response = await fetch("/api/system/dump-download");
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        setStatus(payload.error ?? "Database download failed.");
+      const contentType = response.headers.get("Content-Type") ?? "";
+
+      if (!response.ok || contentType.includes("application/json")) {
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        const message =
+          payload.error ??
+          (response.status === 403
+            ? "You do not have permission to download database dumps."
+            : response.status === 401
+              ? "Please sign in again."
+              : `Database download failed (${response.status}).`);
+        setDownloadStatus(message);
+        toast.error(message);
         return;
       }
 
       const blob = await response.blob();
+      if (blob.size === 0) {
+        const message = "Download returned an empty file.";
+        setDownloadStatus(message);
+        toast.error(message);
+        return;
+      }
+
       const disposition = response.headers.get("Content-Disposition") ?? "";
       const match = disposition.match(/filename="([^"]+)"/);
       const filename = match?.[1] ?? todayDumpName;
@@ -68,13 +91,25 @@ export function DatabaseOperationsPanel() {
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = filename;
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
       anchor.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(anchor);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-      setStatus(`Downloaded ${filename} (${formatBytes(blob.size)}).`);
+      const successMessage = `Downloaded ${filename} (${formatBytes(blob.size)}).`;
+      setDownloadStatus(successMessage);
+      toast.success(successMessage);
       await loadMeta();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Database download failed — check your connection and try again.";
+      setDownloadStatus(message);
+      toast.error(message);
     } finally {
-      setBusy(false);
+      setDownloading(false);
     }
   }
 
@@ -140,12 +175,15 @@ export function DatabaseOperationsPanel() {
         <button
           type="button"
           onClick={() => void runDumpDownload()}
-          disabled={busy}
+          disabled={busy || downloading}
           className="inline-flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
         >
           <Download className="h-4 w-4" />
-          Download {todayDumpName}
+          {downloading ? "Preparing download…" : `Download ${todayDumpName}`}
         </button>
+        {downloadStatus && (
+          <p className="mt-3 text-sm text-stone-600">{downloadStatus}</p>
+        )}
       </SectionShell>
 
       <SectionShell title="Deploy database dump">

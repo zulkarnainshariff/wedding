@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
+import { CheckboxDropdown } from "@/components/admin/CheckboxDropdown";
 import { SectionShell } from "@/components/layout/PageShell";
 import { DatabaseOperationsPanel } from "@/components/admin/DatabaseOperationsPanel";
 
@@ -46,7 +47,8 @@ export function SystemDiagnosticsPanel({
   const [kind, setKind] = useState<LogKind>("login");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [username, setUsername] = useState("");
+  const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
+  const [userOptions, setUserOptions] = useState<string[]>([]);
   const [operation, setOperation] = useState("");
   const [resourceType, setResourceType] = useState("");
   const [rows, setRows] = useState<LogRow[]>([]);
@@ -61,7 +63,9 @@ export function SystemDiagnosticsPanel({
     const params = new URLSearchParams({ kind });
     if (from) params.set("from", new Date(from).toISOString());
     if (to) params.set("to", new Date(to).toISOString());
-    if (username.trim()) params.set("username", username.trim().toLowerCase());
+    if (selectedUsernames.length > 0) {
+      params.set("usernames", selectedUsernames.join(","));
+    }
     if (kind === "errors") {
       if (operation.trim()) params.set("operation", operation.trim());
       if (resourceType.trim()) params.set("resourceType", resourceType.trim());
@@ -87,7 +91,20 @@ export function SystemDiagnosticsPanel({
 
     setSelected([]);
     setLoading(false);
-  }, [from, to, kind, username, operation, resourceType]);
+  }, [from, to, kind, selectedUsernames, operation, resourceType]);
+
+  useEffect(() => {
+    void fetch("/api/users/brief")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((rows: { username: string }[]) => {
+        setUserOptions(
+          rows
+            .map((row) => row.username)
+            .sort((a, b) => a.localeCompare(b)),
+        );
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -100,6 +117,25 @@ export function SystemDiagnosticsPanel({
         ? current.filter((entry) => entry !== id)
         : [...current, id],
     );
+  }
+
+  const visibleRowIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const allVisibleSelected =
+    visibleRowIds.length > 0 &&
+    visibleRowIds.every((id) => selected.includes(id));
+  const someVisibleSelected =
+    visibleRowIds.some((id) => selected.includes(id)) && !allVisibleSelected;
+
+  function toggleSelectAllVisible() {
+    if (allVisibleSelected) {
+      setSelected((current) =>
+        current.filter((id) => !visibleRowIds.includes(id)),
+      );
+      return;
+    }
+    setSelected((current) => [
+      ...new Set([...current, ...visibleRowIds]),
+    ]);
   }
 
   async function deleteSelected() {
@@ -248,15 +284,35 @@ export function SystemDiagnosticsPanel({
               className="w-full rounded-lg border border-stone-200 px-3 py-2"
             />
           </label>
-          <label className="block text-sm sm:col-span-2">
-            <span className="mb-1 block text-stone-500">Username</span>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-lg border border-stone-200 px-3 py-2"
-              placeholder="Filter by username"
+          <div className="text-sm sm:col-span-2">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-stone-500">Users</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUsernames(userOptions)}
+                  disabled={userOptions.length === 0}
+                  className="text-xs font-medium text-brand-deep hover:underline disabled:opacity-50"
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedUsernames([])}
+                  disabled={selectedUsernames.length === 0}
+                  className="text-xs font-medium text-stone-600 hover:underline disabled:opacity-50"
+                >
+                  Unselect all
+                </button>
+              </div>
+            </div>
+            <CheckboxDropdown
+              options={userOptions}
+              value={selectedUsernames}
+              onChange={setSelectedUsernames}
+              emptyLabel="All users"
             />
-          </label>
+          </div>
           {kind === "errors" && (
             <>
               <label className="block text-sm">
@@ -313,7 +369,21 @@ export function SystemDiagnosticsPanel({
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-stone-100 bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
               <tr>
-                <th className="px-3 py-2"> </th>
+                <th className="px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    ref={(input) => {
+                      if (input) input.indeterminate = someVisibleSelected;
+                    }}
+                    onChange={toggleSelectAllVisible}
+                    aria-label={
+                      allVisibleSelected
+                        ? "Unselect all visible logs"
+                        : "Select all visible logs"
+                    }
+                  />
+                </th>
                 <th className="px-3 py-2">When</th>
                 <th className="px-3 py-2">User</th>
                 <th className="px-3 py-2">Event</th>

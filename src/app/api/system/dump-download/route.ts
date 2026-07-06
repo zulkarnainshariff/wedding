@@ -23,7 +23,7 @@ export async function GET() {
         byteSize: dump.byteSize,
         method: dump.method,
       },
-    });
+    }).catch(() => undefined);
 
     return new NextResponse(sql, {
       status: 200,
