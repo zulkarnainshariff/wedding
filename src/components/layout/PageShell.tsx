@@ -13,7 +13,7 @@ export function PageShell({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="relative z-30 shrink-0 border-b border-border/60 bg-background/80 pb-4 backdrop-blur-sm">
+      <div className="relative z-30 shrink-0 border-b border-border/60 bg-background/80 pb-2 backdrop-blur-sm">
         {eyebrow && (
           <p className="theme-eyebrow text-xs font-semibold uppercase">
             {eyebrow}
@@ -25,7 +25,7 @@ export function PageShell({
         </div>
         {toolbar ? <div className="mt-4">{toolbar}</div> : null}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto pt-4">{children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto pt-2">{children}</div>
     </div>
   );
 }
