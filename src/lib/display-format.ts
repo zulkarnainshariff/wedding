@@ -12,6 +12,32 @@ function parseCalendarDate(value: string): { y: string; m: string; d: string } |
   return { y: match[1], m: match[2], d: match[3] };
 }
 
+export function formatTripDayCircleBadge(
+  value: string | Date | null | undefined,
+): { day: string; month: string } {
+  if (!value) return { day: "—", month: "" };
+
+  let parts = typeof value === "string" ? parseCalendarDate(value) : null;
+  if (!parts && value instanceof Date) {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    parts = {
+      y: String(value.getFullYear()),
+      m: pad(value.getMonth() + 1),
+      d: pad(value.getDate()),
+    };
+  }
+  if (!parts) return { day: "—", month: "" };
+
+  const month = new Date(
+    `${parts.y}-${parts.m}-${parts.d}T12:00:00`,
+  ).toLocaleDateString("en-US", { month: "short" });
+
+  return {
+    day: String(Number(parts.d)),
+    month,
+  };
+}
+
 export function formatDateOnlyWithPrefs(
   value: string | Date | null | undefined,
   preferences: UserPreferences = DEFAULT_USER_PREFERENCES,

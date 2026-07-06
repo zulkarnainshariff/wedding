@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { ExternalLink, MapPin } from "lucide-react";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import {
@@ -9,6 +10,7 @@ import {
   mapsUrl,
 } from "@/lib/types";
 import { FlightDetailView } from "@/components/itinerary/FlightViews";
+import { FormattedItemNotes, ItemNotesSection } from "@/components/itinerary/FormattedItemNotes";
 import type { ItineraryItem } from "@/lib/schema";
 
 function DetailRow({
@@ -16,9 +18,9 @@ function DetailRow({
   value,
 }: {
   label: string;
-  value?: string | null;
+  value?: ReactNode;
 }) {
-  if (!value) return null;
+  if (value == null || value === "") return null;
   return (
     <div className="grid gap-1 border-b border-stone-100 py-3 last:border-0 sm:grid-cols-[10rem_1fr]">
       <dt className="text-sm font-medium text-stone-500">{label}</dt>
@@ -139,18 +141,7 @@ export function AccommodationDetailView({
         </div>
       )}
 
-      {details.notes && details.notes.length > 0 && (
-        <div className="border-t border-stone-100 py-4">
-          <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
-            Notes
-          </h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-700">
-            {details.notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <ItemNotesSection notes={details.notes} variant="section" />
     </div>
   );
 }
@@ -160,10 +151,6 @@ export function CarRentalDetailView({
 }: {
   details: NonNullable<ReturnType<typeof getCarRentalDetails>>;
 }) {
-  const notes = Array.isArray(details.notes)
-    ? details.notes.join("; ")
-    : details.notes;
-
   return (
     <div className="space-y-6">
       {details.bookingStatus !== "confirmed" && (
@@ -189,7 +176,10 @@ export function CarRentalDetailView({
         <DetailRow label="Return time" value={details.returnTime} />
         <DetailRow label="Return location" value={details.returnLocation} />
         <DetailRow label="Confirmation" value={details.confirmationCode} />
-        <DetailRow label="Notes" value={notes} />
+        <DetailRow
+          label="Notes"
+          value={<FormattedItemNotes notes={details.notes} />}
+        />
       </dl>
       <div className="flex flex-wrap gap-3">
         <MapLink

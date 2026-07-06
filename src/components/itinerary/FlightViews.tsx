@@ -19,6 +19,7 @@ import { formatFlightProgressDuration } from "@/lib/flight-progress";
 import {
   buildFlightItinerarySummaries,
 } from "@/lib/flight-itinerary-display";
+import { ItemNotesSection } from "@/components/itinerary/FormattedItemNotes";
 import type { ItineraryItem } from "@/lib/schema";
 
 function DetailRow({
@@ -365,18 +366,7 @@ export function FlightDetailView({
         )}
       </div>
 
-      {flight.notes && flight.notes.length > 0 && (
-        <div className="border-t border-stone-100 py-4">
-          <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
-            Notes
-          </h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-700">
-            {flight.notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <ItemNotesSection notes={flight.notes} variant="section" />
     </div>
   );
 }
@@ -406,18 +396,7 @@ export function PetRelocationDetailView({
         )}
       </dl>
 
-      {details.notes && details.notes.length > 0 && (
-        <div className="border-t border-stone-100 py-4">
-          <h3 className="text-sm font-semibold tracking-wide text-stone-500 uppercase">
-            Notes
-          </h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-700">
-            {details.notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <ItemNotesSection notes={details.notes} variant="section" />
     </div>
   );
 }

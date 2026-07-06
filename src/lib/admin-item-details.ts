@@ -17,6 +17,7 @@ import { mergeItemPrivacyFields } from "@/lib/admin-item-privacy";
 import { extractItemAdditionalViewers } from "@/lib/item-viewers";
 import { extractViewerLinks } from "@/lib/item-viewer-links";
 import { parsePrivateViewers } from "@/lib/item-privacy";
+import { parseItemNotesForStorage } from "@/lib/item-note-format";
 import type { UnitsPreference } from "@/lib/user-preferences";
 
 export type TravellerRecord = { name: string; value: string };
@@ -337,10 +338,7 @@ export function buildStructuredDetailsPayload(
     structured.locationName,
     structured.locationMapUrl,
   );
-  const notes = structured.notes
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const notes = parseItemNotesForStorage(structured.notes);
 
   if (category === "activity") {
     return mergeItemPrivacyFields(
@@ -354,7 +352,7 @@ export function buildStructuredDetailsPayload(
           ? Number(structured.linkedItemId)
           : undefined,
         location,
-        notes: notes.length ? notes : undefined,
+        notes: notes?.length ? notes : undefined,
       },
       structured,
     );
@@ -362,7 +360,7 @@ export function buildStructuredDetailsPayload(
 
   const payload: Record<string, unknown> = {
     ...structured.simple,
-    notes: notes.length ? notes : undefined,
+    notes: notes?.length ? notes : undefined,
   };
 
   if (category !== "flight") {

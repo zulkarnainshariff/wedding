@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DayBannerHeader } from "./DayBannerHeader";
 import { ItemCard } from "./ItemCard";
 import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 import { useDocumentIndicators } from "@/components/itinerary/useDocumentIndicators";
@@ -16,7 +17,6 @@ import {
   collectScheduleParticipantOptions,
   filterScheduleItemsByParticipants,
 } from "@/lib/schedule-participant-filter";
-import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { itemSectionId } from "@/lib/day-jump";
 import { isDayToday } from "@/lib/trip-time";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
@@ -28,7 +28,6 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
   const { user } = useAuth();
   const { effectiveDate, hidePast, hideFreeDays, hideUntouchedDays } = useTripTime();
   const restrictedView = hasRestrictedTravellerView(user);
-  const { formatDateOnlyWithWeekday } = useDisplayFormat();
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
   const allItems = useMemo(
@@ -101,40 +100,12 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
                 id={`schedule-${day.date}`}
                 className="scroll-mt-3"
               >
-                <div
-                  className={[
-                    "sticky top-0 z-20 -mt-px mb-3 flex items-center gap-3 border-b border-border/60 py-2",
-                    isToday
-                      ? "rounded-b-2xl border-x border-accent/40 border-t-0 bg-surface-soft px-3 shadow-sm"
-                      : "bg-background px-0 shadow-sm",
-                  ].join(" ")}
-                >
-                  <div
-                    className={[
-                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-                      isToday
-                        ? "bg-accent text-brand-deep ring-2 ring-accent/40 ring-offset-2"
-                        : "bg-brand-deep text-accent",
-                    ].join(" ")}
-                  >
-                    {day.dayNumber}
-                  </div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-serif text-xl text-brand-deep">
-                        {dayTitle}
-                      </h2>
-                      {isToday && (
-                        <span className="rounded-full bg-brand-deep px-2 py-0.5 text-[10px] font-semibold tracking-wide text-accent uppercase">
-                          Today
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium text-accent">
-                      {formatDateOnlyWithWeekday(day.date)}
-                    </p>
-                  </div>
-                </div>
+                <DayBannerHeader
+                  dayNumber={day.dayNumber}
+                  date={day.date}
+                  title={dayTitle}
+                  isToday={isToday}
+                />
 
                 {day.items.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-stone-200 bg-white/50 px-4 py-6 text-sm text-stone-400">
