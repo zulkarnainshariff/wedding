@@ -12,7 +12,7 @@ export function PublicHeader() {
 
   return (
     <>
-      <header className="fixed top-0 right-0 left-0 z-50 flex items-center justify-between px-4 py-4 md:px-8">
+      <header className="flex items-center justify-between px-4 py-4 md:px-8">
         <p className="font-serif text-lg text-brand-deep/80 md:text-xl">
           Natalie & Zulkarnain
         </p>

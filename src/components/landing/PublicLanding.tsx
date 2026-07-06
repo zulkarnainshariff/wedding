@@ -17,7 +17,7 @@ export function PublicLanding({
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <PublicHeader />
-      <main className="flex flex-1 flex-col pt-24">
+      <main className="flex flex-1 flex-col">
         <InvitationCards
           events={events}
           guestbookEnabled={guestbookEnabled}

@@ -52,7 +52,7 @@ export function GalleryClient({
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <PublicHeader />
-        <main className="mx-auto w-full max-w-5xl px-4 py-24 text-center">
+        <main className="mx-auto w-full max-w-5xl px-4 py-6 text-center">
           <p className="text-stone-600">The photo gallery is not open right now.</p>
         </main>
       </div>
@@ -62,7 +62,7 @@ export function GalleryClient({
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <PublicHeader />
-      <main className="mx-auto w-full max-w-5xl px-4 py-24">
+      <main className="mx-auto w-full max-w-5xl px-4 py-6">
         <h1 className="font-serif text-3xl text-brand-deep">Photo gallery</h1>
         <p className="mt-2 text-sm text-stone-500">
           Shared moments from our celebrations.
