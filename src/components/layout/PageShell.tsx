@@ -25,7 +25,7 @@ export function PageShell({
         </div>
         {toolbar ? <div className="mt-4">{toolbar}</div> : null}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto pt-2">{children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
     </div>
   );
 }

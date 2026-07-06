@@ -103,10 +103,10 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
               >
                 <div
                   className={[
-                    "sticky top-0 z-10 mb-3 flex items-center gap-3 py-1.5 backdrop-blur",
+                    "sticky top-0 z-20 -mt-px mb-3 flex items-center gap-3 border-b border-border/60 py-2",
                     isToday
-                      ? "rounded-2xl border border-accent/40 bg-surface-soft/95 px-3"
-                      : "bg-background/95",
+                      ? "rounded-b-2xl border-x border-accent/40 border-t-0 bg-surface-soft px-3 shadow-sm"
+                      : "bg-background px-0 shadow-sm",
                   ].join(" ")}
                 >
                   <div
