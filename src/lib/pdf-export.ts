@@ -1,4 +1,5 @@
-import { formatBookingGroupsDisplay } from "@/lib/booking-groups";
+import { groupsFromFlatMap, type BookingGroup } from "@/lib/booking-groups";
+import { toDatetimeLocal } from "@/lib/admin-item-form";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
 import { formatClockTimeWithPrefs } from "@/lib/display-format";
 import { resolveFlightSchedule } from "@/lib/flight-datetime";
@@ -18,6 +19,7 @@ import {
   type Category,
   type FlightDetails,
   type FlightSegment,
+  type TravelInsuranceDetails,
 } from "@/lib/types";
 import {
   DEFAULT_USER_PREFERENCES,
@@ -344,6 +346,7 @@ function pdfPlainText(text: string): string {
   return text
     .replace(/\u00b7/g, " | ")
     .replace(/\u2192/g, "->")
+    .replace(/\u2194/g, "<->")
     .replace(/[\u2013\u2014]/g, "-")
     .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
@@ -481,29 +484,144 @@ function formatTravellerList(names: string[], cargoParty: string[] = []): string
   return names.map((name) => formatTravellerLabel(name, cargo.has(name))).join(" / ");
 }
 
-export function formatGroupedBookingRefs(
-  bookingReferences?: Record<string, string>,
-  fallback?: string | null,
-  bookingGroups?: import("./booking-groups").BookingGroup[],
-): string | null {
-  if (bookingGroups && bookingGroups.length > 0) {
-    return formatBookingGroupsDisplay(bookingGroups, bookingReferences, fallback);
+function resolveBookingGroups(details: FlightDetails): BookingGroup[] {
+  if (details.bookingGroups?.length) {
+    return details.bookingGroups.filter((group) => group.reference.trim());
   }
-  if (bookingReferences && Object.keys(bookingReferences).length > 0) {
-    const byRef = new Map<string, string[]>();
-    for (const [name, ref] of Object.entries(bookingReferences)) {
-      const key = ref.trim();
-      if (!key) continue;
-      const list = byRef.get(key) ?? [];
-      list.push(formatTravellerLabel(name));
-      byRef.set(key, list);
+  return groupsFromFlatMap(
+    details.bookingReferences,
+    details.bookingReference,
+  ).filter((group) => group.reference.trim());
+}
+
+function bookingReferencePdfLines(details: FlightDetails): BlockLine[] {
+  const groups = resolveBookingGroups(details);
+  if (!groups.length) {
+    const fallback = details.bookingReference?.trim();
+    if (!fallback) return [];
+    return [
+      { text: "Booking Reference", bold: true },
+      ...detailBlockLines(fallback),
+    ];
+  }
+
+  const lines: BlockLine[] = [{ text: "Booking Reference", bold: true }];
+  for (const group of groups) {
+    const names =
+      group.travellers.length > 0
+        ? group.travellers.map((name) => formatTravellerLabel(name)).join(" / ")
+        : "Booking";
+    let text = `${names}: ${group.reference.trim()}`;
+    const linked = [...new Set(group.linkedWith ?? [])]
+      .map((ref) => ref.trim())
+      .filter((ref) => ref && ref !== group.reference.trim());
+    if (linked.length > 0) {
+      text += ` (linked with ${linked.join(", ")} at airline)`;
     }
-    const grouped = [...byRef.entries()]
-      .map(([ref, names]) => `${names.join(" / ")}: ${ref}`)
-      .join(" · ");
-    return grouped || null;
+    lines.push(...detailBlockLines(text));
   }
-  return fallback?.trim() || null;
+  return lines;
+}
+
+function itemScheduleDate(
+  eventDate: string | null | undefined,
+  datetime: Date | string | null | undefined,
+): string | null {
+  if (eventDate) return eventDate;
+  if (!datetime) return null;
+  const local = toDatetimeLocal(datetime);
+  return local.split("T")[0] || null;
+}
+
+function formatCarRentalDateTimeLine(
+  label: string,
+  dateStr: string | null,
+  timeStr: string | null | undefined,
+): string | null {
+  if (!dateStr) return null;
+  const datePart = formatShortDailyDate(dateStr);
+  const timePart = timeStr?.trim() ? formatPdfClock(timeStr) : null;
+  if (timePart && timePart !== "TBC") {
+    return `${label}: ${datePart} at ${timePart}`;
+  }
+  return `${label}: ${datePart}`;
+}
+
+function readCarRentalTimes(details: unknown): {
+  pickupTime?: string;
+  returnTime?: string;
+} {
+  if (!details || typeof details !== "object") return {};
+  const d = details as { pickupTime?: string; returnTime?: string };
+  return {
+    pickupTime: d.pickupTime,
+    returnTime: d.returnTime,
+  };
+}
+
+function buildCarRentalPdfLines(item: ItineraryItem): BlockLine[] {
+  const structured = getCarRentalDetails(item.details);
+  const times = readCarRentalTimes(item.details);
+  const pickupTime = structured?.pickupTime ?? times.pickupTime;
+  const returnTime = structured?.returnTime ?? times.returnTime;
+  const isScheduleOnly =
+    item.details &&
+    typeof item.details === "object" &&
+    (item.details as { isCarRentalBooking?: boolean }).isCarRentalBooking === false;
+
+  const lines: BlockLine[] = [
+    { text: item.title, bold: true, tag: carUnbookedTag(item) },
+  ];
+
+  if (isScheduleOnly) {
+    const date = itemScheduleDate(item.eventDate, item.startDatetime);
+    const label = /return/i.test(item.title) ? "Return" : "Pickup";
+    const time = /return/i.test(item.title) ? returnTime ?? pickupTime : pickupTime;
+    const scheduleLine = formatCarRentalDateTimeLine(label, date, time);
+    if (scheduleLine) lines.push({ text: scheduleLine, indent: 2, size: 8.5 });
+  } else {
+    const pickupDate = itemScheduleDate(item.eventDate, item.startDatetime);
+    const returnDate =
+      item.endDatetime != null
+        ? toDatetimeLocal(item.endDatetime).split("T")[0] || null
+        : pickupDate;
+    const pickupLine = formatCarRentalDateTimeLine("Pickup", pickupDate, pickupTime);
+    if (pickupLine) lines.push({ text: pickupLine, indent: 2, size: 8.5 });
+    const hasReturn = item.endDatetime != null || Boolean(returnTime?.trim());
+    if (hasReturn) {
+      const returnLine = formatCarRentalDateTimeLine("Return", returnDate, returnTime);
+      if (returnLine) lines.push({ text: returnLine, indent: 2, size: 8.5 });
+    }
+  }
+
+  if (item.summary) {
+    lines.push({ text: item.summary, indent: 2, size: 8.5 });
+  }
+  return lines;
+}
+
+function readTravelInsuranceFields(details: unknown): {
+  provider?: string;
+  policyNumber?: string;
+} {
+  if (!details || typeof details !== "object") return {};
+  const d = details as TravelInsuranceDetails;
+  return {
+    provider: d.provider?.trim() || undefined,
+    policyNumber: d.policyNumber?.trim() || undefined,
+  };
+}
+
+function buildTravelInsurancePdfLines(item: ItineraryItem): BlockLine[] {
+  const { provider, policyNumber } = readTravelInsuranceFields(item.details);
+  const lines: BlockLine[] = [{ text: item.title, bold: true }];
+  if (provider) {
+    lines.push({ text: provider, indent: 2, size: 8.5 });
+  }
+  if (policyNumber) {
+    lines.push({ text: `Policy: ${policyNumber}`, indent: 2, size: 8.5 });
+  }
+  return lines;
 }
 
 function getItemDate(
@@ -772,15 +890,7 @@ function buildFlightDetailsBlock(
     ),
   });
 
-  const refs = formatGroupedBookingRefs(
-    details.bookingReferences,
-    details.bookingReference,
-    details.bookingGroups,
-  );
-  if (refs) {
-    lines.push({ text: "Booking Reference", bold: true });
-    lines.push(...detailBlockLines(refs));
-  }
+  lines.push(...bookingReferencePdfLines(details));
 
   const baggage = formatBaggageSummary(details.baggage, details.cargoParty);
   if (baggage) lines.push(...detailBlockLines(`Baggage ${baggage}`));
@@ -1023,20 +1133,14 @@ function renderItinerary(
   if (carItems.length) {
     writer.writeHeading("Car Rentals");
     for (const item of sortByDateThenOrder(carItems, dayById)) {
-      const lines: BlockLine[] = [
-        { text: item.title, bold: true, tag: carUnbookedTag(item) },
-      ];
-      if (item.summary) lines.push({ text: item.summary, indent: 2, size: 8.5 });
-      writer.drawBlock(lines);
+      writer.drawBlock(buildCarRentalPdfLines(item));
     }
   }
 
   if (insuranceItems.length) {
     writer.writeHeading("Travel Insurance");
     for (const item of sortByDateThenOrder(insuranceItems, dayById)) {
-      const lines: BlockLine[] = [{ text: item.title, bold: true }];
-      if (item.summary) lines.push({ text: item.summary, indent: 2, size: 8.5 });
-      writer.drawBlock(lines);
+      writer.drawBlock(buildTravelInsurancePdfLines(item));
     }
   }
 }
