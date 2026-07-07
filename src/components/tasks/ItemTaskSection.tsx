@@ -185,6 +185,13 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
     }
   }, [searchParams, canAssign, user]);
 
+  function canManageTask(task: ItemTaskRow) {
+    if (!user) return false;
+    if (user.isAdmin) return true;
+    if (task.createdByUserId === user.id) return true;
+    return canAssign && Boolean(selectedPerm?.canAssign || selectedPerm?.canAssignForOthers);
+  }
+
   function canEditTask(task: ItemTaskRow) {
     const isAssignee = task.assigneeUserId === user?.id;
     const isAssigner = task.createdByUserId === user?.id;
@@ -497,6 +504,7 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
         selectedPerm?.canAssign ||
         selectedPerm?.canAssignForOthers);
     const canEditAsAssignee = isAssignee && task.allowAssigneeEdit;
+    const canUpdateStatus = isAssignee || canManageTask(task);
 
     return (
       <div key={task.id} id={`task-row-${task.id}`}>
@@ -555,7 +563,7 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
                 Delete
               </button>
             )}
-            {isAssignee && (
+            {canUpdateStatus ? (
               <>
                 <select
                   value={pendingCantCompleteId === task.id ? "cant_complete" : task.status}
@@ -595,6 +603,10 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
                   </div>
                 )}
               </>
+            ) : (
+              <span className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm text-stone-600">
+                {TASK_STATUS_LABELS[task.status as TaskStatus] ?? task.status}
+              </span>
             )}
           </div>
         </div>

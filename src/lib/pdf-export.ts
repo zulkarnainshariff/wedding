@@ -268,7 +268,11 @@ class PdfWriter {
 
     this.setStyle({ size, bold: line.bold });
     const maxWidth = this.contentWidth - BLOCK_INSET * 2 - indent;
-    const wrapped = this.doc.splitTextToSize(line.text, maxWidth) as string[];
+    const plain = pdfPlainText(line.text);
+    const wrappedRaw = this.doc.splitTextToSize(plain, maxWidth);
+    const wrapped = Array.isArray(wrappedRaw)
+      ? wrappedRaw
+      : [String(wrappedRaw ?? "")];
     for (const row of wrapped) {
       this.ensureSpace(LINE_HEIGHT);
       this.doc.text(row, x, this.y);
@@ -334,6 +338,36 @@ class PdfWriter {
   gap(amount = 2): void {
     this.y += amount;
   }
+}
+
+function pdfPlainText(text: string): string {
+  return text
+    .replace(/\u00b7/g, " | ")
+    .replace(/\u2192/g, "->")
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Split dense flight detail lines so jsPDF does not stretch-wrap them character-by-character. */
+function detailBlockLines(
+  text: string,
+  base: Omit<BlockLine, "text"> = {},
+): BlockLine[] {
+  const plain = pdfPlainText(text);
+  if (!plain) return [];
+
+  const parts = plain
+    .split(/\s+\|\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length <= 1) {
+    return [{ text: plain, ...base }];
+  }
+
+  return parts.map((part) => ({ text: part, ...base }));
 }
 
 function ordinalSuffix(day: number): string {
@@ -500,11 +534,18 @@ function isFlightLike(item: ItineraryItem): boolean {
   return item.category === "flight" || item.category === "pet_relocation";
 }
 
-function flightUnbookedTag(item: ItineraryItem): string | null {
+function isFlightMarkedTbc(item: ItineraryItem): boolean {
   if (item.category === "pet_relocation") {
-    return getPetRelocationDetails(item.details)?.status === "tbc" ? "TBC" : null;
+    return getPetRelocationDetails(item.details)?.status === "tbc";
   }
-  return getFlightDetails(item.details)?.status === "tbc" ? "TBC" : null;
+  const details = getFlightDetails(item.details);
+  if (!details) return false;
+  if (details.status === "confirmed") return false;
+  return details.status === "tbc";
+}
+
+function flightUnbookedTag(item: ItineraryItem): string | null {
+  return isFlightMarkedTbc(item) ? "TBC" : null;
 }
 
 function stayUnbookedTag(item: ItineraryItem): string | null {
@@ -676,9 +717,10 @@ function buildFlightAtAGlanceBlock(
   const dep = formatPdfClock(details.departureTime);
   const arr = formatArrivalWithDayNote(item, details);
   lines.push({
-    text: tag
-      ? "Dep: TBC  Arrival: TBC"
-      : formatDepartureArrivalLine(dep, arr),
+    text:
+      dep === "TBC" && arr === "TBC"
+        ? "Dep: TBC  Arrival: TBC"
+        : formatDepartureArrivalLine(dep, arr),
   });
   return lines;
 }
@@ -736,17 +778,19 @@ function buildFlightDetailsBlock(
     details.bookingGroups,
   );
   if (refs) {
-    lines.push({ text: "Booking Reference" });
-    lines.push({ text: refs });
+    lines.push({ text: "Booking Reference", bold: true });
+    lines.push(...detailBlockLines(refs));
   }
 
   const baggage = formatBaggageSummary(details.baggage, details.cargoParty);
-  if (baggage) lines.push({ text: `Baggage ${baggage}` });
+  if (baggage) lines.push(...detailBlockLines(`Baggage ${baggage}`));
   if (details.aircraft) lines.push({ text: `A/C ${details.aircraft}` });
 
   const passengers = details.passengers ?? details.travellers;
   const seats = formatFlightSeatsSummary(details, passengers);
-  if (seats && seats !== "—") lines.push({ text: `Seats: ${seats}` });
+  if (seats && seats !== "—") {
+    lines.push(...detailBlockLines(`Seats: ${seats}`));
+  }
   if (details.notes?.length) lines.push({ text: `Note ${details.notes.join("; ")}` });
 
   if (details.segments?.length) {
@@ -915,12 +959,21 @@ function renderItinerary(
   if (stayItems.length) {
     writer.writeHeading("Accommodations");
     for (const item of sortByDateThenOrder(stayItems, dayById)) {
-      writer.drawBlock([
+      const details = getAccommodationDetails(item.details);
+      const lines: BlockLine[] = [
         {
           text: formatStayRange(item),
           tag: stayUnbookedTag(item),
         },
-      ]);
+      ];
+      if (details?.address?.trim()) {
+        lines.push({
+          text: details.address.trim(),
+          indent: 2,
+          size: 8.5,
+        });
+      }
+      writer.drawBlock(lines);
     }
     writer.gap(1);
   }

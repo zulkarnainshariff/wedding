@@ -621,6 +621,7 @@ export function TasksPanel() {
   function renderTaskRow(task: TaskRow, depth = 0) {
     const isSelected = editingTaskId === task.id;
     const isAssignee = task.assigneeUserId === user?.id;
+    const canUpdateStatus = isAssignee || canManageTask(task);
     const assignee = assigneeLabel(task);
 
     return (
@@ -684,7 +685,7 @@ export function TasksPanel() {
                   Delete
                 </button>
               )}
-              {isAssignee && (
+              {canUpdateStatus ? (
                 <>
                   <select
                     value={
@@ -726,6 +727,10 @@ export function TasksPanel() {
                     </div>
                   )}
                 </>
+              ) : (
+                <span className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm text-stone-600">
+                  {TASK_STATUS_LABELS[task.status as TaskStatus] ?? task.status}
+                </span>
               )}
             </div>
           </div>

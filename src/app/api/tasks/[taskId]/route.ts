@@ -92,7 +92,9 @@ export async function PUT(request: Request, { params }: Params) {
   const patch: Partial<typeof details.task> = { updatedAt: new Date() };
   let taskWasEdited = false;
 
-  if (isAssignee && body.status && isTaskStatus(body.status)) {
+  const canUpdateStatus = isAssignee || canManage;
+
+  if (canUpdateStatus && body.status && isTaskStatus(body.status)) {
     if (body.status === "cant_complete") {
       const reason = String(body.statusReason ?? "").trim();
       if (!reason) {
