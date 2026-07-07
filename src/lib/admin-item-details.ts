@@ -154,6 +154,16 @@ function recordsFromObject(
   }));
 }
 
+function readAccommodationStayName(details: Record<string, unknown>): string {
+  const location = details.location;
+  if (typeof location === "string") return location;
+  if (location && typeof location === "object") {
+    const name = (location as { name?: unknown }).name;
+    if (typeof name === "string") return name;
+  }
+  return "";
+}
+
 function objectFromRecords(
   records: TravellerRecord[],
   numeric = false,
@@ -207,6 +217,10 @@ export function parseStructuredDetails(
   for (const key of Object.keys(structured.simple)) {
     const val = details[key];
     if (val != null) structured.simple[key] = String(val);
+  }
+
+  if (category === "accommodation") {
+    structured.simple.location = readAccommodationStayName(details);
   }
 
   if (category === "flight") {
@@ -334,13 +348,13 @@ export function buildStructuredDetailsPayload(
   structured: StructuredItemDetails,
   options?: { hasAssignedDay?: boolean },
 ): Record<string, unknown> {
-  const location = buildLocationPayload(
-    structured.locationName,
-    structured.locationMapUrl,
-  );
   const notes = parseItemNotesForStorage(structured.notes);
 
   if (category === "activity") {
+    const location = buildLocationPayload(
+      structured.locationName,
+      structured.locationMapUrl,
+    );
     return mergeItemPrivacyFields(
       {
         slug: structured.simple.slug || `activity-${Date.now()}`,
@@ -362,10 +376,6 @@ export function buildStructuredDetailsPayload(
     ...structured.simple,
     notes: notes?.length ? notes : undefined,
   };
-
-  if (category !== "flight") {
-    payload.location = location;
-  }
 
   if (category === "flight") {
     payload.label =
