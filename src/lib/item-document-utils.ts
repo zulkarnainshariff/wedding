@@ -59,10 +59,21 @@ export function parseExtraViewersInput(raw: string): string[] {
   );
 }
 
+export type DocumentSharingKind = "multi_traveller" | "extra_viewers";
+
+export function documentSharingKinds(
+  doc: Pick<ItemDocument, "travellerName" | "coversTravellers" | "extraViewers">,
+): DocumentSharingKind[] {
+  const covered = parseCoveredTravellers(doc);
+  const extra = parseExtraViewers(doc.extraViewers);
+  const kinds: DocumentSharingKind[] = [];
+  if (covered.length > 1) kinds.push("multi_traveller");
+  if (extra.length > 0) kinds.push("extra_viewers");
+  return kinds;
+}
+
 export function isSharedDocument(
   doc: Pick<ItemDocument, "travellerName" | "coversTravellers" | "extraViewers">,
 ): boolean {
-  const covered = parseCoveredTravellers(doc);
-  const extra = parseExtraViewers(doc.extraViewers);
-  return covered.length > 1 || extra.length > 0;
+  return documentSharingKinds(doc).length > 0;
 }
