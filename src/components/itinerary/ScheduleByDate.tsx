@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { DayBannerHeader } from "./DayBannerHeader";
 import { ItemCard } from "./ItemCard";
-import { useTaskIndicators } from "@/components/tasks/useTaskIndicators";
+import { DayStandaloneTasks } from "./DayStandaloneTasks";
+import { TaskIndicatorBadge, useTaskIndicators } from "@/components/tasks/useTaskIndicators";
 import { useDocumentIndicators } from "@/components/itinerary/useDocumentIndicators";
 import { ScheduleToolbar } from "./ScheduleToolbar";
 import { TripProgressIndicator } from "./TripProgressIndicator";
@@ -18,6 +19,7 @@ import {
   filterScheduleItemsByParticipants,
 } from "@/lib/schedule-participant-filter";
 import { itemSectionId } from "@/lib/day-jump";
+import { tripDayDisplayNumber } from "@/lib/trip-day-display";
 import { isDayToday } from "@/lib/trip-time";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
 import type { ItineraryItemWithSubItems } from "@/lib/item-subitem-utils";
@@ -57,7 +59,7 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
       })),
     [visibleDays],
   );
-  const { itemSummaries } = useTaskIndicators();
+  const { dayCounts, dayTasks, itemSummaries } = useTaskIndicators();
   const documentCounts = useDocumentIndicators();
   const progressItems = useMemo(
     () => sortedVisibleDays.flatMap((day) => day.items),
@@ -93,6 +95,8 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
           {sortedVisibleDays.map((day) => {
             const isToday = isDayToday(day.date, effectiveDate);
             const dayTitle = getDayDisplayTitle(day, day.items.length, restrictedView);
+            const displayDayNumber = tripDayDisplayNumber(day, days);
+            const standaloneTasks = dayTasks[day.id] ?? [];
 
             return (
               <section
@@ -101,17 +105,21 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
                 className="scroll-mt-3"
               >
                 <DayBannerHeader
-                  dayNumber={day.dayNumber}
+                  dayNumber={displayDayNumber}
                   date={day.date}
                   title={dayTitle}
                   isToday={isToday}
+                  trailing={<TaskIndicatorBadge count={dayCounts[day.id] ?? 0} />}
                 />
 
-                {day.items.length === 0 ? (
+                {day.items.length === 0 && standaloneTasks.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-stone-200 bg-white/50 px-4 py-6 text-sm text-stone-400">
                     Nothing scheduled for this date.
                   </p>
                 ) : (
+                  <div className="space-y-3">
+                    <DayStandaloneTasks tasks={standaloneTasks} />
+                    {day.items.length > 0 ? (
                   <div className="relative space-y-3 pl-5 before:absolute before:top-2 before:bottom-2 before:left-[7px] before:w-px before:bg-accent/40">
                     {day.items.map((item) => (
                       <div key={item.id} id={itemSectionId(item.id)} className="relative scroll-mt-24">
@@ -129,6 +137,8 @@ export function ScheduleByDate({ days }: { days: DayWithItems[] }) {
                         />
                       </div>
                     ))}
+                  </div>
+                    ) : null}
                   </div>
                 )}
               </section>

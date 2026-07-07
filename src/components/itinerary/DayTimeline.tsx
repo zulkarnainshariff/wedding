@@ -11,7 +11,9 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { useDayVisibility } from "@/hooks/useDayVisibility";
 import { getDayDisplayTitle, hasRestrictedTravellerView } from "@/lib/day-display";
+import { DayStandaloneTasks } from "./DayStandaloneTasks";
 import { itemSectionId } from "@/lib/day-jump";
+import { tripDayDisplayNumber } from "@/lib/trip-day-display";
 import { isDayToday } from "@/lib/trip-time";
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
 import type { ItineraryItemWithSubItems } from "@/lib/item-subitem-utils";
@@ -31,7 +33,7 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
       })),
     [visibleDays],
   );
-  const { dayCounts, itemSummaries } = useTaskIndicators();
+  const { dayCounts, dayTasks, itemSummaries } = useTaskIndicators();
   const documentCounts = useDocumentIndicators();
   const progressItems = useMemo(
     () => sortedVisibleDays.flatMap((day) => day.items),
@@ -58,30 +60,35 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
         {sortedVisibleDays.map((day) => {
           const isToday = isDayToday(day.date, effectiveDate);
           const dayTitle = getDayDisplayTitle(day, day.items.length, restrictedView);
+          const displayDayNumber = tripDayDisplayNumber(day, days);
+          const standaloneTasks = dayTasks[day.id] ?? [];
 
           return (
             <section
               key={day.id}
-              id={`day-${day.dayNumber}`}
+              id={`day-${day.date}`}
               className="scroll-mt-3"
             >
               <DayBannerHeader
-                dayNumber={day.dayNumber}
+                dayNumber={displayDayNumber}
                 date={day.date}
                 title={dayTitle}
                 isToday={isToday}
                 trailing={<TaskIndicatorBadge count={dayCounts[day.id] ?? 0} />}
               />
 
-              {day.notes && day.items.length > 0 && (
+              {day.notes && (day.items.length > 0 || standaloneTasks.length > 0) && (
                 <p className="mb-4 text-sm text-stone-500">{day.notes}</p>
               )}
 
-              {day.items.length === 0 ? (
+              {day.items.length === 0 && standaloneTasks.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-stone-200 bg-white/50 px-4 py-6 text-sm text-stone-400">
                   No items scheduled for this day.
                 </p>
               ) : (
+                <div className="space-y-3">
+                  <DayStandaloneTasks tasks={standaloneTasks} />
+                  {day.items.length > 0 ? (
                 <div className="relative space-y-3 pl-5 before:absolute before:top-2 before:bottom-2 before:left-[7px] before:w-px before:bg-accent/40">
                   {day.items.map((item) => (
                     <div key={item.id} id={itemSectionId(item.id)} className="relative scroll-mt-24">
@@ -99,6 +106,8 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
                       />
                     </div>
                   ))}
+                </div>
+                  ) : null}
                 </div>
               )}
             </section>

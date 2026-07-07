@@ -84,6 +84,10 @@ export async function syncItineraryDaysForRange(
     created += 1;
   }
 
+  if (created > 0) {
+    await renumberItineraryDays();
+  }
+
   return { created };
 }
 

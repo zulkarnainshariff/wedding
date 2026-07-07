@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
+import { tripDateFromDueAt } from "@/lib/task-day-link";
 import { ensureTaskViewPermissionsSchema } from "@/lib/ensure-task-permissions-schema";
 import type { TaskPermissionAccess } from "@/lib/task-types";
 import type { SessionUser } from "@/lib/permissions";
@@ -286,10 +287,36 @@ export async function getTaskWithDetails(taskId: number) {
   return { ...row, notes, reminders, subtasks };
 }
 
+export type DayTaskBrief = {
+  id: number;
+  title: string;
+  isUrgent: boolean;
+  hasNotes: boolean;
+  mine: boolean;
+};
+
 export async function getTaskIndicators(user: SessionUser) {
   const permissions = await getTaskPermissionsForUser(user);
   const visible = await getVisibleTasks(user);
+  const dayRows = await db
+    .select({ id: itineraryDays.id, date: itineraryDays.date })
+    .from(itineraryDays);
+  const dayIdByDate = new Map(dayRows.map((day) => [day.date, day.id]));
+
+  const resolveTaskDayId = (task: {
+    dayId: number | null;
+    itemId: number | null;
+    dueAt: Date | null;
+  }): number | null => {
+    if (task.itemId) return task.dayId;
+    if (task.dayId) return task.dayId;
+    const tripDate = tripDateFromDueAt(task.dueAt);
+    if (!tripDate) return null;
+    return dayIdByDate.get(tripDate) ?? null;
+  };
+
   const dayCounts: Record<number, number> = {};
+  const dayTasks: Record<number, DayTaskBrief[]> = {};
   const itemCounts: Record<number, number> = {};
   const itemSummaries: Record<
     number,
@@ -308,7 +335,21 @@ export async function getTaskIndicators(user: SessionUser) {
   for (const { task, assignee } of visible) {
     if (task.status === "completed") continue;
     openCount += 1;
-    if (task.dayId) dayCounts[task.dayId] = (dayCounts[task.dayId] ?? 0) + 1;
+    const effectiveDayId = resolveTaskDayId(task);
+    if (effectiveDayId) {
+      dayCounts[effectiveDayId] = (dayCounts[effectiveDayId] ?? 0) + 1;
+      if (!task.itemId) {
+        const list = dayTasks[effectiveDayId] ?? [];
+        list.push({
+          id: task.id,
+          title: task.title,
+          isUrgent: task.isUrgent,
+          hasNotes: (noteCounts.get(task.id) ?? 0) > 0,
+          mine: task.assigneeUserId === user.id,
+        });
+        dayTasks[effectiveDayId] = list;
+      }
+    }
     if (!task.itemId) continue;
 
     itemCounts[task.itemId] = (itemCounts[task.itemId] ?? 0) + 1;
@@ -368,7 +409,7 @@ export async function getTaskIndicators(user: SessionUser) {
     };
   }
 
-  return { dayCounts, itemCounts, itemSummaries: formattedSummaries, openCount };
+  return { dayCounts, dayTasks, itemCounts, itemSummaries: formattedSummaries, openCount };
 }
 
 export async function getMaxDueDate(dayId?: number | null, itemId?: number | null) {

@@ -11,6 +11,7 @@ import {
   getTaskPermissionsForUser,
   getVisibleTasks,
 } from "@/lib/task-queries";
+import { resolveDayIdForDueAt } from "@/lib/task-day-link";
 import { db } from "@/lib/db";
 import { itineraryItems, taskReminders, tasks, weddingEvents } from "@/lib/schema";
 
@@ -108,6 +109,10 @@ export async function POST(request: Request) {
       ? await getMaxDueDate(dayId, linkedItemId)
       : null;
     if (maxDue && dueAt && dueAt > maxDue) dueAt = maxDue;
+
+    if (!dayId && !linkedItemId && body.dueAt) {
+      dayId = await resolveDayIdForDueAt(body.dueAt);
+    }
 
     const [created] = await db
       .insert(tasks)
