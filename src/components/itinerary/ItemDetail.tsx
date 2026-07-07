@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ExternalLink, MapPin, Pencil, Trash2, X } from "lucide-react";
 import { ItemDocumentsSection } from "@/components/itinerary/ItemDocumentsSection";
 import { ItemSubItemsSection } from "@/components/itinerary/ItemSubItemsSection";
+import { AdditionalViewersDisclosure } from "@/components/itinerary/AdditionalViewersDisclosure";
 import { ViewerLinkedPill } from "@/components/itinerary/ViewerLinkedPill";
 import { ItemCompleteToggle, type ItemDoneAccent } from "@/components/itinerary/ItemCompleteToggle";
 import { FlightCheckInReminderPill, FlightCheckInToggle } from "@/components/itinerary/FlightCheckInToggle";
@@ -38,7 +39,7 @@ import {
   extractItemAdditionalViewers,
 } from "@/lib/item-viewers";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { extractViewerLinks, viewerLinkLabel } from "@/lib/item-viewer-links";
+import { extractViewerLinks } from "@/lib/item-viewer-links";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import {
   CATEGORY_META,
@@ -123,21 +124,14 @@ function AdditionalViewersRow({ item }: { item: ItineraryItem }) {
   if (!canSeeItemAdditionalViewers(item, user)) return null;
 
   const viewers = extractItemAdditionalViewers(item.details);
-  const links = extractViewerLinks(item.details);
   if (viewers.length === 0) return null;
 
   return (
-    <dl>
-      {viewers.map((viewer) => {
-        const linked = links[viewer];
-        const value = linked?.length
-          ? `${viewer} (viewing ${viewerLinkLabel(linked)})`
-          : viewer;
-        return (
-          <DetailRow key={viewer} label="Also visible to" value={value} />
-        );
-      })}
-    </dl>
+    <AdditionalViewersDisclosure
+      viewers={viewers}
+      viewerLinks={extractViewerLinks(item.details)}
+      variant="detail"
+    />
   );
 }
 

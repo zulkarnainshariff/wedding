@@ -10,7 +10,9 @@ import {
   extractSubItemViewers,
 } from "@/lib/item-subitems";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { AdditionalViewersDisclosure } from "@/components/itinerary/AdditionalViewersDisclosure";
 import { ViewerLinkedPill } from "@/components/itinerary/ViewerLinkedPill";
+import { extractViewerLinks } from "@/lib/item-viewer-links";
 import { canSeeItemAdditionalViewers } from "@/lib/item-viewers";
 import { ItemTaskIcon } from "@/components/itinerary/ItemTaskIcon";
 import {
@@ -45,15 +47,19 @@ function SubItemTime({
 function SubItemPeopleMeta({
   participants,
   viewers,
+  viewerLinks,
   showViewers = true,
   compact = false,
 }: {
   participants: string[];
   viewers: string[];
+  viewerLinks: Record<string, string[]>;
   showViewers?: boolean;
   compact?: boolean;
 }) {
-  if (participants.length === 0 && viewers.length === 0) return null;
+  if (participants.length === 0 && (!showViewers || viewers.length === 0)) {
+    return null;
+  }
 
   return (
     <div
@@ -65,9 +71,13 @@ function SubItemPeopleMeta({
       {participants.length > 0 && (
         <p>Participants: {participants.join(", ")}</p>
       )}
-      {showViewers && viewers.length > 0 && (
-        <p>Also visible to: {viewers.join(", ")}</p>
-      )}
+      {showViewers && viewers.length > 0 ? (
+        <AdditionalViewersDisclosure
+          viewers={viewers}
+          viewerLinks={viewerLinks}
+          variant="compact"
+        />
+      ) : null}
     </div>
   );
 }
@@ -88,6 +98,7 @@ export function SubItemRow({
   const location = getItemLocation(subItem.details as Record<string, unknown>);
   const participants = extractSubItemParticipants(subItem.details);
   const viewers = extractSubItemViewers(subItem.details);
+  const viewerLinks = extractViewerLinks(subItem.details);
   const showViewers = canSeeItemAdditionalViewers(subItem, user);
   const completed = isItemCompleted(subItem);
   const description =
@@ -141,6 +152,7 @@ export function SubItemRow({
     <SubItemPeopleMeta
       participants={participants}
       viewers={viewers}
+      viewerLinks={viewerLinks}
       showViewers={showViewers}
       compact={compact}
     />
