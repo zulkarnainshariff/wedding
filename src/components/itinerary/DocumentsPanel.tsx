@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, FileText, Pencil, Plus, Trash2, Users } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  FileText,
+  Pencil,
+  Plus,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { DocumentEditForm } from "@/components/documents/DocumentEditForm";
 import { DocumentUploadForm } from "@/components/documents/DocumentUploadForm";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -12,15 +21,39 @@ import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { documentCategoryLabel, type DocumentCategory } from "@/lib/document-categories";
 import { useCategories } from "@/components/categories/CategoriesProvider";
 import { getCategoryIcon, getCategoryStyles } from "@/lib/category-ui";
-import { ADDITIONAL_VIEWERS_LABEL } from "@/lib/item-document-utils";
+import {
+  ADDITIONAL_VIEWERS_LABEL,
+  documentSharingKinds,
+} from "@/lib/item-document-utils";
 import { travellerOptionsFromAccounts } from "@/lib/item-travellers";
 import type { DocumentListEntry, DocumentViewMode } from "@/lib/document-queries";
 
-function SharedBadge() {
+function DocumentSharingBadges({
+  entry,
+}: {
+  entry: Pick<DocumentListEntry, "coversTravellers" | "extraViewers">;
+}) {
+  const kinds = documentSharingKinds({
+    travellerName: entry.coversTravellers[0] ?? "",
+    coversTravellers: entry.coversTravellers,
+    extraViewers: entry.extraViewers,
+  });
+
+  if (kinds.length === 0) return null;
+
   return (
-    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-violet-800 uppercase">
-      Shared
-    </span>
+    <>
+      {kinds.includes("multi_traveller") ? (
+        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-violet-800 uppercase">
+          Multi-traveller
+        </span>
+      ) : null}
+      {kinds.includes("extra_viewers") ? (
+        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-violet-800 uppercase">
+          Extra viewers
+        </span>
+      ) : null}
+    </>
   );
 }
 
@@ -85,7 +118,7 @@ function DocumentRow({
             <span className="rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-stone-700 uppercase">
               {documentCategoryLabel(entry.category, documentCategories)}
             </span>
-            {entry.isShared ? <SharedBadge /> : null}
+            <DocumentSharingBadges entry={entry} />
             {allowEdit && onToggleEdit && onDelete ? (
               <div className="ml-auto flex shrink-0 gap-1 sm:ml-0">
                 <button
@@ -175,23 +208,44 @@ function DocumentRow({
   );
 }
 
-function SectionHeader({
+function CollapsibleSection({
+  sectionKey,
   title,
   count,
   icon,
+  expanded,
+  onToggle,
+  children,
 }: {
+  sectionKey: string;
   title: string;
   count: number;
   icon?: React.ReactNode;
+  expanded: boolean;
+  onToggle: (key: string) => void;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="mb-3 flex items-center gap-2">
-      {icon}
-      <h2 className="font-serif text-lg text-brand-deep">{title}</h2>
-      <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
-        {count}
-      </span>
-    </div>
+    <section>
+      <button
+        type="button"
+        onClick={() => onToggle(sectionKey)}
+        aria-expanded={expanded}
+        className="mb-3 flex w-full items-center gap-2 text-left"
+      >
+        {expanded ? (
+          <ChevronDown className="h-5 w-5 shrink-0 text-stone-500" />
+        ) : (
+          <ChevronRight className="h-5 w-5 shrink-0 text-stone-500" />
+        )}
+        {icon}
+        <h2 className="font-serif text-lg text-brand-deep">{title}</h2>
+        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+          {count}
+        </span>
+      </button>
+      {expanded ? children : null}
+    </section>
   );
 }
 
@@ -203,8 +257,8 @@ function ViewModeTabs({
   onChange: (mode: DocumentViewMode) => void;
 }) {
   const tabs: { id: DocumentViewMode; label: string }[] = [
-    { id: "item_type", label: "By item type" },
     { id: "document_category", label: "By category" },
+    { id: "item_type", label: "By item type" },
     { id: "user", label: "By user" },
   ];
 
@@ -248,6 +302,24 @@ export function DocumentsPanelContent({
   const [editingDocId, setEditingDocId] = useState<number | null>(null);
   const [savingDocId, setSavingDocId] = useState<number | null>(null);
   const [viewerOptions, setViewerOptions] = useState<string[]>([]);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setCollapsedGroups(new Set());
+  }, [viewMode]);
+
+  function toggleGroup(key: string) {
+    setCollapsedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function isGroupExpanded(key: string) {
+    return !collapsedGroups.has(key);
+  }
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -466,26 +538,29 @@ export function DocumentsPanelContent({
                   : meta?.label ?? category!;
 
               return (
-                <section key={key}>
-                  <SectionHeader
-                    title={title}
-                    count={entries.length}
-                    icon={
-                      <span
-                        className={[
-                          "flex h-8 w-8 items-center justify-center rounded-lg",
-                          styles?.bg ?? "bg-stone-100",
-                          styles?.text ?? "text-stone-600",
-                        ].join(" ")}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </span>
-                    }
-                  />
+                <CollapsibleSection
+                  key={key}
+                  sectionKey={key}
+                  title={title}
+                  count={entries.length}
+                  expanded={isGroupExpanded(key)}
+                  onToggle={toggleGroup}
+                  icon={
+                    <span
+                      className={[
+                        "flex h-8 w-8 items-center justify-center rounded-lg",
+                        styles?.bg ?? "bg-stone-100",
+                        styles?.text ?? "text-stone-600",
+                      ].join(" ")}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </span>
+                  }
+                >
                   <ul className="space-y-2">
                     {entries.map((entry) => renderDocumentRow(entry))}
                   </ul>
-                </section>
+                </CollapsibleSection>
               );
             })}
         </div>
@@ -498,32 +573,38 @@ export function DocumentsPanelContent({
               ),
             )
             .map(([category, entries]) => (
-              <section key={category}>
-                <SectionHeader
-                  title={documentCategoryLabel(category, documentCategories)}
-                  count={entries.length}
-                />
+              <CollapsibleSection
+                key={category}
+                sectionKey={category}
+                title={documentCategoryLabel(category, documentCategories)}
+                count={entries.length}
+                expanded={isGroupExpanded(category)}
+                onToggle={toggleGroup}
+              >
                 <ul className="space-y-2">
                   {entries.map((entry) => renderDocumentRow(entry))}
                 </ul>
-              </section>
+              </CollapsibleSection>
             ))}
         </div>
       ) : (
         <div className="space-y-8">
           {groupedByUser.map(([username, entries]) => (
-            <section key={username}>
-              <SectionHeader
-                title={username}
-                count={entries.length}
-                icon={<Users className="h-5 w-5 text-stone-500" />}
-              />
+            <CollapsibleSection
+              key={username}
+              sectionKey={username}
+              title={username}
+              count={entries.length}
+              expanded={isGroupExpanded(username)}
+              onToggle={toggleGroup}
+              icon={<Users className="h-5 w-5 text-stone-500" />}
+            >
               <ul className="space-y-2">
                 {entries.map((entry) =>
                   renderDocumentRow(entry, `${username}-${entry.id}`),
                 )}
               </ul>
-            </section>
+            </CollapsibleSection>
           ))}
         </div>
       )}

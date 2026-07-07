@@ -14,8 +14,8 @@ import {
 } from "@/lib/document-categories";
 import {
   ADDITIONAL_VIEWERS_LABEL,
+  documentSharingKinds,
   extractTravellerOptions,
-  isSharedDocument,
   parseCoveredTravellers,
   parseExtraViewers,
 } from "@/lib/item-document-utils";
@@ -191,12 +191,17 @@ export function ItemDocumentsSection({ item }: { item: ItineraryItem }) {
                           documentCategories,
                         )}
                       </span>
-                      {isSharedDocument(doc) && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand-deep">
+                      {documentSharingKinds(doc).map((kind) => (
+                        <span
+                          key={kind}
+                          className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand-deep"
+                        >
                           <Users className="h-3 w-3" />
-                          Shared
+                          {kind === "multi_traveller"
+                            ? "Multi-traveller"
+                            : "Extra viewers"}
                         </span>
-                      )}
+                      ))}
                     </div>
                     <p className="mt-1 text-xs text-stone-500">
                       Linked to: {covered.join(", ")}
