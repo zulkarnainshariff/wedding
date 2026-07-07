@@ -7,6 +7,7 @@ import {
   canViewTask,
   getTaskWithDetails,
 } from "@/lib/task-queries";
+import { resolveDayIdForDueAt } from "@/lib/task-day-link";
 import { isTaskStatus } from "@/lib/task-types";
 import { db } from "@/lib/db";
 import { taskNotes, taskReminders, tasks } from "@/lib/schema";
@@ -152,6 +153,16 @@ export async function PUT(request: Request, { params }: Params) {
     }
     if (body.assignerNotes !== undefined) {
       patch.assignerNotes = body.assignerNotes;
+      taskWasEdited = true;
+    }
+  }
+
+  if (body.dueAt !== undefined && !details.task.itemId) {
+    const resolvedDayId = body.dueAt
+      ? await resolveDayIdForDueAt(body.dueAt)
+      : null;
+    if (resolvedDayId !== details.task.dayId) {
+      patch.dayId = resolvedDayId;
       taskWasEdited = true;
     }
   }

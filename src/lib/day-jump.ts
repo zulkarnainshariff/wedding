@@ -11,7 +11,7 @@ export function daySectionId(
   day: DayJumpTarget,
   variant: DayJumpVariant,
 ): string {
-  return variant === "timeline" ? `day-${day.dayNumber}` : `schedule-${day.date}`;
+  return variant === "timeline" ? `day-${day.date}` : `schedule-${day.date}`;
 }
 
 export function adminDayRowId(dayId: number): string {

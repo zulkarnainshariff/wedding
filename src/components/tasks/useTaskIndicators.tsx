@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { subscribeSyncUpdated } from "@/lib/sync-client";
-import type { ItemTaskSummary } from "@/lib/task-queries";
+import type { DayTaskBrief, ItemTaskSummary } from "@/lib/task-queries";
 import { TaskNoteIcon } from "@/components/tasks/TaskNoteIcon";
 
 type TaskIndicators = {
   dayCounts: Record<number, number>;
+  dayTasks: Record<number, DayTaskBrief[]>;
   itemCounts: Record<number, number>;
   itemSummaries: Record<number, ItemTaskSummary>;
   openCount: number;
@@ -15,6 +16,7 @@ type TaskIndicators = {
 export function useTaskIndicators() {
   const [indicators, setIndicators] = useState<TaskIndicators>({
     dayCounts: {},
+    dayTasks: {},
     itemCounts: {},
     itemSummaries: {},
     openCount: 0,
@@ -27,6 +29,7 @@ export function useTaskIndicators() {
         if (data) {
           setIndicators({
             dayCounts: data.dayCounts ?? {},
+            dayTasks: data.dayTasks ?? {},
             itemCounts: data.itemCounts ?? {},
             itemSummaries: data.itemSummaries ?? {},
             openCount: data.openCount ?? 0,
