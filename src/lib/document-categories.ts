@@ -47,3 +47,18 @@ export function defaultDocumentCategoryForItem(
   }
   return STANDALONE_DOCUMENT_CATEGORY;
 }
+
+/** Resolve a stored or submitted category slug using DB-backed document categories. */
+export function resolveDocumentCategorySlug(
+  raw: string | null | undefined,
+  categories: AppCategoryRow[],
+): DocumentCategory {
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+  if (!trimmed) {
+    return STANDALONE_DOCUMENT_CATEGORY;
+  }
+  if (isDocumentCategory(trimmed, categories)) {
+    return trimmed;
+  }
+  return defaultDocumentCategoryForItem(trimmed, categories);
+}

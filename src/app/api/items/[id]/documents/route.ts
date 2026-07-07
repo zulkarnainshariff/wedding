@@ -12,10 +12,8 @@ import {
   resolveDocumentMimeType,
   writeDocumentFile,
 } from "@/lib/item-documents";
-import {
-  defaultDocumentCategoryForItem,
-  isDocumentCategory,
-} from "@/lib/document-categories";
+import { getDocumentCategories } from "@/lib/app-categories";
+import { resolveDocumentCategorySlug } from "@/lib/document-categories";
 import { filterItemsByPermission } from "@/lib/permissions";
 import { itemDocuments, itineraryItems } from "@/lib/schema";
 import { bumpSyncVersion } from "@/lib/sync";
@@ -93,9 +91,11 @@ export async function POST(request: Request, { params }: Params) {
     ];
     const label = String(formData.get("label") ?? "").trim() || "Document";
     const categoryRaw = String(formData.get("category") ?? item.category).trim();
-    const category = isDocumentCategory(categoryRaw)
-      ? categoryRaw
-      : defaultDocumentCategoryForItem(item.category);
+    const documentCategories = await getDocumentCategories();
+    const category = resolveDocumentCategorySlug(
+      categoryRaw,
+      documentCategories,
+    );
     const extraViewers = parseExtraViewers(
       String(formData.get("extraViewers") ?? "")
         .split(",")

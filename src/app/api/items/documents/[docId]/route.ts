@@ -8,9 +8,10 @@ import {
   parseExtraViewers,
   readDocumentFile,
 } from "@/lib/item-documents";
+import { getDocumentCategories } from "@/lib/app-categories";
 import {
-  defaultDocumentCategoryForItem,
   isDocumentCategory,
+  resolveDocumentCategorySlug,
 } from "@/lib/document-categories";
 import { normalizeTravellerName } from "@/lib/travellers";
 import { filterItemsByPermission } from "@/lib/permissions";
@@ -155,12 +156,23 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const categoryRaw =
     typeof body.category === "string" ? body.category.trim() : undefined;
-  const category =
-    categoryRaw && isDocumentCategory(categoryRaw)
-      ? categoryRaw
-      : categoryRaw
-        ? defaultDocumentCategoryForItem(categoryRaw)
-        : undefined;
+  let category: string | undefined;
+  if (categoryRaw !== undefined) {
+    const documentCategories = await getDocumentCategories();
+    if (
+      categoryRaw &&
+      !isDocumentCategory(categoryRaw, documentCategories)
+    ) {
+      return NextResponse.json(
+        { error: "Unknown document category" },
+        { status: 400 },
+      );
+    }
+    category = resolveDocumentCategorySlug(
+      categoryRaw,
+      documentCategories,
+    );
+  }
 
   const [updated] = await db
     .update(itemDocuments)
