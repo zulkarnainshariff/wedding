@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAuthError, requireAuth, requireEditAccess } from "@/lib/api-auth";
-import {
-  defaultDocumentCategoryForItem,
-  isDocumentCategory,
-} from "@/lib/document-categories";
+import { getDocumentCategories } from "@/lib/app-categories";
+import { resolveDocumentCategorySlug } from "@/lib/document-categories";
 import { getAllVisibleDocuments } from "@/lib/document-queries";
 import { db } from "@/lib/db";
 import {
@@ -53,9 +51,11 @@ export async function POST(request: Request) {
     ];
     const label = String(formData.get("label") ?? "").trim() || "Document";
     const categoryRaw = String(formData.get("category") ?? "general").trim();
-    const category = isDocumentCategory(categoryRaw)
-      ? categoryRaw
-      : defaultDocumentCategoryForItem(categoryRaw);
+    const documentCategories = await getDocumentCategories();
+    const category = resolveDocumentCategorySlug(
+      categoryRaw,
+      documentCategories,
+    );
     const extraViewers = parseExtraViewers(
       String(formData.get("extraViewers") ?? "")
         .split(",")
