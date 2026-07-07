@@ -107,7 +107,10 @@ function syncStructuredTimes(
 
     if (startDatetime) {
       const [date, time] = startDatetime.split("T");
-      if (date) nextEventDate = date;
+      if (date) {
+        nextEventDate =
+          travelDateFromDepartureDatetime(startDatetime) ?? date;
+      }
       if (date && time) {
         const clock = time.slice(0, 5);
         nextSimple.departureTime = clock;
@@ -553,7 +556,7 @@ export function travelDateFromDepartureDatetime(
   return date;
 }
 
-/** Fill departure date from travel date when departure has no date yet. */
+/** Keep departure/arrival datetimes aligned when the travel date changes. */
 export function applyFlightTravelDateChange(
   form: ItemFormState,
   nextTravelDate: string,
@@ -562,20 +565,43 @@ export function applyFlightTravelDateChange(
     return { ...form, eventDate: nextTravelDate };
   }
 
-  const next: ItemFormState = { ...form, eventDate: nextTravelDate };
-  if (!nextTravelDate.trim()) return next;
+  if (!nextTravelDate.trim()) {
+    return { ...form, eventDate: nextTravelDate };
+  }
 
-  const departureDate = form.startDatetime.split("T")[0]?.trim() ?? "";
-  if (departureDate) return next;
-
-  const timePart = form.startDatetime.includes("T")
+  const prevTravelDate = form.eventDate.trim();
+  const prevStartDate = form.startDatetime.split("T")[0]?.trim() ?? "";
+  const prevEndDate = form.endDatetime.split("T")[0]?.trim() ?? "";
+  const startTime = form.startDatetime.includes("T")
     ? (form.startDatetime.split("T")[1] ?? "")
     : "";
-  next.startDatetime = timePart
-    ? `${nextTravelDate}T${timePart}`
-    : `${nextTravelDate}T`;
+  const endTime = form.endDatetime.includes("T")
+    ? (form.endDatetime.split("T")[1] ?? "")
+    : "";
 
-  return next;
+  const shouldMoveStartDate =
+    !prevStartDate || prevStartDate === prevTravelDate;
+
+  const shouldMoveEndDate =
+    Boolean(form.endDatetime) &&
+    (!prevEndDate ||
+      prevEndDate === prevTravelDate ||
+      (prevStartDate && prevEndDate === prevStartDate));
+
+  return {
+    ...form,
+    eventDate: nextTravelDate,
+    startDatetime: shouldMoveStartDate
+      ? startTime
+        ? `${nextTravelDate}T${startTime}`
+        : `${nextTravelDate}T`
+      : form.startDatetime,
+    endDatetime: shouldMoveEndDate
+      ? endTime
+        ? `${nextTravelDate}T${endTime}`
+        : form.endDatetime
+      : form.endDatetime,
+  };
 }
 
 /** When departure datetime changes, keep arrival time but align its date if it still matched the old departure date. */
@@ -604,7 +630,7 @@ export function applyFlightStartDatetimeChange(
       : form.endDatetime;
 
   let nextEventDate = form.eventDate;
-  if (!nextEventDate.trim() && nextStartDate) {
+  if (nextStartDate) {
     nextEventDate =
       travelDateFromDepartureDatetime(nextStart) ?? nextStartDate;
   }
