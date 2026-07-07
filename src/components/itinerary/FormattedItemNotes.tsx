@@ -5,8 +5,34 @@ import {
   itemNotesHasContent,
   normalizeItemNotesText,
   parseInlineFormattedText,
+  parseLinksInText,
   splitItemNoteLines,
 } from "@/lib/item-note-format";
+
+function LinkifiedText({ text }: { text: string }) {
+  const segments = parseLinksInText(text);
+
+  return (
+    <>
+      {segments.map((segment, index) => {
+        if (segment.kind === "link") {
+          return (
+            <a
+              key={index}
+              href={segment.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="break-all text-brand-deep underline underline-offset-2 hover:text-brand"
+            >
+              {segment.value}
+            </a>
+          );
+        }
+        return <Fragment key={index}>{segment.value}</Fragment>;
+      })}
+    </>
+  );
+}
 
 function InlineFormattedText({ text }: { text: string }) {
   const segments = parseInlineFormattedText(text);
@@ -15,12 +41,20 @@ function InlineFormattedText({ text }: { text: string }) {
     <>
       {segments.map((segment, index) => {
         if (segment.kind === "bold") {
-          return <strong key={index}>{segment.value}</strong>;
+          return (
+            <strong key={index}>
+              <LinkifiedText text={segment.value} />
+            </strong>
+          );
         }
         if (segment.kind === "italic") {
-          return <em key={index}>{segment.value}</em>;
+          return (
+            <em key={index}>
+              <LinkifiedText text={segment.value} />
+            </em>
+          );
         }
-        return <Fragment key={index}>{segment.value}</Fragment>;
+        return <LinkifiedText key={index} text={segment.value} />;
       })}
     </>
   );

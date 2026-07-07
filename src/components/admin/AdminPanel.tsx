@@ -31,6 +31,7 @@ import {
   itemToForm,
   type ItemFormState,
 } from "@/lib/admin-item-form";
+import { formatFlightScheduleLines } from "@/lib/flight-datetime";
 import { getItemSortTime } from "@/lib/item-schedule-datetime";
 import { adminItemEditSectionId, scrollToElementById } from "@/lib/day-jump";
 import { useUnsavedChangesGuard } from "@/components/layout/NavigationGuard";
@@ -756,9 +757,19 @@ export function AdminPanel({
                     <p className="truncate font-medium text-stone-800">{item.title}</p>
                     <p className="text-sm text-stone-500">
                       {getMeta(item.category)?.label ?? item.category}
-                      {item.startDatetime
-                        ? ` · ${new Date(item.startDatetime).toLocaleString()}`
-                        : ""}
+                      {item.category === "flight" && item.startDatetime
+                        ? (() => {
+                            const schedule = formatFlightScheduleLines(item);
+                            if (schedule.departure && schedule.arrival) {
+                              return ` · ${schedule.departure} – ${schedule.arrival}`;
+                            }
+                            return schedule.departure
+                              ? ` · ${schedule.departure}`
+                              : "";
+                          })()
+                        : item.startDatetime
+                          ? ` · ${new Date(item.startDatetime).toLocaleString()}`
+                          : ""}
                     </p>
                   </div>
                   <div className="flex gap-2">

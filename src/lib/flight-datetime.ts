@@ -178,7 +178,7 @@ function wallClockInstant(
   if ([year, month, day].some((part) => Number.isNaN(part)) || !clock) {
     return null;
   }
-  return new Date(year, month - 1, day, clock.hour, clock.minute, 0);
+  return new Date(Date.UTC(year, month - 1, day, clock.hour, clock.minute, 0));
 }
 
 function resolveEndDatetime(
@@ -492,15 +492,11 @@ export function formatFlightEndpointLabel(
   }
 
   if (instant) {
-    const formatted = instant.toLocaleString("en-GB", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: options?.hour12 ?? false,
-    });
+    const formatted = formatInstantInTimezone(
+      instant,
+      timeZone ?? "UTC",
+      options,
+    );
     return code ? `${formatted} (${code})` : formatted;
   }
 
