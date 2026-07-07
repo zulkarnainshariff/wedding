@@ -8,6 +8,7 @@ import {
   type AppThemeId,
 } from "@/lib/app-theme";
 import { appSettings, type AppFeatureFlags } from "@/lib/schema";
+import { DEFAULT_ITINERARY_START_DATE } from "@/lib/trip-day-display";
 
 export type AppSettings = {
   themeId: AppThemeId;
@@ -73,6 +74,11 @@ function normalizeFeatures(raw: unknown): AppFeatureFlags {
       typeof value.tripEndDate === "string" && value.tripEndDate.trim()
         ? value.tripEndDate.trim()
         : null,
+    itineraryStartDate:
+      typeof value.itineraryStartDate === "string" &&
+      value.itineraryStartDate.trim()
+        ? value.itineraryStartDate.trim()
+        : DEFAULT_ITINERARY_START_DATE,
   };
 }
 

@@ -16,9 +16,9 @@ export function TripProgressIndicator({
   days: Pick<ItineraryDay, "date" | "dayNumber" | "title">[];
   items?: ItineraryItemWithSubItems[];
 }) {
-  const { effectiveDate, devMode } = useTripTime();
+  const { effectiveDate, devMode, itineraryStartDate } = useTripTime();
   const { formatDateOnly, formatWallClockDateTime, formatClockTime } = useDisplayFormat();
-  const progress = computeTripProgress(days, effectiveDate);
+  const progress = computeTripProgress(days, effectiveDate, itineraryStartDate);
   const nextItem = items ? findNextItineraryItem(items, effectiveDate) : null;
 
   if (!progress) return null;

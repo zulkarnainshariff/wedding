@@ -75,6 +75,7 @@ export default async function AdminPage() {
         }}
         tripStartDate={appSettings.features.tripStartDate ?? null}
         tripEndDate={appSettings.features.tripEndDate ?? null}
+        itineraryStartDate={appSettings.features.itineraryStartDate ?? null}
       />
     </AppShell>
   );

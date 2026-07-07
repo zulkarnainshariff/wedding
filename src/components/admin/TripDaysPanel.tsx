@@ -1,11 +1,13 @@
 "use client";
 
 import { useLayoutEffect, useMemo, useRef, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { SectionShell } from "@/components/layout/PageShell";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
 import { adminDayRowId, adminDayEditSectionId, scrollToDaySection, scrollToElementById } from "@/lib/day-jump";
+import { resolveItineraryStartDate, tripDaySubtitle } from "@/lib/trip-day-display";
 import type { ItineraryDay } from "@/lib/schema";
 
 const EMPTY_DAY_FORM = {
@@ -19,18 +21,24 @@ export function TripDaysPanel({
   initialItems,
   tripStartDate,
   tripEndDate,
+  itineraryStartDate: initialItineraryStartDate,
   onDaysChanged,
 }: {
   initialDays: ItineraryDay[];
   initialItems: { dayId: number | null }[];
   tripStartDate: string | null;
   tripEndDate: string | null;
+  itineraryStartDate: string | null;
   onDaysChanged?: () => void | Promise<void>;
 }) {
   const toast = useToast();
+  const router = useRouter();
   const { formatDateOnlyWithWeekday, formatDateOnly } = useDisplayFormat();
   const [startDate, setStartDate] = useState(tripStartDate ?? "");
   const [endDate, setEndDate] = useState(tripEndDate ?? "");
+  const [itineraryStartDate, setItineraryStartDate] = useState(
+    initialItineraryStartDate ?? resolveItineraryStartDate(null),
+  );
   const [batchStartDate, setBatchStartDate] = useState(tripStartDate ?? "");
   const [batchEndDate, setBatchEndDate] = useState(tripEndDate ?? "");
   const [days, setDays] = useState(initialDays);
@@ -59,6 +67,39 @@ export function TripDaysPanel({
       [...days].sort((a, b) => a.date.localeCompare(b.date)),
     [days],
   );
+
+  async function saveItineraryStartDate() {
+    if (!itineraryStartDate) {
+      toast.error("Choose a start of itinerary date.");
+      return;
+    }
+    setBusy(true);
+    setStatus(null);
+    try {
+      const response = await fetch("/api/system/app-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          features: { itineraryStartDate },
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!response.ok) {
+        const message = payload.error ?? "Could not save itinerary start date.";
+        setStatus(message);
+        toast.error(message);
+        return;
+      }
+      const message = "Start of itinerary saved.";
+      setStatus(message);
+      toast.success(message);
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function refreshDays() {
     const response = await fetch("/api/days");
@@ -312,6 +353,33 @@ export function TripDaysPanel({
         </p>
       ) : null}
 
+      <SectionShell title="Start of itinerary">
+        <p className="mb-4 text-sm text-stone-500">
+          Days before this date are labeled PREPARATION in the itinerary. Day 1
+          is the first day on or after this date.
+        </p>
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="block text-sm">
+            <span className="mb-1 block text-stone-500">Start of itinerary</span>
+            <input
+              type="date"
+              value={itineraryStartDate}
+              onChange={(e) => setItineraryStartDate(e.target.value)}
+              className="w-full min-w-[12rem] rounded-lg border border-stone-200 px-3 py-2"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void saveItineraryStartDate()}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-brand-deep px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            Save
+          </button>
+        </div>
+      </SectionShell>
+
       <SectionShell title="All days">
         {daysWithCounts.length === 0 ? (
           <p className="text-sm text-stone-500">
@@ -331,7 +399,8 @@ export function TripDaysPanel({
                 >
                   <div>
                     <p className="font-medium text-stone-800">
-                      Day {day.dayNumber} · {day.title || (untouched ? "Blank day" : free ? "Free day" : "Untitled")}
+                      {tripDaySubtitle(day, daysWithCounts, itineraryStartDate)} ·{" "}
+                      {day.title || (untouched ? "Blank day" : free ? "Free day" : "Untitled")}
                     </p>
                     <p className="text-sm text-stone-500">
                       {formatDateOnlyWithWeekday(day.date)}

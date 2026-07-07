@@ -10,7 +10,7 @@ export function DayBannerHeader({
   isToday,
   trailing,
 }: {
-  dayNumber: number;
+  dayNumber: number | null;
   date: string;
   title: string;
   isToday: boolean;
@@ -51,7 +51,13 @@ export function DayBannerHeader({
           {trailing}
         </div>
         <p className="text-sm font-medium text-accent">
-          Day <span className="font-bold">{dayNumber}</span>
+          {dayNumber === null ? (
+            <span className="font-bold tracking-wide">PREPARATION</span>
+          ) : (
+            <>
+              Day <span className="font-bold">{dayNumber}</span>
+            </>
+          )}
         </p>
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { CalendarDays, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTripTime } from "@/components/itinerary/TripTimeContext";
 import { useAnchoredDropdownPosition } from "@/hooks/useAnchoredDropdownPosition";
 import { useDropdownDismiss } from "@/hooks/useDropdownDismiss";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
@@ -24,6 +25,7 @@ export function DayJumpSelector({
   days: DayJumpTarget[];
   variant: DayJumpVariant;
 }) {
+  const { itineraryStartDate } = useTripTime();
   const { formatDateOnly } = useDisplayFormat();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -69,7 +71,12 @@ export function DayJumpSelector({
   }
 
   const jumpLabel = selectedDay
-    ? formatDayJumpPrimary(selectedDay, formatDateOnly)
+    ? formatDayJumpPrimary(
+        selectedDay,
+        formatDateOnly,
+        days,
+        itineraryStartDate,
+      )
     : "Jump to day";
 
   return (
@@ -140,7 +147,12 @@ export function DayJumpSelector({
                         className="w-full rounded-lg px-3 py-2.5 text-left hover:bg-stone-50 active:bg-stone-100"
                       >
                         <span className="block text-sm font-medium text-stone-800">
-                          {formatDayJumpPrimary(day, formatDateOnly)}
+                          {formatDayJumpPrimary(
+                            day,
+                            formatDateOnly,
+                            days,
+                            itineraryStartDate,
+                          )}
                         </span>
                         {title ? (
                           <span className="mt-0.5 block text-xs leading-snug text-stone-500">

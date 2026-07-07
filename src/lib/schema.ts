@@ -101,6 +101,8 @@ export type AppFeatureFlags = {
   photoGalleryEnabled?: boolean;
   tripStartDate?: string | null;
   tripEndDate?: string | null;
+  /** First calendar day labeled "Day 1"; earlier days show as PREPARATION. */
+  itineraryStartDate?: string | null;
 };
 
 export const appSettings = pgTable("app_settings", {

@@ -22,7 +22,8 @@ type DayWithItems = ItineraryDay & { items: ItineraryItemWithSubItems[] };
 
 export function DayTimeline({ days }: { days: DayWithItems[] }) {
   const { user } = useAuth();
-  const { effectiveDate, hidePast, hideFreeDays, hideUntouchedDays } = useTripTime();
+  const { effectiveDate, hidePast, hideFreeDays, hideUntouchedDays, itineraryStartDate } =
+    useTripTime();
   const restrictedView = hasRestrictedTravellerView(user);
   const { visibleDays } = useDayVisibility(days);
   const sortedVisibleDays = useMemo(
@@ -60,7 +61,11 @@ export function DayTimeline({ days }: { days: DayWithItems[] }) {
         {sortedVisibleDays.map((day) => {
           const isToday = isDayToday(day.date, effectiveDate);
           const dayTitle = getDayDisplayTitle(day, day.items.length, restrictedView);
-          const displayDayNumber = tripDayDisplayNumber(day, days);
+          const displayDayNumber = tripDayDisplayNumber(
+            day,
+            days,
+            itineraryStartDate,
+          );
           const standaloneTasks = dayTasks[day.id] ?? [];
 
           return (

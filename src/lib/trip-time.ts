@@ -1,4 +1,5 @@
 import type { ItineraryDay, ItineraryItem } from "@/lib/schema";
+import { resolveItineraryStartDate } from "@/lib/trip-day-display";
 
 export function parseTripDate(dateStr: string): Date {
   return new Date(`${dateStr}T12:00:00`);
@@ -99,14 +100,20 @@ export function formatDaysUntilStart(days: number): string {
 export function computeTripProgress(
   days: Pick<ItineraryDay, "date" | "dayNumber" | "title">[],
   effectiveDate: Date,
+  itineraryStartDate?: string | null,
 ): TripProgress | null {
   if (days.length === 0) return null;
 
-  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
+  const itineraryStart = resolveItineraryStartDate(itineraryStartDate);
+  const sorted = [...days]
+    .filter((day) => day.date >= itineraryStart)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.length === 0) return null;
+
   const startDate = sorted[0].date;
   const endDate = sorted[sorted.length - 1].date;
   const currentDate = toDateString(effectiveDate);
-  const startMs = parseTripDate(startDate).getTime();
+  const startMs = parseTripDate(itineraryStart).getTime();
   const endMs = parseTripDate(endDate).getTime();
   const currentMs = effectiveDate.getTime();
 
