@@ -97,6 +97,7 @@ export function AdminPanel({
   initialFeatures = { guestbookEnabled: false, photoGalleryEnabled: false },
   tripStartDate = null,
   tripEndDate = null,
+  itineraryStartDate = null,
 }: {
   initialDays: ItineraryDay[];
   initialItems: ItineraryItem[];
@@ -115,6 +116,7 @@ export function AdminPanel({
   initialFeatures?: { guestbookEnabled: boolean; photoGalleryEnabled: boolean };
   tripStartDate?: string | null;
   tripEndDate?: string | null;
+  itineraryStartDate?: string | null;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -551,6 +553,7 @@ export function AdminPanel({
             initialItems={items}
             tripStartDate={tripStartDate}
             tripEndDate={tripEndDate}
+            itineraryStartDate={itineraryStartDate}
             onDaysChanged={refreshDays}
           />
         </div>

@@ -18,6 +18,7 @@ import {
   getTodayDate,
   toDateString,
 } from "@/lib/trip-time";
+import { resolveItineraryStartDate } from "@/lib/trip-day-display";
 
 const DEV_MODE_KEY = "wedding-dev-mode";
 const SIMULATED_DATE_KEY = "wedding-simulated-date";
@@ -39,6 +40,7 @@ type TripTimeContextValue = {
   setDayVisible: (dayId: number, visible: boolean, isFree: boolean) => Promise<void>;
   effectiveDate: Date;
   effectiveDateString: string;
+  itineraryStartDate: string;
 };
 
 const TripTimeContext = createContext<TripTimeContextValue | null>(null);
@@ -64,7 +66,13 @@ async function persistPreferences(
   return response.ok;
 }
 
-export function TripTimeProvider({ children }: { children: React.ReactNode }) {
+export function TripTimeProvider({
+  children,
+  itineraryStartDate: itineraryStartDateProp,
+}: {
+  children: React.ReactNode;
+  itineraryStartDate?: string | null;
+}) {
   const { user, refreshUser } = useAuth();
   const [devMode, setDevModeState] = useState(false);
   const [simulatedDate, setSimulatedDateState] = useState(() =>
@@ -193,6 +201,8 @@ export function TripTimeProvider({ children }: { children: React.ReactNode }) {
     [activeDevMode, simulatedDate, hydrated],
   );
 
+  const itineraryStartDate = resolveItineraryStartDate(itineraryStartDateProp);
+
   const value = useMemo<TripTimeContextValue>(
     () => ({
       devMode: activeDevMode,
@@ -211,6 +221,7 @@ export function TripTimeProvider({ children }: { children: React.ReactNode }) {
       setDayVisible,
       effectiveDate,
       effectiveDateString: toDateString(effectiveDate),
+      itineraryStartDate,
     }),
     [
       activeDevMode,
@@ -229,6 +240,7 @@ export function TripTimeProvider({ children }: { children: React.ReactNode }) {
       setHideUntouchedDays,
       setDayVisible,
       effectiveDate,
+      itineraryStartDate,
     ],
   );
 

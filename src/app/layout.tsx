@@ -55,7 +55,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [{ themeId }, cookieStore] = await Promise.all([
+  const [{ themeId, features }, cookieStore] = await Promise.all([
     getAppSettings(),
     cookies(),
   ]);
@@ -71,7 +71,9 @@ export default async function RootLayout({
         <AuthProvider hasSession={hasSession}>
           <CategoriesProvider>
             <ToastProvider>
-              <TripTimeProvider>
+              <TripTimeProvider
+                itineraryStartDate={features.itineraryStartDate}
+              >
                 <OfflineSyncProvider>
                   <NavigationGuardProvider>
                     <ActivityTracker />

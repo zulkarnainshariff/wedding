@@ -1,4 +1,5 @@
 import type { ItineraryDay } from "@/lib/schema";
+import { tripDaySubtitle } from "@/lib/trip-day-display";
 
 export type DayJumpTarget = Pick<
   ItineraryDay,
@@ -6,6 +7,10 @@ export type DayJumpTarget = Pick<
 >;
 
 export type DayJumpVariant = "timeline" | "schedule";
+
+export function formatDayJumpSecondary(day: DayJumpTarget): string | null {
+  return day.title?.trim() || null;
+}
 
 export function daySectionId(
   day: DayJumpTarget,
@@ -78,20 +83,29 @@ export function scrollToElementById(sectionId: string): void {
 export function formatDayJumpPrimary(
   day: DayJumpTarget,
   formatDateOnly: (value: string | Date | null | undefined) => string,
+  allDays?: DayJumpTarget[],
+  itineraryStartDate?: string | null,
 ): string {
-  return `Day ${day.dayNumber} · ${formatDateOnly(day.date)}`;
-}
-
-export function formatDayJumpSecondary(day: DayJumpTarget): string | null {
-  return day.title?.trim() || null;
+  const label =
+    allDays && allDays.length > 0
+      ? tripDaySubtitle(day, allDays, itineraryStartDate)
+      : `Day ${day.dayNumber}`;
+  return `${label} · ${formatDateOnly(day.date)}`;
 }
 
 export function formatDayJumpLabel(
   day: DayJumpTarget,
   formatDateOnly: (value: string | Date | null | undefined) => string,
+  allDays?: DayJumpTarget[],
+  itineraryStartDate?: string | null,
 ): string {
   const title = formatDayJumpSecondary(day);
-  const primary = formatDayJumpPrimary(day, formatDateOnly);
+  const primary = formatDayJumpPrimary(
+    day,
+    formatDateOnly,
+    allDays,
+    itineraryStartDate,
+  );
   return title ? `${primary} · ${title}` : primary;
 }
 
