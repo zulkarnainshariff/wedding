@@ -1,5 +1,6 @@
 import {
   extractItemTravellers,
+  itemIncludesBroadGuestList,
   travellerMatchesUsername,
 } from "@/lib/item-travellers";
 import { extractItemAdditionalViewers } from "@/lib/item-viewers";
@@ -8,7 +9,6 @@ import {
   isSubItem,
 } from "@/lib/item-subitems";
 import type { SessionUser } from "@/lib/permissions";
-import { userIsGuardianOfTravellers } from "@/lib/user-guardian-access";
 import type { ItineraryItem } from "@/lib/schema";
 import { isAdminSession } from "@/lib/role-levels";
 
@@ -70,11 +70,18 @@ export function canViewPrivateItem(
   user: SessionUser,
 ): boolean {
   if (isAdminSession(user.roleLevel)) return true;
-  if (userIsItemParticipant(item, user)) return true;
-  if (userIsGuardianOfTravellers(user, extractItemTravellers(item.details, item.category))) {
-    return true;
-  }
   if (userIsPrivateViewer(item, user)) return true;
   if (userIsAdditionalViewer(item, user)) return true;
-  return false;
+
+  const travellers = isSubItem(item)
+    ? extractSubItemParticipants(item.details)
+    : extractItemTravellers(item.details, item.category);
+
+  if (itemIncludesBroadGuestList(travellers)) {
+    return false;
+  }
+
+  return travellers.some((traveller) =>
+    travellerMatchesUsername(traveller, user.username),
+  );
 }

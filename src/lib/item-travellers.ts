@@ -90,6 +90,25 @@ export function itemIncludesEveryone(travellers: string[]): boolean {
   );
 }
 
+/** Guest labels that name a group, not specific travellers — must not grant private access. */
+export function isBroadTravellerLabel(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    normalized === "all travellers" ||
+    normalized === "all travelers" ||
+    normalized.startsWith("everyone except") ||
+    normalized.startsWith("rest of group")
+  );
+}
+
+export function itemIncludesBroadGuestList(travellers: string[]): boolean {
+  return (
+    itemIncludesEveryone(travellers) ||
+    travellers.some((name) => isBroadTravellerLabel(name))
+  );
+}
+
 export const EVERYONE_TRAVELLER = "Everyone";
 
 export const SYSTEM_ACCOUNT_USERNAMES = new Set(["root", "admin"]);

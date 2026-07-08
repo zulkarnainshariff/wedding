@@ -6,8 +6,10 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import {
   readOfflineCache,
   writeOfflineCache,
+  clearOfflineCache,
   type OfflineCache,
 } from "@/lib/offline-store";
+import { canViewItemTravellers } from "@/lib/permissions";
 import { dispatchSyncUpdated } from "@/lib/sync-client";
 
 type SyncCheckResult = "upToDate" | "updateAvailable" | "offline" | "error";
@@ -69,31 +71,36 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
   );
 
   const syncNow = useCallback(async () => {
-    if (typeof window === "undefined" || syncInFlightRef.current) return;
+    if (typeof window === "undefined" || syncInFlightRef.current || !user) return;
 
     syncInFlightRef.current = true;
     setSyncing(true);
     try {
       const existing = await readOfflineCache();
-      const query = existing?.updateId ? `?updateId=${existing.updateId}` : "";
+      const cacheMatchesUser = existing?.userId === user.id;
+      const query =
+        cacheMatchesUser && existing?.updateId
+          ? `?updateId=${existing.updateId}`
+          : "";
       const response = await fetchSync(
         query,
         AbortSignal.timeout(SYNC_TIMEOUT_MS),
       );
 
-      if (response.status === 304 && existing) {
+      if (response.status === 304 && existing && cacheMatchesUser) {
         applyCache(existing);
         setIsOffline(false);
         return;
       }
 
       if (!response.ok) {
-        if (existing) applyCache(existing);
+        if (existing && cacheMatchesUser) applyCache(existing);
         return;
       }
 
       const data = await response.json();
       const payload: OfflineCache = {
+        userId: user.id,
         updateId: data.updateId,
         days: data.days,
         items: data.items,
@@ -111,7 +118,7 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
       syncInFlightRef.current = false;
       setSyncing(false);
     }
-  }, [applyCache, publishSyncUpdate]);
+  }, [applyCache, publishSyncUpdate, user]);
 
   const checkForUpdates = useCallback(async (): Promise<SyncCheckResult> => {
     if (!navigator.onLine) return "offline";
@@ -131,10 +138,15 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     void readOfflineCache().then((existing) => {
-      if (existing) applyCache(existing);
+      if (existing?.userId === user.id) {
+        applyCache(existing);
+      } else if (existing) {
+        void clearOfflineCache();
+      }
     });
-  }, [applyCache]);
+  }, [applyCache, authLoading, user]);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -218,8 +230,13 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const getCachedItem = useCallback(
-    (id: number) => cache?.items.find((item) => item.id === id) ?? null,
-    [cache],
+    (id: number) => {
+      if (!user || cache?.userId !== user.id) return null;
+      const item = cache.items.find((entry) => entry.id === id) ?? null;
+      if (!item) return null;
+      return canViewItemTravellers(item, user) ? item : null;
+    },
+    [cache, user],
   );
 
   return (

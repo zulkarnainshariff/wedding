@@ -3,6 +3,7 @@ const STORE_NAME = "cache";
 const CACHE_KEY = "itinerary";
 
 export type OfflineCache = {
+  userId: number;
   updateId: string;
   days: import("./schema").ItineraryDay[];
   items: import("./schema").ItineraryItem[];
