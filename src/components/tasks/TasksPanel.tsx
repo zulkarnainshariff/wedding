@@ -2,12 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronRight, ExternalLink, Plus, Save, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Archive, ArchiveRestore, Plus, Save, Trash2, X } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/components/ui/ToastProvider";
 import { TaskNoteIcon } from "@/components/tasks/TaskNoteIcon";
+import { TaskListVisibilityControls } from "@/components/tasks/TaskListVisibilityControls";
 import { SectionShell } from "@/components/layout/PageShell";
 import { scrollToElementById, taskEditSectionId, taskRowId } from "@/lib/day-jump";
+import {
+  isTaskArchived,
+  matchesTaskListVisibility,
+} from "@/lib/task-list-filters";
 import {
   TASK_STATUSES,
   TASK_STATUS_LABELS,
@@ -95,6 +100,8 @@ export function TasksPanel() {
     allowTaggedNotes: false,
   });
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [sortKey, setSortKey] = useState<TaskSortKey>("dueAt");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -248,8 +255,15 @@ export function TasksPanel() {
     void loadUsers();
   }, [canManageUsers, canAssign, user, tasks]);
 
+  const listVisibility = useMemo(
+    () => ({ showCompleted, showArchived }),
+    [showCompleted, showArchived],
+  );
+
   const rootTasks = useMemo(() => {
     let list = tasks.filter((task) => !task.parentTaskId);
+
+    list = list.filter((task) => matchesTaskListVisibility(task, listVisibility));
 
     if (urgencyFilter === "urgent") {
       const parentsWithUrgentChildren = new Set(
@@ -277,12 +291,13 @@ export function TasksPanel() {
     }
 
     return list;
-  }, [tasks, urgencyFilter, sortKey, user?.isAdmin]);
+  }, [tasks, urgencyFilter, sortKey, user?.isAdmin, listVisibility]);
 
   const subtasksByParent = useMemo(() => {
     const map = new Map<number, TaskRow[]>();
     for (const task of tasks) {
       if (task.parentTaskId) {
+        if (!matchesTaskListVisibility(task, listVisibility)) continue;
         if (urgencyFilter === "urgent" && !task.isUrgent) continue;
         if (urgencyFilter === "non-urgent" && task.isUrgent) continue;
         const list = map.get(task.parentTaskId) ?? [];
@@ -291,7 +306,7 @@ export function TasksPanel() {
       }
     }
     return map;
-  }, [tasks, urgencyFilter]);
+  }, [tasks, urgencyFilter, listVisibility]);
 
   const assigneeOptions = useMemo(() => {
     if (!user) return users;
@@ -535,6 +550,25 @@ export function TasksPanel() {
     window.dispatchEvent(new Event("tasks-changed"));
   }
 
+  async function setTaskArchived(taskId: number, archived: boolean) {
+    setBusy(true);
+    setError(null);
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived }),
+    });
+    setBusy(false);
+    if (!response.ok) {
+      setError(archived ? "Failed to archive task." : "Failed to unarchive task.");
+      return;
+    }
+    if (archived && editingTaskId === taskId) closeTaskEditor();
+    await loadTasks({ silent: true });
+    window.dispatchEvent(new Event("tasks-changed"));
+    showSuccess(archived ? "Task archived." : "Task restored.");
+  }
+
   async function deleteNote(taskId: number, noteId: number) {
     if (!confirm("Delete this note?")) return;
     setBusy(true);
@@ -622,7 +656,10 @@ export function TasksPanel() {
     const isSelected = editingTaskId === task.id;
     const isAssignee = task.assigneeUserId === user?.id;
     const canUpdateStatus = isAssignee || canManageTask(task);
+    const canArchive = canManageTask(task);
     const assignee = assigneeLabel(task);
+    const archived = isTaskArchived(task);
+    const completed = task.status === "completed";
 
     return (
       <div key={task.id} className={depth > 0 ? "ml-6 border-l border-stone-200 pl-4" : ""}>
@@ -631,6 +668,7 @@ export function TasksPanel() {
           className={[
             "scroll-mt-24 py-4",
             isSelected ? "rounded-xl bg-brand-deep/5 px-3 -mx-3" : "",
+            archived || completed ? "opacity-75" : "",
           ].join(" ")}
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -651,6 +689,16 @@ export function TasksPanel() {
                   {task.isUrgent ? (
                     <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">
                       Urgent
+                    </span>
+                  ) : null}
+                  {archived ? (
+                    <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-600 ring-1 ring-stone-200">
+                      Archived
+                    </span>
+                  ) : null}
+                  {completed && !archived ? (
+                    <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                      Completed
                     </span>
                   ) : null}
                   {task.hasNotes && task.notePreview ? (
@@ -674,6 +722,26 @@ export function TasksPanel() {
             </button>
 
             <div className="flex flex-col items-stretch gap-2 sm:items-end">
+              {canArchive && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void setTaskArchived(task.id, !archived)}
+                  className="inline-flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-50"
+                >
+                  {archived ? (
+                    <>
+                      <ArchiveRestore className="h-3.5 w-3.5" />
+                      Unarchive
+                    </>
+                  ) : (
+                    <>
+                      <Archive className="h-3.5 w-3.5" />
+                      Archive
+                    </>
+                  )}
+                </button>
+              )}
               {user?.isAdmin && (
                 <button
                   type="button"
@@ -769,6 +837,14 @@ export function TasksPanel() {
             />
             <span className="font-medium text-stone-700">Urgent only</span>
           </label>
+          <TaskListVisibilityControls
+            tasks={tasks}
+            options={{ showCompleted, showArchived }}
+            onChange={({ showCompleted: nextCompleted, showArchived: nextArchived }) => {
+              setShowCompleted(nextCompleted);
+              setShowArchived(nextArchived);
+            }}
+          />
           {user?.isAdmin && (
             <label className="inline-flex items-center gap-2 text-sm text-stone-600">
               <span>Sort by</span>
@@ -1145,9 +1221,11 @@ export function TasksPanel() {
         <p className="text-sm text-stone-500">
           {urgencyFilter === "urgent"
             ? "No urgent tasks."
-            : canAssign
-              ? "No tasks yet. Create one above or from an itinerary item."
-              : "No tasks yet."}
+            : !showCompleted || !showArchived
+              ? "No active tasks match these filters. Try showing completed or archived tasks."
+              : canAssign
+                ? "No tasks yet. Create one above or from an itinerary item."
+                : "No tasks yet."}
         </p>
       ) : (
         <div className="divide-y divide-stone-100">

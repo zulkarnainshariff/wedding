@@ -333,7 +333,7 @@ export async function getTaskIndicators(user: SessionUser) {
   let openCount = 0;
 
   for (const { task, assignee } of visible) {
-    if (task.status === "completed") continue;
+    if (task.status === "completed" || task.archivedAt) continue;
     openCount += 1;
     const effectiveDayId = resolveTaskDayId(task);
     if (effectiveDayId) {

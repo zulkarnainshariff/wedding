@@ -2,11 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Save, Trash2, Archive, ArchiveRestore, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useDiscardConfirm } from "@/hooks/useDiscardConfirm";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { TaskNoteIcon } from "@/components/tasks/TaskNoteIcon";
+import { TaskListVisibilityControls } from "@/components/tasks/TaskListVisibilityControls";
+import {
+  isTaskArchived,
+  matchesTaskListVisibility,
+} from "@/lib/task-list-filters";
 import {
   TASK_STATUSES,
   TASK_STATUS_LABELS,
@@ -33,6 +38,7 @@ type ItemTaskRow = {
   noteCount: number;
   notePreview?: string;
   parentTaskId: number | null;
+  archivedAt: string | null;
 };
 
 type TaskNoteRow = { note: { id: number; content: string }; author: string };
@@ -118,6 +124,8 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
   const [editingNotes, setEditingNotes] = useState<TaskNoteRow[] | null>(null);
   const [focusTaskId, setFocusTaskId] = useState<number | null>(null);
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [sortKey, setSortKey] = useState<TaskSortKey>("dueAt");
   const openedTaskRef = useRef<number | null>(null);
 
@@ -434,6 +442,25 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
     notifyTasksChanged();
   }
 
+  async function setTaskArchived(taskId: number, archived: boolean) {
+    setBusy(true);
+    setError(null);
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived }),
+    });
+    setBusy(false);
+    if (!response.ok) {
+      setError(archived ? "Failed to archive task." : "Failed to unarchive task.");
+      return;
+    }
+    if (archived && editingTask?.id === taskId) returnToList();
+    setStatus(archived ? "Task archived." : "Task restored.");
+    await loadTasks();
+    notifyTasksChanged();
+  }
+
   async function deleteNote(taskId: number, noteId: number) {
     if (!confirm("Delete this note?")) return;
     setBusy(true);
@@ -457,8 +484,15 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
     notifyTasksChanged();
   }
 
+  const listVisibility = useMemo(
+    () => ({ showCompleted, showArchived }),
+    [showCompleted, showArchived],
+  );
+
   const rootTasks = useMemo(() => {
     let list = tasks.filter((task) => !task.parentTaskId);
+
+    list = list.filter((task) => matchesTaskListVisibility(task, listVisibility));
 
     if (urgencyFilter === "urgent") {
       list = list.filter((task) => task.isUrgent);
@@ -479,18 +513,19 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
     }
 
     return list;
-  }, [tasks, urgencyFilter, sortKey, user?.isAdmin]);
+  }, [tasks, urgencyFilter, sortKey, user?.isAdmin, listVisibility]);
   const subtasksByParent = useMemo(() => {
     const map = new Map<number, ItemTaskRow[]>();
     for (const task of tasks) {
       if (task.parentTaskId) {
+        if (!matchesTaskListVisibility(task, listVisibility)) continue;
         const list = map.get(task.parentTaskId) ?? [];
         list.push(task);
         map.set(task.parentTaskId, list);
       }
     }
     return map;
-  }, [tasks]);
+  }, [tasks, listVisibility]);
 
   if (tasks.length === 0 && !canAssign && mode === "list") return null;
 
@@ -505,6 +540,9 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
         selectedPerm?.canAssignForOthers);
     const canEditAsAssignee = isAssignee && task.allowAssigneeEdit;
     const canUpdateStatus = isAssignee || canManageTask(task);
+    const canArchive = canManageTask(task);
+    const archived = isTaskArchived(task);
+    const completed = task.status === "completed";
 
     return (
       <div key={task.id} id={`task-row-${task.id}`}>
@@ -513,6 +551,7 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
             "flex flex-col gap-2 rounded-xl border border-stone-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
             depth > 0 ? "ml-6 border-dashed bg-stone-50/80" : "",
             focusTaskId === task.id ? "ring-2 ring-amber-300" : "",
+            archived || completed ? "opacity-75" : "",
           ].join(" ")}
         >
           <div className="min-w-0">
@@ -522,6 +561,16 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
               {task.isUrgent ? (
                 <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">
                   Urgent
+                </span>
+              ) : null}
+              {archived ? (
+                <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-600 ring-1 ring-stone-200">
+                  Archived
+                </span>
+              ) : null}
+              {completed && !archived ? (
+                <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                  Completed
                 </span>
               ) : null}
               {task.hasNotes && task.notePreview ? (
@@ -542,6 +591,26 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
             )}
           </div>
           <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+            {canArchive && mode === "list" && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void setTaskArchived(task.id, !archived)}
+                className="inline-flex items-center justify-center gap-1 rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-50"
+              >
+                {archived ? (
+                  <>
+                    <ArchiveRestore className="h-3.5 w-3.5" />
+                    Unarchive
+                  </>
+                ) : (
+                  <>
+                    <Archive className="h-3.5 w-3.5" />
+                    Archive
+                  </>
+                )}
+              </button>
+            )}
             {(canEditAsAssigner || canEditAsAssignee) && mode === "list" && (
               <button
                 type="button"
@@ -765,6 +834,14 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
             />
             <span className="font-medium text-stone-700">Urgent only</span>
           </label>
+          <TaskListVisibilityControls
+            tasks={tasks}
+            options={{ showCompleted, showArchived }}
+            onChange={({ showCompleted: nextCompleted, showArchived: nextArchived }) => {
+              setShowCompleted(nextCompleted);
+              setShowArchived(nextArchived);
+            }}
+          />
           {user?.isAdmin && (
             <label className="inline-flex items-center gap-2 text-sm text-stone-600">
               <span>Sort by</span>
@@ -786,7 +863,9 @@ export function ItemTaskSection({ item }: { item: ItineraryItem }) {
         <p className="mt-2 text-sm text-stone-500">
           {urgencyFilter === "urgent"
             ? "No urgent tasks for this item."
-            : "No tasks linked to this item yet."}
+            : !showCompleted || !showArchived
+              ? "No active tasks match these filters. Try showing completed or archived tasks."
+              : "No tasks linked to this item yet."}
         </p>
       ) : (
         <div className="mt-3 space-y-2">
