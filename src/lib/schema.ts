@@ -274,6 +274,7 @@ export const tasks = pgTable("tasks", {
   allowAssigneeEdit: boolean("allow_assignee_edit").default(false).notNull(),
   statusReason: text("status_reason"),
   isUrgent: boolean("is_urgent").default(false).notNull(),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

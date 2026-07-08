@@ -144,6 +144,10 @@ export async function PUT(request: Request, { params }: Params) {
       patch.isUrgent = Boolean(body.isUrgent);
       taskWasEdited = true;
     }
+    if (body.archived !== undefined) {
+      patch.archivedAt = body.archived ? new Date() : null;
+      taskWasEdited = true;
+    }
   } else if (isAssignee && details.task.allowAssigneeEdit) {
     if (body.title) {
       patch.title = body.title;
