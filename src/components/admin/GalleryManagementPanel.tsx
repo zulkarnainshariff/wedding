@@ -203,15 +203,26 @@ export function GalleryManagementPanel({
         method: "POST",
         body: formData,
       });
-      const body = (await response.json().catch(() => ({}))) as {
+      const raw = await response.text();
+      let body: {
         error?: string;
         count?: number;
         photos?: GalleryPhoto[];
         albumId?: number;
-      };
+      } = {};
+      try {
+        body = raw ? (JSON.parse(raw) as typeof body) : {};
+      } catch {
+        body = {};
+      }
 
       if (!response.ok) {
-        toast.error(body.error ?? "Could not upload photos.");
+        toast.error(
+          body.error ??
+            (raw.trim()
+              ? `Upload failed (${response.status}).`
+              : "Could not upload photos."),
+        );
         return;
       }
 
@@ -242,8 +253,12 @@ export function GalleryManagementPanel({
         }.`,
       );
       if (!compact) void loadPhotos();
-    } catch {
-      toast.error("Could not upload photos.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not upload photos. Check your connection and try again.",
+      );
     } finally {
       setBulkBusy(false);
     }

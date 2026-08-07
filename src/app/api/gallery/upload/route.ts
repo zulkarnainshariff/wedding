@@ -103,117 +103,137 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const formData = await request.formData();
-  const eventId = Number(formData.get("eventId"));
-  const albumName = String(formData.get("albumName") ?? "").trim();
-  const albumIdRaw = formData.get("albumId");
-  const albumIdInput =
-    albumIdRaw != null && String(albumIdRaw).trim()
-      ? Number(albumIdRaw)
-      : null;
-  const caption = String(formData.get("caption") ?? "").trim() || null;
-  const guestNames = String(formData.get("guestNames") ?? "");
-  const groupingsText = String(formData.get("groupings") ?? "");
-
-  if (!eventId) {
-    return NextResponse.json({ error: "Event is required." }, { status: 400 });
-  }
-  if (!albumName && !(albumIdInput && albumIdInput > 0)) {
-    return NextResponse.json(
-      { error: "Album name is required for bulk uploads." },
-      { status: 400 },
-    );
-  }
-
-  let albumId = albumIdInput && albumIdInput > 0 ? albumIdInput : null;
-  if (albumName) {
-    const album = await findOrCreateAlbumByName(albumName);
-    albumId = album?.id ?? albumId;
-  }
-  if (!albumId) {
-    return NextResponse.json(
-      { error: "Could not resolve album for upload." },
-      { status: 400 },
-    );
-  }
-
-  const files = formData
-    .getAll("files")
-    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
-
-  if (files.length === 0) {
-    const single = formData.get("file");
-    if (single instanceof File && single.size > 0) files.push(single);
-  }
-
-  if (files.length === 0) {
-    return NextResponse.json(
-      { error: "Choose image files or a zip archive to upload." },
-      { status: 400 },
-    );
-  }
-
-  let images: UploadedImage[];
   try {
-    images = await collectImagesFromFiles(files);
-  } catch (error) {
+    const formData = await request.formData();
+    const eventId = Number(formData.get("eventId"));
+    const albumName = String(formData.get("albumName") ?? "").trim();
+    const albumIdRaw = formData.get("albumId");
+    const albumIdInput =
+      albumIdRaw != null && String(albumIdRaw).trim()
+        ? Number(albumIdRaw)
+        : null;
+    const caption = String(formData.get("caption") ?? "").trim() || null;
+    const guestNames = String(formData.get("guestNames") ?? "");
+    const groupingsText = String(formData.get("groupings") ?? "");
+
+    if (!eventId) {
+      return NextResponse.json({ error: "Event is required." }, { status: 400 });
+    }
+    if (!albumName && !(albumIdInput && albumIdInput > 0)) {
+      return NextResponse.json(
+        { error: "Album name is required for bulk uploads." },
+        { status: 400 },
+      );
+    }
+
+    let albumId = albumIdInput && albumIdInput > 0 ? albumIdInput : null;
+    if (albumName) {
+      const album = await findOrCreateAlbumByName(albumName);
+      albumId = album?.id ?? albumId;
+    }
+    if (!albumId) {
+      return NextResponse.json(
+        { error: "Could not resolve album for upload." },
+        { status: 400 },
+      );
+    }
+
+    const files = formData
+      .getAll("files")
+      .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+
+    if (files.length === 0) {
+      const single = formData.get("file");
+      if (single instanceof File && single.size > 0) files.push(single);
+    }
+
+    if (files.length === 0) {
+      return NextResponse.json(
+        { error: "Choose image files or a zip archive to upload." },
+        { status: 400 },
+      );
+    }
+
+    let images: UploadedImage[];
+    try {
+      images = await collectImagesFromFiles(files);
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Could not read upload files.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (images.length === 0) {
+      return NextResponse.json(
+        { error: "No supported images found in the upload." },
+        { status: 400 },
+      );
+    }
+
+    const tags = parseGuestNames(guestNames);
+    const groupings = parseCommaList(groupingsText);
+    const createdIds: number[] = [];
+
+    for (const image of images) {
+      const storageKey = buildGalleryStorageKey(image.fileName);
+      await writeGalleryFile(storageKey, image.buffer);
+
+      const [photo] = await db
+        .insert(galleryPhotos)
+        .values({
+          eventId,
+          albumId,
+          url: "/api/gallery/media/0",
+          storageKey,
+          originalFilename: image.fileName,
+          mimeType: image.mimeType,
+          caption,
+        })
+        .returning();
+
+      await db
+        .update(galleryPhotos)
+        .set({ url: galleryMediaUrl(photo.id) })
+        .where(eq(galleryPhotos.id, photo.id));
+
+      await replacePhotoPeopleTags(photo.id, tags);
+      await replacePhotoGroupings(photo.id, groupings);
+      createdIds.push(photo.id);
+    }
+
+    const photos = await listGalleryPhotos({ eventId, albumId });
+    const created = photos.filter((photo) => createdIds.includes(photo.id));
+
+    revalidatePath("/gallery");
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Could not read upload files.",
-      },
-      { status: 400 },
-    );
-  }
-
-  if (images.length === 0) {
-    return NextResponse.json(
-      { error: "No supported images found in the upload." },
-      { status: 400 },
-    );
-  }
-
-  const tags = parseGuestNames(guestNames);
-  const groupings = parseCommaList(groupingsText);
-  const createdIds: number[] = [];
-
-  for (const image of images) {
-    const storageKey = buildGalleryStorageKey(image.fileName);
-    await writeGalleryFile(storageKey, image.buffer);
-
-    const [photo] = await db
-      .insert(galleryPhotos)
-      .values({
-        eventId,
+        count: created.length,
+        photos: created,
         albumId,
-        url: "/api/gallery/media/0",
-        storageKey,
-        originalFilename: image.fileName,
-        mimeType: image.mimeType,
-        caption,
-      })
-      .returning();
-
-    await db
-      .update(galleryPhotos)
-      .set({ url: galleryMediaUrl(photo.id) })
-      .where(eq(galleryPhotos.id, photo.id));
-
-    await replacePhotoPeopleTags(photo.id, tags);
-    await replacePhotoGroupings(photo.id, groupings);
-    createdIds.push(photo.id);
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error("POST /api/gallery/upload failed:", error);
+    const message =
+      error instanceof Error ? error.message : "Could not upload photos.";
+    const looksLikeMissingSchema =
+      /album_id|storage_key|gallery_albums|gallery_photo_groupings|does not exist/i.test(
+        message,
+      );
+    return NextResponse.json(
+      {
+        error: looksLikeMissingSchema
+          ? "Gallery database update is missing. Run npm run db:migrate-gallery-albums, then try again."
+          : message,
+      },
+      { status: 500 },
+    );
   }
-
-  const photos = await listGalleryPhotos({ eventId, albumId });
-  const created = photos.filter((photo) => createdIds.includes(photo.id));
-
-  revalidatePath("/gallery");
-  return NextResponse.json(
-    {
-      count: created.length,
-      photos: created,
-      albumId,
-    },
-    { status: 201 },
-  );
 }
