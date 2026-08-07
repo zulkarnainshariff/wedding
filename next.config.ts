@@ -8,7 +8,9 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "512mb",
     },
+    // Used when middleware/proxy clones request bodies (default is 10MB).
     proxyClientMaxBodySize: "512mb",
+    middlewareClientMaxBodySize: "512mb",
   },
   turbopack: {
     root: path.join(__dirname),

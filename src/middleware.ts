@@ -84,5 +84,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image).*)"],
+  // Skip middleware for gallery uploads so large multipart bodies are not
+  // buffered/cloned by the middleware layer.
+  matcher: ["/((?!_next/static|_next/image|api/gallery/upload).*)"],
 };

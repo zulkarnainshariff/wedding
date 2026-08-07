@@ -6,6 +6,11 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { GalleryEditablePhotoGrid } from "@/components/gallery/GalleryPhotoGrid";
 import { PortaledFileInput } from "@/components/ui/PortaledFileInput";
 import { parseGuestNames } from "@/lib/gallery-photo-utils";
+import {
+  batchGalleryUploadFiles,
+  describeGalleryUploadHttpError,
+  expandGalleryUploadFiles,
+} from "@/lib/gallery-client-upload";
 
 export type GalleryEvent = { id: number; name: string };
 export type GalleryAlbum = { id: number; name: string };
@@ -227,56 +232,94 @@ export function GalleryManagementPanel({
 
     setBulkBusy(true);
     try {
-      const formData = new FormData();
-      formData.set("eventId", String(eventId));
-      formData.set("albumName", albumName);
-      if (bulk.caption.trim()) formData.set("caption", bulk.caption.trim());
-      if (bulk.guestNames.trim()) formData.set("guestNames", bulk.guestNames);
-      if (bulk.groupings.trim()) formData.set("groupings", bulk.groupings);
-      if (bulk.isPrivate) formData.set("isPrivate", "true");
-      for (const file of selectedFiles) {
-        formData.append("files", file);
-      }
-
-      const response = await fetch("/api/gallery/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const raw = await response.text();
-      let body: {
-        error?: string;
-        count?: number;
-        photos?: GalleryPhoto[];
-        albumId?: number;
-      } = {};
+      let images: File[];
       try {
-        body = raw ? (JSON.parse(raw) as typeof body) : {};
-      } catch {
-        body = {};
-      }
-
-      if (!response.ok) {
+        images = await expandGalleryUploadFiles(selectedFiles);
+      } catch (error) {
         toast.error(
-          body.error ??
-            (raw.trim()
-              ? `Upload failed (${response.status}).`
-              : "Could not upload photos."),
+          error instanceof Error
+            ? error.message
+            : "Could not read the selected files.",
         );
         return;
       }
 
-      const created = body.photos ?? [];
-      if (!compact && created.length > 0) {
-        setPhotos((current) => [...created, ...current]);
+      if (images.length === 0) {
+        toast.error("No supported images found in the upload.");
+        return;
       }
-      for (const photo of created) {
+
+      const batches = batchGalleryUploadFiles(images);
+      const createdAll: GalleryPhoto[] = [];
+      let albumId: number | undefined;
+
+      for (let index = 0; index < batches.length; index += 1) {
+        const batch = batches[index];
+        const formData = new FormData();
+        formData.set("eventId", String(eventId));
+        formData.set("albumName", albumName);
+        if (bulk.caption.trim()) formData.set("caption", bulk.caption.trim());
+        if (bulk.guestNames.trim()) formData.set("guestNames", bulk.guestNames);
+        if (bulk.groupings.trim()) formData.set("groupings", bulk.groupings);
+        if (bulk.isPrivate) formData.set("isPrivate", "true");
+        for (const file of batch) {
+          formData.append("files", file);
+        }
+
+        const response = await fetch("/api/gallery/upload", {
+          method: "POST",
+          body: formData,
+        });
+        const raw = await response.text();
+        let body: {
+          error?: string;
+          count?: number;
+          photos?: GalleryPhoto[];
+          albumId?: number;
+        } = {};
+        try {
+          body = raw ? (JSON.parse(raw) as typeof body) : {};
+        } catch {
+          body = {};
+        }
+
+        if (!response.ok) {
+          const detail = describeGalleryUploadHttpError(
+            response.status,
+            body.error,
+          );
+          const progress =
+            createdAll.length > 0
+              ? ` Uploaded ${createdAll.length} photo${
+                  createdAll.length === 1 ? "" : "s"
+                } before failing on batch ${index + 1}/${batches.length}.`
+              : "";
+          toast.error(`${detail}${progress}`);
+          if (createdAll.length > 0) {
+            if (!compact) {
+              setPhotos((current) => [...createdAll, ...current]);
+            }
+            for (const photo of createdAll) onPhotoAdded?.(photo);
+          }
+          return;
+        }
+
+        const created = body.photos ?? [];
+        createdAll.push(...created);
+        if (body.albumId) albumId = body.albumId;
+      }
+
+      if (!compact && createdAll.length > 0) {
+        setPhotos((current) => [...createdAll, ...current]);
+      }
+      for (const photo of createdAll) {
         onPhotoAdded?.(photo);
       }
-      if (body.albumId && albumName) {
+      if (albumId && albumName) {
         setAlbums((current) =>
-          current.some((album) => album.id === body.albumId)
+          current.some((album) => album.id === albumId)
             ? current
-            : [...current, { id: body.albumId!, name: albumName }],
+            : [...current, { id: albumId!, name: albumName }],
         );
       }
 
@@ -287,8 +330,10 @@ export function GalleryManagementPanel({
       setSelectedFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
       toast.success(
-        `Uploaded ${body.count ?? created.length} photo${
-          (body.count ?? created.length) === 1 ? "" : "s"
+        `Uploaded ${createdAll.length} photo${
+          createdAll.length === 1 ? "" : "s"
+        }${
+          batches.length > 1 ? ` in ${batches.length} batches` : ""
         }.`,
       );
       if (!compact) void loadPhotos();
@@ -562,8 +607,9 @@ export function GalleryManagementPanel({
           Bulk upload
         </p>
         <p className="mt-1 text-xs text-stone-500">
-          Upload multiple images or a zip archive. You will be asked for an album
-          name; photos can be reassigned to other albums later.
+          Upload images or a zip archive. Zips are unpacked in your browser and
+          sent in small batches so reverse proxies do not reject large bodies.
+          You will be asked for an album name; photos can be reassigned later.
         </p>
       </div>
       <label className="block text-sm">

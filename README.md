@@ -114,6 +114,11 @@ Point your site at the Docker host port:
 
 ```nginx
 location / {
+    client_max_body_size 512m;
+    proxy_read_timeout 600s;
+    proxy_send_timeout 600s;
+    proxy_request_buffering off;
+
     proxy_pass http://127.0.0.1:3102;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
@@ -125,6 +130,8 @@ location / {
     proxy_cache_bypass $http_upgrade;
 }
 ```
+
+> Gallery uploads can be tens or hundreds of MB. Without `client_max_body_size`, OpenResty/nginx returns **HTTP 413** before the Next.js app sees the request. After changing this, reload OpenResty (`sudo openresty -s reload` or your usual reload).
 
 ### Manual Docker commands
 
