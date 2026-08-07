@@ -9,8 +9,8 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "512mb",
     },
     // Used when middleware/proxy clones request bodies (default is 10MB).
+    // Do not also set middlewareClientMaxBodySize — Next rejects both together.
     proxyClientMaxBodySize: "512mb",
-    middlewareClientMaxBodySize: "512mb",
   },
   turbopack: {
     root: path.join(__dirname),
