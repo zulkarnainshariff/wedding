@@ -8,12 +8,14 @@ export function PortaledFileInput({
   id,
   name,
   accept,
+  multiple = false,
   onChange,
 }: {
   inputRef: RefObject<HTMLInputElement | null>;
   id: string;
   name?: string;
   accept?: string;
+  multiple?: boolean;
   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   const [mounted, setMounted] = useState(false);
@@ -29,6 +31,7 @@ export function PortaledFileInput({
       name={name}
       type="file"
       accept={accept}
+      multiple={multiple}
       onChange={onChange}
       className="sr-only"
       tabIndex={-1}

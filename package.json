@@ -25,6 +25,7 @@
     "db:migrate-app-settings": "tsx src/db/migrate-app-settings.ts",
     "db:migrate-error-logs": "tsx src/db/migrate-error-logs.ts",
     "db:migrate-public-features": "tsx src/db/migrate-public-features.ts",
+    "db:migrate-gallery-albums": "tsx src/db/migrate-gallery-albums.ts",
     "db:migrate-trip-days": "tsx src/db/migrate-trip-days.ts",
     "db:migrate-guestbook-moderation": "tsx src/db/migrate-guestbook-moderation.ts",
     "db:migrate-pet-relocation-participants": "tsx src/db/migrate-pet-relocation-participants.ts",
@@ -33,12 +34,13 @@
     "db:migrate-guest-member-fields": "tsx src/db/migrate-guest-member-fields.ts",
     "db:migrate-document-fields": "tsx src/db/migrate-document-fields.ts",
     "db:migrate-app-categories": "tsx src/db/migrate-app-categories.ts",
-    "db:migrate-all": "npm run db:push && npm run db:migrate-task-view-permissions && npm run db:migrate-item-features && npm run db:migrate-system-logs && npm run db:migrate-app-settings && npm run db:migrate-error-logs && npm run db:migrate-public-features && npm run db:migrate-trip-days && npm run db:migrate-guestbook-moderation && npm run db:migrate-pet-relocation-participants && npm run db:migrate-guest-list-event-roles && npm run db:migrate-guest-member-fields && npm run db:migrate-document-fields && npm run db:migrate-app-categories",
+    "db:migrate-all": "npm run db:push && npm run db:migrate-task-view-permissions && npm run db:migrate-item-features && npm run db:migrate-system-logs && npm run db:migrate-app-settings && npm run db:migrate-error-logs && npm run db:migrate-public-features && npm run db:migrate-gallery-albums && npm run db:migrate-trip-days && npm run db:migrate-guestbook-moderation && npm run db:migrate-pet-relocation-participants && npm run db:migrate-guest-list-event-roles && npm run db:migrate-guest-member-fields && npm run db:migrate-document-fields && npm run db:migrate-app-categories",
     "db:dump-seed": "bash scripts/dump-wedding-seed.sh",
     "db:reset-sequences": "tsx src/db/reset-sequences.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "adm-zip": "^0.6.0",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.3",
@@ -52,6 +54,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/adm-zip": "^0.5.8",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20",
     "@types/react": "^19",

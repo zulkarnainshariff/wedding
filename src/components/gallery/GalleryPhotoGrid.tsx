@@ -5,41 +5,55 @@ import { Maximize2, Pencil, Trash2, X } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
+  formatCommaList,
   formatGuestNames,
   parseGuestNames,
 } from "@/lib/gallery-photo-utils";
-import type { GalleryEvent, GalleryPhoto } from "@/components/admin/GalleryManagementPanel";
+import type {
+  GalleryAlbum,
+  GalleryEvent,
+  GalleryPhoto,
+} from "@/components/admin/GalleryManagementPanel";
 
 type PhotoFormState = {
   eventId: string;
+  albumId: string;
+  albumName: string;
   url: string;
   caption: string;
   guestNames: string;
+  groupings: string;
 };
 
 function photoToForm(photo: GalleryPhoto): PhotoFormState {
   return {
     eventId: String(photo.eventId),
+    albumId: photo.albumId ? String(photo.albumId) : "",
+    albumName: "",
     url: photo.url,
     caption: photo.caption ?? "",
     guestNames: formatGuestNames(photo.tags),
+    groupings: formatCommaList(photo.groupings ?? []),
   };
 }
 
 function GalleryPhotoEditDialog({
   photo,
   events,
+  albums,
   busy,
   onClose,
   onSave,
 }: {
   photo: GalleryPhoto;
   events: GalleryEvent[];
+  albums: GalleryAlbum[];
   busy: boolean;
   onClose: () => void;
   onSave: (form: PhotoFormState) => void;
 }) {
   const [form, setForm] = useState(() => photoToForm(photo));
+  const isUploaded = photo.url.startsWith("/api/gallery/media/");
 
   useEffect(() => {
     setForm(photoToForm(photo));
@@ -55,7 +69,7 @@ function GalleryPhotoEditDialog({
     >
       <div className="absolute inset-0 bg-stone-900/45 backdrop-blur-[2px]" />
       <div
-        className="relative w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
+        className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -82,16 +96,62 @@ function GalleryPhotoEditDialog({
             </select>
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-stone-500">Photo URL</span>
-            <input
-              type="url"
-              value={form.url}
+            <span className="mb-1 block text-stone-500">Album</span>
+            <select
+              value={form.albumId}
               onChange={(e) =>
-                setForm((current) => ({ ...current, url: e.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  albumId: e.target.value,
+                  albumName: "",
+                }))
               }
               className="w-full rounded-lg border border-stone-200 px-3 py-2"
-            />
+            >
+              <option value="">No album</option>
+              {albums.map((album) => (
+                <option key={album.id} value={album.id}>
+                  {album.name}
+                </option>
+              ))}
+            </select>
           </label>
+          {!form.albumId ? (
+            <label className="block text-sm">
+              <span className="mb-1 block text-stone-500">
+                Or create album
+              </span>
+              <input
+                value={form.albumName}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    albumName: e.target.value,
+                  }))
+                }
+                placeholder="New album name"
+                className="w-full rounded-lg border border-stone-200 px-3 py-2"
+              />
+            </label>
+          ) : null}
+          {!isUploaded ? (
+            <label className="block text-sm">
+              <span className="mb-1 block text-stone-500">Photo URL</span>
+              <input
+                type="url"
+                value={form.url}
+                onChange={(e) =>
+                  setForm((current) => ({ ...current, url: e.target.value }))
+                }
+                className="w-full rounded-lg border border-stone-200 px-3 py-2"
+              />
+            </label>
+          ) : (
+            <p className="rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-500">
+              Uploaded file — URL cannot be changed. Reassign the album or tags
+              below.
+            </p>
+          )}
           <label className="block text-sm">
             <span className="mb-1 block text-stone-500">Caption (optional)</span>
             <input
@@ -103,7 +163,7 @@ function GalleryPhotoEditDialog({
             />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-stone-500">Tag guests (optional)</span>
+            <span className="mb-1 block text-stone-500">Tag people</span>
             <input
               value={form.guestNames}
               onChange={(e) =>
@@ -113,6 +173,20 @@ function GalleryPhotoEditDialog({
                 }))
               }
               placeholder="Nat, Zulkarnain"
+              className="w-full rounded-lg border border-stone-200 px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block text-stone-500">Groupings</span>
+            <input
+              value={form.groupings}
+              onChange={(e) =>
+                setForm((current) => ({
+                  ...current,
+                  groupings: e.target.value,
+                }))
+              }
+              placeholder="Family, Bridal party"
               className="w-full rounded-lg border border-stone-200 px-3 py-2"
             />
           </label>
@@ -189,10 +263,18 @@ function GalleryPhotoLightbox({
           {photo.caption ? (
             <p className="font-medium text-stone-800">{photo.caption}</p>
           ) : null}
-          <p className="text-stone-500">{photo.eventName}</p>
+          <p className="text-stone-500">
+            {photo.albumName ? `${photo.albumName} · ` : ""}
+            {photo.eventName}
+          </p>
           {photo.tags.length > 0 ? (
             <p className="mt-1 text-stone-500">
-              {photo.tags.map((tag) => tag.guestName).join(", ")}
+              People: {photo.tags.map((tag) => tag.guestName).join(", ")}
+            </p>
+          ) : null}
+          {(photo.groupings?.length ?? 0) > 0 ? (
+            <p className="mt-1 text-stone-500">
+              Groupings: {photo.groupings.join(", ")}
             </p>
           ) : null}
         </div>
@@ -264,10 +346,18 @@ export function GalleryPhotoCard({
           {photo.caption && (
             <p className="font-medium text-stone-800">{photo.caption}</p>
           )}
-          <p className="text-xs text-stone-400">{photo.eventName}</p>
+          <p className="text-xs text-stone-400">
+            {photo.albumName ? `${photo.albumName} · ` : ""}
+            {photo.eventName}
+          </p>
           {photo.tags.length > 0 && (
             <p className="mt-1 text-xs text-stone-500">
               {photo.tags.map((tag) => tag.guestName).join(", ")}
+            </p>
+          )}
+          {(photo.groupings?.length ?? 0) > 0 && (
+            <p className="mt-1 text-xs text-brand-deep/80">
+              {photo.groupings.join(" · ")}
             </p>
           )}
         </figcaption>
@@ -283,11 +373,13 @@ export function GalleryPhotoCard({
 export function GalleryEditablePhotoGrid({
   photos,
   events,
+  albums = [],
   onPhotoUpdated,
   onPhotoRemoved,
 }: {
   photos: GalleryPhoto[];
   events: GalleryEvent[];
+  albums?: GalleryAlbum[];
   onPhotoUpdated?: (photo: GalleryPhoto) => void;
   onPhotoRemoved?: (photoId: number) => void;
 }) {
@@ -300,9 +392,15 @@ export function GalleryEditablePhotoGrid({
     if (!editingPhoto) return;
 
     const eventId = Number(form.eventId);
+    if (!eventId) {
+      toast.error("Event is required.");
+      return;
+    }
+
+    const isUploaded = editingPhoto.url.startsWith("/api/gallery/media/");
     const url = form.url.trim();
-    if (!eventId || !url) {
-      toast.error("Event and photo URL are required.");
+    if (!isUploaded && !url) {
+      toast.error("Photo URL is required.");
       return;
     }
 
@@ -313,9 +411,12 @@ export function GalleryEditablePhotoGrid({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           eventId,
-          url,
+          albumId: form.albumId ? Number(form.albumId) : null,
+          albumName: form.albumName.trim() || undefined,
+          url: isUploaded ? editingPhoto.url : url,
           caption: form.caption.trim() || null,
           tags: parseGuestNames(form.guestNames),
+          groupingsText: form.groupings,
         }),
       });
 
@@ -374,6 +475,7 @@ export function GalleryEditablePhotoGrid({
         <GalleryPhotoEditDialog
           photo={editingPhoto}
           events={events}
+          albums={albums}
           busy={busy}
           onClose={() => {
             if (!busy) setEditingPhoto(null);

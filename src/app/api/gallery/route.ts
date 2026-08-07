@@ -4,12 +4,18 @@ import { isAuthError, requireAuth } from "@/lib/api-auth";
 import { getSessionUser } from "@/lib/auth";
 import { getAppSettings, isPhotoGalleryEnabled } from "@/lib/app-settings";
 import {
+  findOrCreateAlbumByName,
   listAllEventsForGallery,
+  listGalleryAlbums,
+  listGalleryFilterOptions,
   listGalleryPhotos,
   listPublishedEventsForGallery,
+  replacePhotoGroupings,
+  replacePhotoPeopleTags,
 } from "@/lib/gallery-queries";
+import { parseGuestNames, parseCommaList } from "@/lib/gallery-photo-utils";
 import { db } from "@/lib/db";
-import { galleryPhotos, galleryPhotoTags } from "@/lib/schema";
+import { galleryPhotos } from "@/lib/schema";
 
 export async function GET(request: Request) {
   const settings = await getAppSettings();
@@ -22,11 +28,32 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const eventId = searchParams.get("eventId");
-  const photos = await listGalleryPhotos(eventId ? Number(eventId) : undefined);
+  const albumId = searchParams.get("albumId");
+  const grouping = searchParams.get("grouping");
+  const person = searchParams.get("person");
+
+  const [photos, albums, filterOptions] = await Promise.all([
+    listGalleryPhotos({
+      eventId: eventId ? Number(eventId) : undefined,
+      albumId: albumId ? Number(albumId) : undefined,
+      grouping: grouping ?? undefined,
+      person: person ?? undefined,
+    }),
+    listGalleryAlbums(),
+    listGalleryFilterOptions(),
+  ]);
+
   const events = sessionUser?.isAdmin
     ? await listAllEventsForGallery()
     : await listPublishedEventsForGallery();
-  return NextResponse.json({ photos, events });
+
+  return NextResponse.json({
+    photos,
+    events,
+    albums,
+    groupings: filterOptions.groupings,
+    people: filterOptions.people,
+  });
 }
 
 export async function POST(request: Request) {
@@ -40,32 +67,38 @@ export async function POST(request: Request) {
   const eventId = Number(body.eventId);
   const url = String(body.url ?? "").trim();
   const caption = body.caption ? String(body.caption).trim() : null;
+  const albumName =
+    typeof body.albumName === "string" ? body.albumName.trim() : "";
+  const albumIdRaw = body.albumId != null ? Number(body.albumId) : null;
   const tags: { guestName: string; email?: string }[] = Array.isArray(body.tags)
     ? body.tags
-    : [];
+    : parseGuestNames(String(body.guestNames ?? ""));
+  const groupings: string[] = Array.isArray(body.groupings)
+    ? body.groupings.map(String)
+    : parseCommaList(String(body.groupingsText ?? ""));
 
   if (!eventId || !url) {
-    return NextResponse.json({ error: "Event and photo URL are required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Event and photo URL are required." },
+      { status: 400 },
+    );
+  }
+
+  let albumId: number | null = albumIdRaw && albumIdRaw > 0 ? albumIdRaw : null;
+  if (!albumId && albumName) {
+    const album = await findOrCreateAlbumByName(albumName);
+    albumId = album?.id ?? null;
   }
 
   const [photo] = await db
     .insert(galleryPhotos)
-    .values({ eventId, url, caption })
+    .values({ eventId, albumId, url, caption })
     .returning();
 
-  if (tags.length > 0) {
-    await db.insert(galleryPhotoTags).values(
-      tags
-        .filter((tag) => tag.guestName?.trim())
-        .map((tag) => ({
-          photoId: photo.id,
-          guestName: tag.guestName.trim(),
-          email: tag.email?.trim() || null,
-        })),
-    );
-  }
+  await replacePhotoPeopleTags(photo.id, tags);
+  await replacePhotoGroupings(photo.id, groupings);
 
-  const photos = await listGalleryPhotos(eventId);
+  const photos = await listGalleryPhotos({ eventId });
   const created = photos.find((entry) => entry.id === photo.id);
 
   revalidatePath("/gallery");

@@ -1,11 +1,22 @@
 export function parseGuestNames(input: string): { guestName: string }[] {
-  return input
-    .split(/[,\n]/)
-    .map((name) => name.trim())
-    .filter(Boolean)
-    .map((guestName) => ({ guestName }));
+  return parseCommaList(input).map((guestName) => ({ guestName }));
 }
 
 export function formatGuestNames(tags: { guestName: string }[]): string {
   return tags.map((tag) => tag.guestName).join(", ");
+}
+
+export function parseCommaList(input: string): string[] {
+  return [
+    ...new Set(
+      input
+        .split(/[,\n]/)
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+export function formatCommaList(values: string[]): string {
+  return values.join(", ");
 }
