@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { getAppSettings, isPhotoGalleryEnabled } from "@/lib/app-settings";
 import { getGalleryPhotoById } from "@/lib/gallery-queries";
-import { readGalleryFile } from "@/lib/gallery-storage";
+import {
+  readGalleryFile,
+  readOrCreateGalleryThumbnail,
+} from "@/lib/gallery-storage";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   const settings = await getAppSettings();
   const sessionUser = await getSessionUser();
   const galleryEnabled = isPhotoGalleryEnabled(settings);
@@ -30,7 +33,26 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Photo not found." }, { status: 404 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const wantThumb = searchParams.get("size") === "thumb";
+
   try {
+    if (wantThumb) {
+      try {
+        const data = await readOrCreateGalleryThumbnail(photo.storageKey);
+        return new NextResponse(new Uint8Array(data), {
+          headers: {
+            "Content-Type": "image/webp",
+            "Cache-Control": isAdmin
+              ? "private, max-age=300"
+              : "public, max-age=31536000, immutable",
+          },
+        });
+      } catch {
+        // Unsupported formats (e.g. some HEIC) fall back to the original.
+      }
+    }
+
     const data = await readGalleryFile(photo.storageKey);
     return new NextResponse(new Uint8Array(data), {
       headers: {

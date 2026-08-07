@@ -20,6 +20,7 @@ import {
   resolveGalleryMimeType,
   sanitizeGalleryFileName,
   writeGalleryFile,
+  writeGalleryThumbnail,
 } from "@/lib/gallery-storage";
 import { db } from "@/lib/db";
 import { galleryPhotos } from "@/lib/schema";
@@ -187,6 +188,14 @@ export async function POST(request: Request) {
     for (const image of images) {
       const storageKey = buildGalleryStorageKey(image.fileName);
       await writeGalleryFile(storageKey, image.buffer);
+      try {
+        await writeGalleryThumbnail(storageKey, image.buffer);
+      } catch (error) {
+        console.warn(
+          `Could not generate gallery thumbnail for ${image.fileName}:`,
+          error,
+        );
+      }
 
       const [photo] = await db
         .insert(galleryPhotos)

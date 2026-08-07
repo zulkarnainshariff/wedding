@@ -3,7 +3,7 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  serverExternalPackages: ["adm-zip"],
+  serverExternalPackages: ["adm-zip", "sharp"],
   experimental: {
     serverActions: {
       bodySizeLimit: "512mb",
