@@ -5,6 +5,7 @@ import { PublicHeader } from "@/components/landing/PublicHeader";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   GalleryManagementPanel,
+  type GalleryAlbum,
   type GalleryPhoto,
 } from "@/components/admin/GalleryManagementPanel";
 import {
@@ -26,7 +27,13 @@ export function GalleryClient({
   const { user } = useAuth();
   const [photos, setPhotos] = useState<GalleryPhotoView[]>([]);
   const [eventFilter, setEventFilter] = useState("");
+  const [albumFilter, setAlbumFilter] = useState("");
+  const [groupingFilter, setGroupingFilter] = useState("");
+  const [personFilter, setPersonFilter] = useState("");
   const [events, setEvents] = useState<{ id: number; name: string }[]>([]);
+  const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
+  const [groupings, setGroupings] = useState<string[]>([]);
+  const [people, setPeople] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const isAdmin = Boolean(user?.isAdmin);
@@ -34,9 +41,15 @@ export function GalleryClient({
 
   useEffect(() => {
     if (!galleryVisible) return;
-    const params = eventFilter ? `?eventId=${eventFilter}` : "";
+    const params = new URLSearchParams();
+    if (eventFilter) params.set("eventId", eventFilter);
+    if (albumFilter) params.set("albumId", albumFilter);
+    if (groupingFilter) params.set("grouping", groupingFilter);
+    if (personFilter) params.set("person", personFilter);
+    const query = params.toString() ? `?${params.toString()}` : "";
+
     void (async () => {
-      const response = await fetch(`/api/gallery${params}`);
+      const response = await fetch(`/api/gallery${query}`);
       if (!response.ok) {
         setError("Gallery is unavailable.");
         return;
@@ -44,9 +57,12 @@ export function GalleryClient({
       const data = await response.json();
       setPhotos(data.photos ?? []);
       setEvents(data.events ?? []);
+      setAlbums(data.albums ?? []);
+      setGroupings(data.groupings ?? []);
+      setPeople(data.people ?? []);
       setError(null);
     })();
-  }, [galleryVisible, eventFilter]);
+  }, [galleryVisible, eventFilter, albumFilter, groupingFilter, personFilter]);
 
   if (!galleryVisible) {
     return (
@@ -86,20 +102,64 @@ export function GalleryClient({
           </p>
         )}
 
-        {events.length > 1 && (
-          <select
-            value={eventFilter}
-            onChange={(e) => setEventFilter(e.target.value)}
-            className="mt-6 rounded-lg border border-stone-200 px-3 py-2 text-sm"
-          >
-            <option value="">All events</option>
-            {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <div className="mt-6 flex flex-wrap gap-3">
+          {events.length > 1 && (
+            <select
+              value={eventFilter}
+              onChange={(e) => setEventFilter(e.target.value)}
+              className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+            >
+              <option value="">All events</option>
+              {events.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {albums.length > 0 && (
+            <select
+              value={albumFilter}
+              onChange={(e) => setAlbumFilter(e.target.value)}
+              className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+            >
+              <option value="">All albums</option>
+              {albums.map((album) => (
+                <option key={album.id} value={album.id}>
+                  {album.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {groupings.length > 0 && (
+            <select
+              value={groupingFilter}
+              onChange={(e) => setGroupingFilter(e.target.value)}
+              className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+            >
+              <option value="">All groupings</option>
+              {groupings.map((grouping) => (
+                <option key={grouping} value={grouping}>
+                  {grouping}
+                </option>
+              ))}
+            </select>
+          )}
+          {people.length > 0 && (
+            <select
+              value={personFilter}
+              onChange={(e) => setPersonFilter(e.target.value)}
+              className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+            >
+              <option value="">All people</option>
+              {people.map((person) => (
+                <option key={person} value={person}>
+                  {person}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
 
         {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
@@ -110,6 +170,7 @@ export function GalleryClient({
             <GalleryEditablePhotoGrid
               photos={photos}
               events={events}
+              albums={albums}
               onPhotoUpdated={(photo) =>
                 setPhotos((current) =>
                   current.map((entry) => (entry.id === photo.id ? photo : entry)),

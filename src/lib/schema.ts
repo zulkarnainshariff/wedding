@@ -386,12 +386,27 @@ export const guestbookEntries = pgTable("guestbook_entries", {
     .notNull(),
 });
 
+export const galleryAlbums = pgTable("gallery_albums", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 export const galleryPhotos = pgTable("gallery_photos", {
   id: serial("id").primaryKey(),
   eventId: integer("event_id")
     .notNull()
     .references(() => weddingEvents.id, { onDelete: "cascade" }),
+  albumId: integer("album_id").references(() => galleryAlbums.id, {
+    onDelete: "set null",
+  }),
   url: text("url").notNull(),
+  storageKey: text("storage_key"),
+  originalFilename: text("original_filename"),
+  mimeType: text("mime_type"),
   caption: text("caption"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
@@ -408,6 +423,17 @@ export const galleryPhotoTags = pgTable(
     guestName: text("guest_name").notNull(),
   },
   (table) => [primaryKey({ columns: [table.photoId, table.guestName] })],
+);
+
+export const galleryPhotoGroupings = pgTable(
+  "gallery_photo_groupings",
+  {
+    photoId: integer("photo_id")
+      .notNull()
+      .references(() => galleryPhotos.id, { onDelete: "cascade" }),
+    grouping: text("grouping").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.photoId, table.grouping] })],
 );
 
 export const userActivitySessions = pgTable("user_activity_sessions", {
@@ -455,5 +481,7 @@ export type UsageLog = typeof usageLogs.$inferSelect;
 export type UserActivitySession = typeof userActivitySessions.$inferSelect;
 export type ErrorLog = typeof errorLogs.$inferSelect;
 export type GuestbookEntry = typeof guestbookEntries.$inferSelect;
+export type GalleryAlbum = typeof galleryAlbums.$inferSelect;
 export type GalleryPhoto = typeof galleryPhotos.$inferSelect;
 export type GalleryPhotoTag = typeof galleryPhotoTags.$inferSelect;
+export type GalleryPhotoGrouping = typeof galleryPhotoGroupings.$inferSelect;
