@@ -26,6 +26,7 @@
     "db:migrate-error-logs": "tsx src/db/migrate-error-logs.ts",
     "db:migrate-public-features": "tsx src/db/migrate-public-features.ts",
     "db:migrate-gallery-albums": "tsx src/db/migrate-gallery-albums.ts",
+    "db:migrate-gallery-privacy": "tsx src/db/migrate-gallery-privacy.ts",
     "db:migrate-trip-days": "tsx src/db/migrate-trip-days.ts",
     "db:migrate-guestbook-moderation": "tsx src/db/migrate-guestbook-moderation.ts",
     "db:migrate-pet-relocation-participants": "tsx src/db/migrate-pet-relocation-participants.ts",
@@ -34,7 +35,7 @@
     "db:migrate-guest-member-fields": "tsx src/db/migrate-guest-member-fields.ts",
     "db:migrate-document-fields": "tsx src/db/migrate-document-fields.ts",
     "db:migrate-app-categories": "tsx src/db/migrate-app-categories.ts",
-    "db:migrate-all": "npm run db:push && npm run db:migrate-task-view-permissions && npm run db:migrate-item-features && npm run db:migrate-system-logs && npm run db:migrate-app-settings && npm run db:migrate-error-logs && npm run db:migrate-public-features && npm run db:migrate-gallery-albums && npm run db:migrate-trip-days && npm run db:migrate-guestbook-moderation && npm run db:migrate-pet-relocation-participants && npm run db:migrate-guest-list-event-roles && npm run db:migrate-guest-member-fields && npm run db:migrate-document-fields && npm run db:migrate-app-categories",
+    "db:migrate-all": "npm run db:push && npm run db:migrate-task-view-permissions && npm run db:migrate-item-features && npm run db:migrate-system-logs && npm run db:migrate-app-settings && npm run db:migrate-error-logs && npm run db:migrate-public-features && npm run db:migrate-gallery-albums && npm run db:migrate-gallery-privacy && npm run db:migrate-trip-days && npm run db:migrate-guestbook-moderation && npm run db:migrate-pet-relocation-participants && npm run db:migrate-guest-list-event-roles && npm run db:migrate-guest-member-fields && npm run db:migrate-document-fields && npm run db:migrate-app-categories",
     "db:dump-seed": "bash scripts/dump-wedding-seed.sh",
     "db:reset-sequences": "tsx src/db/reset-sequences.ts",
     "db:studio": "drizzle-kit studio"

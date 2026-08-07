@@ -10,6 +10,13 @@ import { parseGuestNames } from "@/lib/gallery-photo-utils";
 export type GalleryEvent = { id: number; name: string };
 export type GalleryAlbum = { id: number; name: string };
 
+export type GalleryPeopleTag = {
+  guestName: string;
+  email: string | null;
+  userId?: number | null;
+  username?: string | null;
+};
+
 export type GalleryPhoto = {
   id: number;
   eventId: number;
@@ -18,8 +25,17 @@ export type GalleryPhoto = {
   albumName: string | null;
   url: string;
   caption: string | null;
-  tags: { guestName: string; email: string | null }[];
+  isPrivate?: boolean;
+  tags: GalleryPeopleTag[];
   groupings: string[];
+};
+
+export type GalleryPersonFilterOption = {
+  guestName: string;
+  email: string | null;
+  userId: number | null;
+  username: string | null;
+  label: string;
 };
 
 const EMPTY_FORM = {
@@ -30,6 +46,7 @@ const EMPTY_FORM = {
   caption: "",
   guestNames: "",
   groupings: "",
+  isPrivate: false,
 };
 
 const EMPTY_BULK = {
@@ -38,23 +55,30 @@ const EMPTY_BULK = {
   caption: "",
   guestNames: "",
   groupings: "",
+  isPrivate: false,
 };
 
 export function GalleryManagementPanel({
   events,
   photoGalleryEnabled = true,
+  albumMoveTagMode = "ask",
   compact = false,
   onPhotoAdded,
   onPhotoUpdated,
   onPhotoRemoved,
+  onAlbumsChange,
+  onAlbumMoveTagModeChange,
 }: {
   events: GalleryEvent[];
   photoGalleryEnabled?: boolean;
+  albumMoveTagMode?: "ask" | "always" | "never";
   /** On the public gallery page: show only the add form. */
   compact?: boolean;
   onPhotoAdded?: (photo: GalleryPhoto) => void;
   onPhotoUpdated?: (photo: GalleryPhoto) => void;
   onPhotoRemoved?: (photoId: number) => void;
+  onAlbumsChange?: (albums: GalleryAlbum[]) => void;
+  onAlbumMoveTagModeChange?: (mode: "ask" | "always" | "never") => void;
 }) {
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,34 +87,43 @@ export function GalleryManagementPanel({
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [bulk, setBulk] = useState(EMPTY_BULK);
+  const [newAlbumName, setNewAlbumName] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(!compact);
   const [busy, setBusy] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [albumBusy, setAlbumBusy] = useState(false);
+  const [moveTagMode, setMoveTagMode] = useState(albumMoveTagMode);
 
   const loadPhotos = useCallback(async () => {
-    if (compact) return;
-    setLoading(true);
+    setLoading(!compact);
     try {
       const response = await fetch("/api/gallery");
       if (!response.ok) {
-        toast.error("Could not load gallery photos.");
+        if (!compact) toast.error("Could not load gallery photos.");
         return;
       }
       const data = (await response.json()) as {
         photos: GalleryPhoto[];
         events: GalleryEvent[];
         albums: GalleryAlbum[];
+        albumMoveTagMode?: "ask" | "always" | "never";
       };
-      setPhotos(data.photos ?? []);
+      if (!compact) setPhotos(data.photos ?? []);
       if (data.events?.length) setGalleryEvents(data.events);
-      setAlbums(data.albums ?? []);
+      const nextAlbums = data.albums ?? [];
+      setAlbums(nextAlbums);
+      onAlbumsChange?.(nextAlbums);
+      if (data.albumMoveTagMode) {
+        setMoveTagMode(data.albumMoveTagMode);
+        onAlbumMoveTagModeChange?.(data.albumMoveTagMode);
+      }
     } catch {
-      toast.error("Could not load gallery photos.");
+      if (!compact) toast.error("Could not load gallery photos.");
     } finally {
       setLoading(false);
     }
-  }, [compact, toast]);
+  }, [compact, onAlbumMoveTagModeChange, onAlbumsChange, toast]);
 
   useEffect(() => {
     void loadPhotos();
@@ -99,6 +132,10 @@ export function GalleryManagementPanel({
   useEffect(() => {
     if (events.length > 0) setGalleryEvents(events);
   }, [events]);
+
+  useEffect(() => {
+    setMoveTagMode(albumMoveTagMode);
+  }, [albumMoveTagMode]);
 
   useEffect(() => {
     if (!form.eventId && galleryEvents[0]) {
@@ -136,6 +173,7 @@ export function GalleryManagementPanel({
           albumName: form.albumName.trim() || undefined,
           tags: parseGuestNames(form.guestNames),
           groupingsText: form.groupings,
+          isPrivate: form.isPrivate,
         }),
       });
 
@@ -195,6 +233,7 @@ export function GalleryManagementPanel({
       if (bulk.caption.trim()) formData.set("caption", bulk.caption.trim());
       if (bulk.guestNames.trim()) formData.set("guestNames", bulk.guestNames);
       if (bulk.groupings.trim()) formData.set("groupings", bulk.groupings);
+      if (bulk.isPrivate) formData.set("isPrivate", "true");
       for (const file of selectedFiles) {
         formData.append("files", file);
       }
@@ -282,6 +321,84 @@ export function GalleryManagementPanel({
     setPhotos((current) => current.filter((photo) => photo.id !== photoId));
     onPhotoRemoved?.(photoId);
   }
+
+  function syncAlbums(next: GalleryAlbum[]) {
+    setAlbums(next);
+    onAlbumsChange?.(next);
+  }
+
+  async function createAlbum() {
+    const name = newAlbumName.trim();
+    if (!name) {
+      toast.error("Enter an album name.");
+      return;
+    }
+    setAlbumBusy(true);
+    try {
+      const response = await fetch("/api/gallery/albums", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        albums?: GalleryAlbum[];
+        album?: GalleryAlbum;
+      };
+      if (!response.ok) {
+        toast.error(body.error ?? "Could not create album.");
+        return;
+      }
+      const nextAlbums = body.albums ?? [];
+      if (nextAlbums.length > 0) {
+        syncAlbums(nextAlbums);
+      } else if (body.album) {
+        syncAlbums(
+          albums.some((album) => album.id === body.album!.id)
+            ? albums
+            : [...albums, body.album],
+        );
+      }
+      setNewAlbumName("");
+      toast.success(`Album “${name}” ready.`);
+    } catch {
+      toast.error("Could not create album.");
+    } finally {
+      setAlbumBusy(false);
+    }
+  }
+
+  const albumManager = (
+    <div className="grid gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-[1fr_auto]">
+      <div className="sm:col-span-2">
+        <p className="text-sm font-medium text-stone-700">Albums</p>
+        <p className="mt-1 text-xs text-stone-500">
+          Create albums here, then move photos individually or with multi-select
+          in the grid below.
+        </p>
+      </div>
+      <input
+        value={newAlbumName}
+        onChange={(e) => setNewAlbumName(e.target.value)}
+        placeholder="New album name"
+        className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+      />
+      <button
+        type="button"
+        disabled={albumBusy}
+        onClick={() => void createAlbum()}
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-deep px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+      >
+        <Plus className="h-4 w-4" />
+        {albumBusy ? "Creating…" : "Create album"}
+      </button>
+      {albums.length > 0 ? (
+        <p className="text-xs text-stone-500 sm:col-span-2">
+          {albums.map((album) => album.name).join(" · ")}
+        </p>
+      ) : null}
+    </div>
+  );
 
   const addForm = (
     <div
@@ -404,6 +521,25 @@ export function GalleryManagementPanel({
           className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2"
         />
       </label>
+      <label className="flex items-start gap-3 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm sm:col-span-2">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={form.isPrivate}
+          onChange={(e) =>
+            setForm((current) => ({
+              ...current,
+              isPrivate: e.target.checked,
+            }))
+          }
+        />
+        <span>
+          <span className="font-medium text-stone-800">Private</span>
+          <span className="mt-0.5 block text-xs text-stone-500">
+            Only visible to admins.
+          </span>
+        </span>
+      </label>
       <div className="sm:col-span-2">
         <button
           type="button"
@@ -525,6 +661,25 @@ export function GalleryManagementPanel({
           className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2"
         />
       </label>
+      <label className="flex items-start gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-3 text-sm sm:col-span-2">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={bulk.isPrivate}
+          onChange={(e) =>
+            setBulk((current) => ({
+              ...current,
+              isPrivate: e.target.checked,
+            }))
+          }
+        />
+        <span>
+          <span className="font-medium text-stone-800">Mark uploads private</span>
+          <span className="mt-0.5 block text-xs text-stone-500">
+            Only visible to admins.
+          </span>
+        </span>
+      </label>
       <div className="sm:col-span-2">
         <button
           type="button"
@@ -549,6 +704,7 @@ export function GalleryManagementPanel({
     }
     return (
       <div className="space-y-4">
+        {albumManager}
         {addForm}
         {bulkForm}
       </div>
@@ -575,6 +731,7 @@ export function GalleryManagementPanel({
         </p>
       ) : (
         <div className="space-y-4">
+          {albumManager}
           {bulkForm}
           {addForm}
         </div>
@@ -589,8 +746,20 @@ export function GalleryManagementPanel({
           photos={photos}
           events={galleryEvents}
           albums={albums}
+          albumMoveTagMode={moveTagMode}
+          onAlbumMoveTagModeChange={(mode) => {
+            setMoveTagMode(mode);
+            onAlbumMoveTagModeChange?.(mode);
+          }}
+          onAlbumsChange={syncAlbums}
           onPhotoUpdated={handlePhotoUpdated}
           onPhotoRemoved={handlePhotoRemoved}
+          onPhotosMoved={(moved) => {
+            setPhotos((current) => {
+              const byId = new Map(moved.map((photo) => [photo.id, photo]));
+              return current.map((photo) => byId.get(photo.id) ?? photo);
+            });
+          }}
         />
       )}
     </div>

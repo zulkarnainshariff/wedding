@@ -9,8 +9,8 @@ export const GALLERY_UPLOAD_ROOT = path.join(
   "gallery",
 );
 
-export const MAX_GALLERY_IMAGE_BYTES = 20 * 1024 * 1024;
-export const MAX_GALLERY_ZIP_BYTES = 120 * 1024 * 1024;
+export const MAX_GALLERY_IMAGE_BYTES = 50 * 1024 * 1024;
+export const MAX_GALLERY_ZIP_BYTES = 512 * 1024 * 1024;
 
 const IMAGE_EXTENSIONS = new Set([
   ".jpg",

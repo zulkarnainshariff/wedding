@@ -72,6 +72,8 @@ export default async function AdminPage() {
         initialFeatures={{
           guestbookEnabled: Boolean(appSettings.features.guestbookEnabled),
           photoGalleryEnabled: Boolean(appSettings.features.photoGalleryEnabled),
+          galleryAlbumMoveTagMode:
+            appSettings.features.galleryAlbumMoveTagMode ?? "ask",
         }}
         tripStartDate={appSettings.features.tripStartDate ?? null}
         tripEndDate={appSettings.features.tripEndDate ?? null}

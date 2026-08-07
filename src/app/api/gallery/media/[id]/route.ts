@@ -10,8 +10,9 @@ export async function GET(_request: Request, { params }: Params) {
   const settings = await getAppSettings();
   const sessionUser = await getSessionUser();
   const galleryEnabled = isPhotoGalleryEnabled(settings);
+  const isAdmin = Boolean(sessionUser?.isAdmin);
 
-  if (!galleryEnabled && !sessionUser?.isAdmin) {
+  if (!galleryEnabled && !isAdmin) {
     return NextResponse.json({ error: "Photo gallery is not enabled." }, { status: 403 });
   }
 
@@ -25,12 +26,18 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Photo not found." }, { status: 404 });
   }
 
+  if (photo.isPrivate && !isAdmin) {
+    return NextResponse.json({ error: "Photo not found." }, { status: 404 });
+  }
+
   try {
     const data = await readGalleryFile(photo.storageKey);
     return new NextResponse(new Uint8Array(data), {
       headers: {
         "Content-Type": photo.mimeType || "application/octet-stream",
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Cache-Control": isAdmin
+          ? "private, max-age=60"
+          : "public, max-age=31536000, immutable",
         ...(photo.originalFilename
           ? {
               "Content-Disposition": `inline; filename="${photo.originalFilename.replace(/"/g, "")}"`,

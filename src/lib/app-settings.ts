@@ -60,12 +60,22 @@ async function ensureAppSettingsSchema(): Promise<void> {
   schemaEnsured = true;
 }
 
+function normalizeAlbumMoveTagMode(
+  value: unknown,
+): "ask" | "always" | "never" {
+  if (value === "always" || value === "never" || value === "ask") return value;
+  return "ask";
+}
+
 function normalizeFeatures(raw: unknown): AppFeatureFlags {
   if (!raw || typeof raw !== "object") return {};
   const value = raw as Partial<AppFeatureFlags>;
   return {
     guestbookEnabled: Boolean(value.guestbookEnabled),
     photoGalleryEnabled: Boolean(value.photoGalleryEnabled),
+    galleryAlbumMoveTagMode: normalizeAlbumMoveTagMode(
+      value.galleryAlbumMoveTagMode,
+    ),
     tripStartDate:
       typeof value.tripStartDate === "string" && value.tripStartDate.trim()
         ? value.tripStartDate.trim()
@@ -140,10 +150,42 @@ export async function updateAppFeatures(
   features: AppFeatureFlags,
 ): Promise<AppSettings> {
   const current = await getAppSettings();
-  const normalized = {
-    ...normalizeFeatures(current.features),
-    ...normalizeFeatures(features),
-  };
+  const incoming = features as Partial<AppFeatureFlags>;
+  const merged: AppFeatureFlags = { ...current.features };
+
+  if ("guestbookEnabled" in incoming) {
+    merged.guestbookEnabled = Boolean(incoming.guestbookEnabled);
+  }
+  if ("photoGalleryEnabled" in incoming) {
+    merged.photoGalleryEnabled = Boolean(incoming.photoGalleryEnabled);
+  }
+  if ("galleryAlbumMoveTagMode" in incoming) {
+    merged.galleryAlbumMoveTagMode = normalizeAlbumMoveTagMode(
+      incoming.galleryAlbumMoveTagMode,
+    );
+  }
+  if ("tripStartDate" in incoming) {
+    merged.tripStartDate =
+      typeof incoming.tripStartDate === "string" &&
+      incoming.tripStartDate.trim()
+        ? incoming.tripStartDate.trim()
+        : null;
+  }
+  if ("tripEndDate" in incoming) {
+    merged.tripEndDate =
+      typeof incoming.tripEndDate === "string" && incoming.tripEndDate.trim()
+        ? incoming.tripEndDate.trim()
+        : null;
+  }
+  if ("itineraryStartDate" in incoming) {
+    merged.itineraryStartDate =
+      typeof incoming.itineraryStartDate === "string" &&
+      incoming.itineraryStartDate.trim()
+        ? incoming.itineraryStartDate.trim()
+        : DEFAULT_ITINERARY_START_DATE;
+  }
+
+  const normalized = normalizeFeatures(merged);
 
   await ensureAppSettingsSchema();
 
@@ -157,6 +199,12 @@ export async function updateAppFeatures(
 
   invalidateAppSettingsCache();
   return { themeId: current.themeId, features: normalized };
+}
+
+export function getGalleryAlbumMoveTagMode(
+  settings: AppSettings,
+): "ask" | "always" | "never" {
+  return normalizeAlbumMoveTagMode(settings.features.galleryAlbumMoveTagMode);
 }
 
 export async function updateAppTripRange(

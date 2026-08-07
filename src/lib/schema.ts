@@ -99,6 +99,8 @@ export const syncMetadata = pgTable("sync_metadata", {
 export type AppFeatureFlags = {
   guestbookEnabled?: boolean;
   photoGalleryEnabled?: boolean;
+  /** When moving photos between albums: ask | always add previous album as grouping | never. */
+  galleryAlbumMoveTagMode?: "ask" | "always" | "never";
   tripStartDate?: string | null;
   tripEndDate?: string | null;
   /** First calendar day labeled "Day 1"; earlier days show as PREPARATION. */
@@ -408,6 +410,7 @@ export const galleryPhotos = pgTable("gallery_photos", {
   originalFilename: text("original_filename"),
   mimeType: text("mime_type"),
   caption: text("caption"),
+  isPrivate: boolean("is_private").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -421,6 +424,9 @@ export const galleryPhotoTags = pgTable(
       .references(() => galleryPhotos.id, { onDelete: "cascade" }),
     email: text("email"),
     guestName: text("guest_name").notNull(),
+    userId: integer("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [primaryKey({ columns: [table.photoId, table.guestName] })],
 );

@@ -4,9 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/ToastProvider";
 
+export type GalleryAlbumMoveTagMode = "ask" | "always" | "never";
+
 type FeatureFlags = {
   guestbookEnabled: boolean;
   photoGalleryEnabled: boolean;
+  galleryAlbumMoveTagMode?: GalleryAlbumMoveTagMode;
 };
 
 export function PublicFeaturesPanel({
@@ -16,8 +19,13 @@ export function PublicFeaturesPanel({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const [features, setFeatures] = useState(initialFeatures);
-  const [saved, setSaved] = useState(initialFeatures);
+  const [features, setFeatures] = useState<FeatureFlags>({
+    guestbookEnabled: initialFeatures.guestbookEnabled,
+    photoGalleryEnabled: initialFeatures.photoGalleryEnabled,
+    galleryAlbumMoveTagMode:
+      initialFeatures.galleryAlbumMoveTagMode ?? "ask",
+  });
+  const [saved, setSaved] = useState(features);
   const [busy, setBusy] = useState(false);
 
   async function saveFeatures() {
@@ -33,8 +41,14 @@ export function PublicFeaturesPanel({
         return;
       }
       const data = (await response.json()) as { features: FeatureFlags };
-      setSaved(data.features);
-      setFeatures(data.features);
+      const next = {
+        guestbookEnabled: Boolean(data.features.guestbookEnabled),
+        photoGalleryEnabled: Boolean(data.features.photoGalleryEnabled),
+        galleryAlbumMoveTagMode:
+          data.features.galleryAlbumMoveTagMode ?? "ask",
+      };
+      setSaved(next);
+      setFeatures(next);
       toast.success("Public features saved.");
       router.refresh();
     } catch {
@@ -46,7 +60,8 @@ export function PublicFeaturesPanel({
 
   const dirty =
     features.guestbookEnabled !== saved.guestbookEnabled ||
-    features.photoGalleryEnabled !== saved.photoGalleryEnabled;
+    features.photoGalleryEnabled !== saved.photoGalleryEnabled ||
+    features.galleryAlbumMoveTagMode !== saved.galleryAlbumMoveTagMode;
 
   return (
     <div className="space-y-4">
@@ -99,6 +114,36 @@ export function PublicFeaturesPanel({
           </span>
         </span>
       </label>
+
+      {features.photoGalleryEnabled ? (
+        <div className="rounded-xl border border-stone-200 bg-white p-4 text-sm">
+          <p className="font-medium text-stone-800">Gallery settings</p>
+          <p className="mt-1 text-stone-500">
+            When moving photos between albums, previous album names can be kept
+            as grouping tags (for example, &ldquo;digital album #1&rdquo;).
+          </p>
+          <label className="mt-3 block">
+            <span className="mb-1 block text-stone-500">
+              Previous album name as tag
+            </span>
+            <select
+              value={features.galleryAlbumMoveTagMode ?? "ask"}
+              onChange={(e) =>
+                setFeatures((current) => ({
+                  ...current,
+                  galleryAlbumMoveTagMode: e.target
+                    .value as GalleryAlbumMoveTagMode,
+                }))
+              }
+              className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2"
+            >
+              <option value="ask">Ask each time</option>
+              <option value="always">Always add previous album name as tags</option>
+              <option value="never">Never ask / never add</option>
+            </select>
+          </label>
+        </div>
+      ) : null}
 
       <button
         type="button"

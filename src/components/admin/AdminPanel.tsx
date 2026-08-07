@@ -95,7 +95,11 @@ export function AdminPanel({
   showSuperuserTools = false,
   eventsMissingCoordinators = [],
   initialThemeId,
-  initialFeatures = { guestbookEnabled: false, photoGalleryEnabled: false },
+  initialFeatures = {
+    guestbookEnabled: false,
+    photoGalleryEnabled: false,
+    galleryAlbumMoveTagMode: "ask",
+  },
   tripStartDate = null,
   tripEndDate = null,
   itineraryStartDate = null,
@@ -114,7 +118,11 @@ export function AdminPanel({
   showSuperuserTools?: boolean;
   eventsMissingCoordinators?: { id: number; name: string }[];
   initialThemeId: AppThemeId;
-  initialFeatures?: { guestbookEnabled: boolean; photoGalleryEnabled: boolean };
+  initialFeatures?: {
+    guestbookEnabled: boolean;
+    photoGalleryEnabled: boolean;
+    galleryAlbumMoveTagMode?: "ask" | "always" | "never";
+  };
   tripStartDate?: string | null;
   tripEndDate?: string | null;
   itineraryStartDate?: string | null;
@@ -494,7 +502,7 @@ export function AdminPanel({
       {tab === "public" && showFullAdmin && (
         <div className={TAB_CONTENT_CLASS}>
           <PublicFeaturesPanel
-            key={`${initialFeatures.guestbookEnabled}-${initialFeatures.photoGalleryEnabled}`}
+            key={`${initialFeatures.guestbookEnabled}-${initialFeatures.photoGalleryEnabled}-${initialFeatures.galleryAlbumMoveTagMode ?? "ask"}`}
             initialFeatures={initialFeatures}
           />
         </div>
@@ -508,6 +516,9 @@ export function AdminPanel({
               name: event.name,
             }))}
             photoGalleryEnabled={initialFeatures.photoGalleryEnabled}
+            albumMoveTagMode={
+              initialFeatures.galleryAlbumMoveTagMode ?? "ask"
+            }
           />
         </div>
       )}
