@@ -21,8 +21,9 @@ export async function GET(request: Request) {
   const settings = await getAppSettings();
   const sessionUser = await getSessionUser();
   const galleryEnabled = isPhotoGalleryEnabled(settings);
+  const isAdmin = Boolean(sessionUser?.isAdmin);
 
-  if (!galleryEnabled && !sessionUser?.isAdmin) {
+  if (!galleryEnabled && !isAdmin) {
     return NextResponse.json({ error: "Photo gallery is not enabled." }, { status: 403 });
   }
 
@@ -38,12 +39,13 @@ export async function GET(request: Request) {
       albumId: albumId ? Number(albumId) : undefined,
       grouping: grouping ?? undefined,
       person: person ?? undefined,
+      includePrivate: isAdmin,
     }),
     listGalleryAlbums(),
     listGalleryFilterOptions(),
   ]);
 
-  const events = sessionUser?.isAdmin
+  const events = isAdmin
     ? await listAllEventsForGallery()
     : await listPublishedEventsForGallery();
 
@@ -53,6 +55,7 @@ export async function GET(request: Request) {
     albums,
     groupings: filterOptions.groupings,
     people: filterOptions.people,
+    albumMoveTagMode: settings.features.galleryAlbumMoveTagMode ?? "ask",
   });
 }
 
@@ -70,7 +73,8 @@ export async function POST(request: Request) {
   const albumName =
     typeof body.albumName === "string" ? body.albumName.trim() : "";
   const albumIdRaw = body.albumId != null ? Number(body.albumId) : null;
-  const tags: { guestName: string; email?: string }[] = Array.isArray(body.tags)
+  const isPrivate = Boolean(body.isPrivate);
+  const tags = Array.isArray(body.tags)
     ? body.tags
     : parseGuestNames(String(body.guestNames ?? ""));
   const groupings: string[] = Array.isArray(body.groupings)
@@ -92,13 +96,13 @@ export async function POST(request: Request) {
 
   const [photo] = await db
     .insert(galleryPhotos)
-    .values({ eventId, albumId, url, caption })
+    .values({ eventId, albumId, url, caption, isPrivate })
     .returning();
 
   await replacePhotoPeopleTags(photo.id, tags);
   await replacePhotoGroupings(photo.id, groupings);
 
-  const photos = await listGalleryPhotos({ eventId });
+  const photos = await listGalleryPhotos({ eventId, includePrivate: true });
   const created = photos.find((entry) => entry.id === photo.id);
 
   revalidatePath("/gallery");

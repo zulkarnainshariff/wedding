@@ -6,8 +6,10 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import {
   GalleryManagementPanel,
   type GalleryAlbum,
+  type GalleryPersonFilterOption,
   type GalleryPhoto,
 } from "@/components/admin/GalleryManagementPanel";
+import type { GalleryAlbumMoveTagMode } from "@/components/admin/PublicFeaturesPanel";
 import {
   GalleryEditablePhotoGrid,
   GalleryPhotoCard,
@@ -15,14 +17,46 @@ import {
 
 type GalleryPhotoView = GalleryPhoto;
 
+function normalizePeople(
+  people: unknown,
+): GalleryPersonFilterOption[] {
+  if (!Array.isArray(people)) return [];
+  return people
+    .map((entry) => {
+      if (typeof entry === "string") {
+        return {
+          guestName: entry,
+          email: null,
+          userId: null,
+          username: null,
+          label: entry,
+        };
+      }
+      if (entry && typeof entry === "object" && "guestName" in entry) {
+        const row = entry as GalleryPersonFilterOption;
+        return {
+          guestName: row.guestName,
+          email: row.email ?? null,
+          userId: row.userId ?? null,
+          username: row.username ?? null,
+          label: row.label || row.guestName,
+        };
+      }
+      return null;
+    })
+    .filter((entry): entry is GalleryPersonFilterOption => Boolean(entry));
+}
+
 export function GalleryClient({
   enabled,
   guestbookEnabled = false,
   photoGalleryEnabled = enabled,
+  initialAlbumMoveTagMode = "ask",
 }: {
   enabled: boolean;
   guestbookEnabled?: boolean;
   photoGalleryEnabled?: boolean;
+  initialAlbumMoveTagMode?: GalleryAlbumMoveTagMode;
 }) {
   const { user } = useAuth();
   const [photos, setPhotos] = useState<GalleryPhotoView[]>([]);
@@ -33,7 +67,9 @@ export function GalleryClient({
   const [events, setEvents] = useState<{ id: number; name: string }[]>([]);
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
   const [groupings, setGroupings] = useState<string[]>([]);
-  const [people, setPeople] = useState<string[]>([]);
+  const [people, setPeople] = useState<GalleryPersonFilterOption[]>([]);
+  const [albumMoveTagMode, setAlbumMoveTagMode] =
+    useState<GalleryAlbumMoveTagMode>(initialAlbumMoveTagMode);
   const [error, setError] = useState<string | null>(null);
 
   const isAdmin = Boolean(user?.isAdmin);
@@ -59,7 +95,10 @@ export function GalleryClient({
       setEvents(data.events ?? []);
       setAlbums(data.albums ?? []);
       setGroupings(data.groupings ?? []);
-      setPeople(data.people ?? []);
+      setPeople(normalizePeople(data.people));
+      if (data.albumMoveTagMode) {
+        setAlbumMoveTagMode(data.albumMoveTagMode);
+      }
       setError(null);
     })();
   }, [galleryVisible, eventFilter, albumFilter, groupingFilter, personFilter]);
@@ -90,6 +129,9 @@ export function GalleryClient({
               compact
               events={events}
               photoGalleryEnabled={enabled}
+              albumMoveTagMode={albumMoveTagMode}
+              onAlbumMoveTagModeChange={setAlbumMoveTagMode}
+              onAlbumsChange={setAlbums}
               onPhotoAdded={(photo) => setPhotos((current) => [photo, ...current])}
             />
           </div>
@@ -153,8 +195,8 @@ export function GalleryClient({
             >
               <option value="">All people</option>
               {people.map((person) => (
-                <option key={person} value={person}>
-                  {person}
+                <option key={person.guestName} value={person.guestName}>
+                  {person.label}
                 </option>
               ))}
             </select>
@@ -171,6 +213,9 @@ export function GalleryClient({
               photos={photos}
               events={events}
               albums={albums}
+              albumMoveTagMode={albumMoveTagMode}
+              onAlbumMoveTagModeChange={setAlbumMoveTagMode}
+              onAlbumsChange={setAlbums}
               onPhotoUpdated={(photo) =>
                 setPhotos((current) =>
                   current.map((entry) => (entry.id === photo.id ? photo : entry)),
@@ -179,6 +224,12 @@ export function GalleryClient({
               onPhotoRemoved={(photoId) =>
                 setPhotos((current) => current.filter((photo) => photo.id !== photoId))
               }
+              onPhotosMoved={(moved) => {
+                const byId = new Map(moved.map((photo) => [photo.id, photo]));
+                setPhotos((current) =>
+                  current.map((photo) => byId.get(photo.id) ?? photo),
+                );
+              }}
             />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

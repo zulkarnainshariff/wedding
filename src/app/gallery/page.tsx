@@ -1,6 +1,7 @@
 import { GalleryClient } from "@/components/landing/GalleryClient";
 import {
   getAppSettings,
+  getGalleryAlbumMoveTagMode,
   isGuestbookEnabled,
   isPhotoGalleryEnabled,
 } from "@/lib/app-settings";
@@ -15,6 +16,7 @@ export default async function GalleryPage() {
       enabled={photoGalleryEnabled}
       guestbookEnabled={isGuestbookEnabled(settings)}
       photoGalleryEnabled={photoGalleryEnabled}
+      initialAlbumMoveTagMode={getGalleryAlbumMoveTagMode(settings)}
     />
   );
 }

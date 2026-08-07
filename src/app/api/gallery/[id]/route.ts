@@ -49,6 +49,10 @@ export async function PUT(request: Request, { params }: Params) {
       : existing.caption;
   const urlInput =
     body.url !== undefined ? String(body.url ?? "").trim() : existing.url;
+  const isPrivate =
+    body.isPrivate !== undefined
+      ? Boolean(body.isPrivate)
+      : existing.isPrivate;
 
   if (!eventId) {
     return NextResponse.json({ error: "Event is required." }, { status: 400 });
@@ -84,6 +88,7 @@ export async function PUT(request: Request, { params }: Params) {
       albumId,
       url: nextUrl,
       caption,
+      isPrivate,
     })
     .where(eq(galleryPhotos.id, photoId))
     .returning({ id: galleryPhotos.id });
@@ -93,7 +98,7 @@ export async function PUT(request: Request, { params }: Params) {
   }
 
   if (body.tags !== undefined || body.guestNames !== undefined) {
-    const tags: { guestName: string; email?: string }[] = Array.isArray(body.tags)
+    const tags = Array.isArray(body.tags)
       ? body.tags
       : parseGuestNames(String(body.guestNames ?? ""));
     await replacePhotoPeopleTags(photoId, tags);
@@ -106,7 +111,7 @@ export async function PUT(request: Request, { params }: Params) {
     await replacePhotoGroupings(photoId, groupings);
   }
 
-  const photos = await listGalleryPhotos();
+  const photos = await listGalleryPhotos({ includePrivate: true });
   const photo = photos.find((entry) => entry.id === photoId);
 
   revalidatePath("/gallery");

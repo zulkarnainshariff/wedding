@@ -115,6 +115,10 @@ export async function POST(request: Request) {
     const caption = String(formData.get("caption") ?? "").trim() || null;
     const guestNames = String(formData.get("guestNames") ?? "");
     const groupingsText = String(formData.get("groupings") ?? "");
+    const isPrivate =
+      String(formData.get("isPrivate") ?? "").toLowerCase() === "true" ||
+      formData.get("isPrivate") === "1" ||
+      formData.get("isPrivate") === "on";
 
     if (!eventId) {
       return NextResponse.json({ error: "Event is required." }, { status: 400 });
@@ -194,6 +198,7 @@ export async function POST(request: Request) {
           originalFilename: image.fileName,
           mimeType: image.mimeType,
           caption,
+          isPrivate,
         })
         .returning();
 
@@ -207,7 +212,11 @@ export async function POST(request: Request) {
       createdIds.push(photo.id);
     }
 
-    const photos = await listGalleryPhotos({ eventId, albumId });
+    const photos = await listGalleryPhotos({
+      eventId,
+      albumId,
+      includePrivate: true,
+    });
     const created = photos.filter((photo) => createdIds.includes(photo.id));
 
     revalidatePath("/gallery");
