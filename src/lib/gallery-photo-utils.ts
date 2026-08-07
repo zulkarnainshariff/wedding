@@ -1,3 +1,12 @@
+export const GALLERY_PAGE_SIZE = 36;
+
+export function photoPreviewUrl(photo: {
+  url: string;
+  thumbUrl?: string | null;
+}): string {
+  return photo.thumbUrl?.trim() || photo.url;
+}
+
 export function parseGuestNames(input: string): { guestName: string }[] {
   return parseCommaList(input).map((guestName) => ({ guestName }));
 }

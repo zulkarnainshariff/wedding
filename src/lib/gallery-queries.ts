@@ -8,7 +8,7 @@ import {
   users,
   weddingEvents,
 } from "@/lib/schema";
-import { galleryMediaUrl } from "@/lib/gallery-storage";
+import { galleryMediaUrl, galleryThumbUrl } from "@/lib/gallery-storage";
 
 export type GalleryListFilters = {
   eventId?: number;
@@ -31,6 +31,15 @@ function displayUrl(photo: {
   storageKey: string | null;
 }): string {
   if (photo.storageKey) return galleryMediaUrl(photo.id);
+  return photo.url;
+}
+
+function displayThumbUrl(photo: {
+  id: number;
+  url: string;
+  storageKey: string | null;
+}): string {
+  if (photo.storageKey) return galleryThumbUrl(photo.id);
   return photo.url;
 }
 
@@ -140,6 +149,7 @@ export async function listGalleryPhotos(filters: GalleryListFilters = {}) {
     albumId: photo.albumId,
     albumName: photo.albumName,
     url: displayUrl(photo),
+    thumbUrl: displayThumbUrl(photo),
     storageKey: photo.storageKey,
     originalFilename: photo.originalFilename,
     mimeType: photo.mimeType,

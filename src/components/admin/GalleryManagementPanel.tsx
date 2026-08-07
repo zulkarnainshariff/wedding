@@ -29,6 +29,8 @@ export type GalleryPhoto = {
   albumId: number | null;
   albumName: string | null;
   url: string;
+  /** Grid/preview URL; falls back to full `url` for external links. */
+  thumbUrl?: string;
   caption: string | null;
   isPrivate?: boolean;
   tags: GalleryPeopleTag[];

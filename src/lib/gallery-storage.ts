@@ -1,6 +1,7 @@
-import { mkdir, readFile, unlink, writeFile } from "fs/promises";
+import { access, mkdir, readFile, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import sharp from "sharp";
 
 export const GALLERY_UPLOAD_ROOT = path.join(
   process.cwd(),
@@ -11,6 +12,8 @@ export const GALLERY_UPLOAD_ROOT = path.join(
 
 export const MAX_GALLERY_IMAGE_BYTES = 50 * 1024 * 1024;
 export const MAX_GALLERY_ZIP_BYTES = 512 * 1024 * 1024;
+export const GALLERY_THUMB_MAX_EDGE = 640;
+export const GALLERY_THUMB_WEBP_QUALITY = 72;
 
 const IMAGE_EXTENSIONS = new Set([
   ".jpg",
@@ -84,20 +87,71 @@ export function buildGalleryStorageKey(fileName: string): string {
   return `${randomUUID()}-${safe}`;
 }
 
+/** Thumbnail key derived from the original storage key (WebP under thumbs/). */
+export function galleryThumbKey(storageKey: string): string {
+  const base = path.basename(storageKey);
+  return path.posix.join("thumbs", `${base}.webp`);
+}
+
 export function galleryFilePath(storageKey: string): string {
-  return path.join(GALLERY_UPLOAD_ROOT, path.basename(storageKey));
+  const normalized = storageKey.replace(/\\/g, "/");
+  if (!normalized || normalized.includes("..")) {
+    throw new Error("Invalid gallery storage key.");
+  }
+  const parts = normalized.split("/").filter(Boolean);
+  return path.join(GALLERY_UPLOAD_ROOT, ...parts);
 }
 
 export async function writeGalleryFile(
   storageKey: string,
   data: Buffer,
 ): Promise<void> {
-  await ensureGalleryUploadDir();
-  await writeFile(galleryFilePath(storageKey), data);
+  const filePath = galleryFilePath(storageKey);
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, data);
 }
 
 export async function readGalleryFile(storageKey: string): Promise<Buffer> {
   return readFile(galleryFilePath(storageKey));
+}
+
+async function fileExists(storageKey: string): Promise<boolean> {
+  try {
+    await access(galleryFilePath(storageKey));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function writeGalleryThumbnail(
+  storageKey: string,
+  originalData?: Buffer,
+): Promise<Buffer> {
+  const source = originalData ?? (await readGalleryFile(storageKey));
+  const thumb = await sharp(source)
+    .rotate()
+    .resize({
+      width: GALLERY_THUMB_MAX_EDGE,
+      height: GALLERY_THUMB_MAX_EDGE,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .webp({ quality: GALLERY_THUMB_WEBP_QUALITY })
+    .toBuffer();
+  await writeGalleryFile(galleryThumbKey(storageKey), thumb);
+  return thumb;
+}
+
+/** Return cached thumbnail bytes, generating on first request if needed. */
+export async function readOrCreateGalleryThumbnail(
+  storageKey: string,
+): Promise<Buffer> {
+  const thumbKey = galleryThumbKey(storageKey);
+  if (await fileExists(thumbKey)) {
+    return readGalleryFile(thumbKey);
+  }
+  return writeGalleryThumbnail(storageKey);
 }
 
 export async function deleteGalleryFile(
@@ -109,10 +163,19 @@ export async function deleteGalleryFile(
   } catch {
     /* missing file is fine */
   }
+  try {
+    await unlink(galleryFilePath(galleryThumbKey(storageKey)));
+  } catch {
+    /* missing thumb is fine */
+  }
 }
 
 export function galleryMediaUrl(photoId: number): string {
   return `/api/gallery/media/${photoId}`;
+}
+
+export function galleryThumbUrl(photoId: number): string {
+  return `/api/gallery/media/${photoId}?size=thumb`;
 }
 
 export function parseTagList(input: string): string[] {

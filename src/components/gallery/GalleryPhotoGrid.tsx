@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { FolderInput, Maximize2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { formatCommaList, parseCommaList } from "@/lib/gallery-photo-utils";
+import {
+  formatCommaList,
+  GALLERY_PAGE_SIZE,
+  parseCommaList,
+  photoPreviewUrl,
+} from "@/lib/gallery-photo-utils";
 import type {
   GalleryAlbum,
   GalleryEvent,
@@ -663,11 +668,13 @@ export function GalleryPhotoCard({
           selected ? "border-brand-deep ring-2 ring-brand-deep/30" : "border-stone-200",
         ].join(" ")}
       >
-        <div className="relative aspect-[4/3] overflow-hidden">
+        <div className="relative aspect-[4/3] overflow-hidden bg-stone-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={photo.url}
+            src={photoPreviewUrl(photo)}
             alt={photo.caption ?? photo.eventName}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover"
           />
           {selectable ? (
@@ -753,11 +760,82 @@ export function GalleryPhotoCard({
   );
 }
 
+function GalleryLoadMore({
+  visible,
+  total,
+  onLoadMore,
+}: {
+  visible: number;
+  total: number;
+  onLoadMore: () => void;
+}) {
+  if (visible >= total) {
+    if (total <= GALLERY_PAGE_SIZE) return null;
+    return (
+      <p className="mt-6 text-center text-xs text-stone-500">
+        Showing all {total} photos
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-6 flex flex-col items-center gap-2">
+      <p className="text-xs text-stone-500">
+        Showing {visible} of {total} photos
+      </p>
+      <button
+        type="button"
+        onClick={onLoadMore}
+        className="rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+      >
+        Load more
+      </button>
+    </div>
+  );
+}
+
+export function GalleryPublicPhotoGrid({
+  photos,
+  paginationKey = "",
+}: {
+  photos: GalleryPhoto[];
+  paginationKey?: string;
+}) {
+  const [visibleCount, setVisibleCount] = useState(GALLERY_PAGE_SIZE);
+
+  useEffect(() => {
+    setVisibleCount(GALLERY_PAGE_SIZE);
+  }, [paginationKey]);
+
+  const visiblePhotos = useMemo(
+    () => photos.slice(0, visibleCount),
+    [photos, visibleCount],
+  );
+
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {visiblePhotos.map((photo) => (
+          <GalleryPhotoCard key={photo.id} photo={photo} />
+        ))}
+      </div>
+      <GalleryLoadMore
+        visible={visiblePhotos.length}
+        total={photos.length}
+        onLoadMore={() =>
+          setVisibleCount((current) => current + GALLERY_PAGE_SIZE)
+        }
+      />
+    </>
+  );
+}
+
 export function GalleryEditablePhotoGrid({
   photos,
   events,
   albums = [],
   albumMoveTagMode = "ask",
+  paginationKey = "",
   onAlbumMoveTagModeChange,
   onAlbumsChange,
   onPhotoUpdated,
@@ -768,6 +846,8 @@ export function GalleryEditablePhotoGrid({
   events: GalleryEvent[];
   albums?: GalleryAlbum[];
   albumMoveTagMode?: GalleryAlbumMoveTagMode;
+  /** Change this when filters change so the page resets to the first chunk. */
+  paginationKey?: string;
   onAlbumMoveTagModeChange?: (mode: GalleryAlbumMoveTagMode) => void;
   onAlbumsChange?: (albums: GalleryAlbum[]) => void;
   onPhotoUpdated?: (photo: GalleryPhoto) => void;
@@ -788,10 +868,16 @@ export function GalleryEditablePhotoGrid({
   const [users, setUsers] = useState<BriefUser[]>([]);
   const [moveTagMode, setMoveTagMode] =
     useState<GalleryAlbumMoveTagMode>(albumMoveTagMode);
+  const [visibleCount, setVisibleCount] = useState(GALLERY_PAGE_SIZE);
 
   useEffect(() => {
     setMoveTagMode(albumMoveTagMode);
   }, [albumMoveTagMode]);
+
+  useEffect(() => {
+    setVisibleCount(GALLERY_PAGE_SIZE);
+    setSelectedIds(new Set());
+  }, [paginationKey]);
 
   useEffect(() => {
     void fetch("/api/users/brief")
@@ -799,6 +885,11 @@ export function GalleryEditablePhotoGrid({
       .then((data: BriefUser[]) => setUsers(Array.isArray(data) ? data : []))
       .catch(() => setUsers([]));
   }, []);
+
+  const visiblePhotos = useMemo(
+    () => photos.slice(0, visibleCount),
+    [photos, visibleCount],
+  );
 
   const selectedCount = selectedIds.size;
   const selectedPhotos = useMemo(
@@ -1021,7 +1112,7 @@ export function GalleryEditablePhotoGrid({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {photos.map((photo) => (
+        {visiblePhotos.map((photo) => (
           <GalleryPhotoCard
             key={photo.id}
             photo={photo}
@@ -1042,6 +1133,14 @@ export function GalleryEditablePhotoGrid({
           />
         ))}
       </div>
+
+      <GalleryLoadMore
+        visible={visiblePhotos.length}
+        total={photos.length}
+        onLoadMore={() =>
+          setVisibleCount((current) => current + GALLERY_PAGE_SIZE)
+        }
+      />
 
       {editingPhoto && (
         <GalleryPhotoEditDialog

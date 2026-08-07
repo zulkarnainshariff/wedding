@@ -12,7 +12,7 @@ import {
 import type { GalleryAlbumMoveTagMode } from "@/components/admin/PublicFeaturesPanel";
 import {
   GalleryEditablePhotoGrid,
-  GalleryPhotoCard,
+  GalleryPublicPhotoGrid,
 } from "@/components/gallery/GalleryPhotoGrid";
 
 type GalleryPhotoView = GalleryPhoto;
@@ -74,6 +74,7 @@ export function GalleryClient({
 
   const isAdmin = Boolean(user?.isAdmin);
   const galleryVisible = enabled || isAdmin;
+  const filterKey = `${eventFilter}|${albumFilter}|${groupingFilter}|${personFilter}`;
 
   useEffect(() => {
     if (!galleryVisible) return;
@@ -213,6 +214,7 @@ export function GalleryClient({
               photos={photos}
               events={events}
               albums={albums}
+              paginationKey={filterKey}
               albumMoveTagMode={albumMoveTagMode}
               onAlbumMoveTagModeChange={setAlbumMoveTagMode}
               onAlbumsChange={setAlbums}
@@ -232,11 +234,7 @@ export function GalleryClient({
               }}
             />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {photos.map((photo) => (
-                <GalleryPhotoCard key={photo.id} photo={photo} />
-              ))}
-            </div>
+            <GalleryPublicPhotoGrid photos={photos} paginationKey={filterKey} />
           )}
         </div>
       </main>
