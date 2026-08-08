@@ -323,6 +323,60 @@ export async function replacePhotoGroupings(
   }
 }
 
+export async function appendPhotoPeopleTags(
+  photoIds: number[],
+  tags: GalleryPeopleTagInput[],
+) {
+  const ids = [...new Set(photoIds.filter((id) => id > 0))];
+  const normalized = tags
+    .map((tag) => ({
+      guestName: tag.guestName?.trim() ?? "",
+      email: tag.email?.trim() || null,
+      userId: tag.userId && tag.userId > 0 ? tag.userId : null,
+    }))
+    .filter((tag) => tag.guestName);
+  if (ids.length === 0 || normalized.length === 0) return;
+
+  const existing = await db
+    .select({
+      photoId: galleryPhotoTags.photoId,
+      guestName: galleryPhotoTags.guestName,
+    })
+    .from(galleryPhotoTags)
+    .where(inArray(galleryPhotoTags.photoId, ids));
+
+  const existingKeys = new Set(
+    existing.map(
+      (row) => `${row.photoId}::${row.guestName.toLowerCase()}`,
+    ),
+  );
+
+  const rows: {
+    photoId: number;
+    guestName: string;
+    email: string | null;
+    userId: number | null;
+  }[] = [];
+
+  for (const photoId of ids) {
+    for (const tag of normalized) {
+      const key = `${photoId}::${tag.guestName.toLowerCase()}`;
+      if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
+      rows.push({
+        photoId,
+        guestName: tag.guestName,
+        email: tag.email,
+        userId: tag.userId,
+      });
+    }
+  }
+
+  if (rows.length > 0) {
+    await db.insert(galleryPhotoTags).values(rows);
+  }
+}
+
 export async function appendPhotoGroupings(
   photoIds: number[],
   grouping: string,
@@ -349,6 +403,78 @@ export async function appendPhotoGroupings(
   if (rows.length > 0) {
     await db.insert(galleryPhotoGroupings).values(rows);
   }
+}
+
+export async function appendPhotoGroupingsMany(
+  photoIds: number[],
+  groupings: string[],
+) {
+  const labels = [
+    ...new Set(groupings.map((entry) => entry.trim()).filter(Boolean)),
+  ];
+  for (const label of labels) {
+    await appendPhotoGroupings(photoIds, label);
+  }
+}
+
+export async function bulkUpdateGalleryPhotos(options: {
+  photoIds: number[];
+  eventId?: number;
+  albumId?: number | null;
+  albumName?: string;
+  addPreviousAlbumAsTag?: boolean;
+  isPrivate?: boolean;
+  addPeople?: GalleryPeopleTagInput[];
+  addGroupings?: string[];
+}) {
+  const photoIds = [...new Set(options.photoIds.filter((id) => id > 0))];
+  if (photoIds.length === 0) {
+    return { updated: 0, previousAlbumNames: [] as string[] };
+  }
+
+  let albumId = options.albumId;
+  let previousAlbumNames: string[] = [];
+
+  if (typeof options.albumName === "string" && options.albumName.trim()) {
+    const album = await findOrCreateAlbumByName(options.albumName.trim());
+    albumId = album?.id ?? albumId;
+  }
+
+  const albumChanging = options.albumId !== undefined || Boolean(options.albumName?.trim());
+  if (albumChanging) {
+    const moveResult = await movePhotosToAlbum({
+      photoIds,
+      albumId: albumId ?? null,
+      addPreviousAlbumAsTag: Boolean(options.addPreviousAlbumAsTag),
+    });
+    previousAlbumNames = moveResult.previousAlbumNames;
+  }
+
+  const patch: {
+    eventId?: number;
+    isPrivate?: boolean;
+  } = {};
+  if (options.eventId != null && options.eventId > 0) {
+    patch.eventId = options.eventId;
+  }
+  if (options.isPrivate !== undefined) {
+    patch.isPrivate = Boolean(options.isPrivate);
+  }
+  if (Object.keys(patch).length > 0) {
+    await db
+      .update(galleryPhotos)
+      .set(patch)
+      .where(inArray(galleryPhotos.id, photoIds));
+  }
+
+  if (options.addPeople?.length) {
+    await appendPhotoPeopleTags(photoIds, options.addPeople);
+  }
+  if (options.addGroupings?.length) {
+    await appendPhotoGroupingsMany(photoIds, options.addGroupings);
+  }
+
+  return { updated: photoIds.length, previousAlbumNames, albumId: albumId ?? null };
 }
 
 export async function movePhotosToAlbum(options: {

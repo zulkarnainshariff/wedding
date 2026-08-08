@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FolderInput, Maximize2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { FolderInput, Maximize2, Pencil, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { MultiSelectFilter } from "@/components/gallery/MultiSelectFilter";
 import {
   formatCommaList,
   GALLERY_PAGE_SIZE,
@@ -92,6 +93,8 @@ function PeopleTagsEditor({
   knownNames: string[];
   onChange: (people: PeopleTagDraft[]) => void;
 }) {
+  const [multiPick, setMultiPick] = useState<string[]>([]);
+
   const nameOptions = useMemo(() => {
     const set = new Set(knownNames.map((name) => name.trim()).filter(Boolean));
     for (const row of people) {
@@ -100,9 +103,58 @@ function PeopleTagsEditor({
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [knownNames, people]);
 
+  function addSelectedNames() {
+    if (multiPick.length === 0) return;
+    const existing = new Set(
+      people.map((row) => row.guestName.trim().toLowerCase()).filter(Boolean),
+    );
+    const next = [...people];
+    // Fill a blank trailing row first, if present.
+    const blankIndex = next.findIndex((row) => !row.guestName.trim());
+    for (const name of multiPick) {
+      const trimmed = name.trim();
+      if (!trimmed || existing.has(trimmed.toLowerCase())) continue;
+      existing.add(trimmed.toLowerCase());
+      if (blankIndex >= 0 && !next[blankIndex].guestName.trim()) {
+        next[blankIndex] = {
+          ...next[blankIndex],
+          guestName: trimmed,
+        };
+      } else {
+        next.push({ guestName: trimmed, email: "", userId: "" });
+      }
+    }
+    onChange(next.length > 0 ? next : [{ guestName: "", email: "", userId: "" }]);
+    setMultiPick([]);
+  }
+
   return (
     <div className="space-y-3">
       <span className="block text-sm text-stone-500">People</span>
+      {nameOptions.length > 0 ? (
+        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-stone-100 bg-white p-3">
+          <div className="min-w-[12rem] flex-1">
+            <MultiSelectFilter
+              label="Add names"
+              emptyLabel="Select people…"
+              options={nameOptions.map((name) => ({
+                value: name,
+                label: name,
+              }))}
+              selected={multiPick}
+              onChange={setMultiPick}
+            />
+          </div>
+          <button
+            type="button"
+            disabled={multiPick.length === 0}
+            onClick={addSelectedNames}
+            className="rounded-lg bg-brand-deep px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            Add selected ({multiPick.length})
+          </button>
+        </div>
+      ) : null}
       {people.map((row, index) => {
         const hasEmail = Boolean(row.email.trim());
         const hasUser = Boolean(row.userId);
@@ -131,26 +183,6 @@ function PeopleTagsEditor({
                   <option key={name} value={name} />
                 ))}
               </datalist>
-              {nameOptions.length > 0 ? (
-                <select
-                  value=""
-                  onChange={(e) => {
-                    const picked = e.target.value;
-                    if (!picked) return;
-                    const next = [...people];
-                    next[index] = { ...row, guestName: picked };
-                    onChange(next);
-                  }}
-                  className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">Choose existing name…</option>
-                  {nameOptions.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
             </label>
             <label className="block text-sm">
               <span className="mb-1 block text-xs text-stone-500">
@@ -190,9 +222,7 @@ function PeopleTagsEditor({
                     ...row,
                     userId,
                     email: "",
-                    guestName: matched
-                      ? matched.username
-                      : row.guestName,
+                    guestName: matched ? matched.username : row.guestName,
                   };
                   onChange(next);
                 }}
@@ -522,6 +552,231 @@ function MoveAlbumDialog({
             className="rounded-xl bg-brand-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
           >
             {busy ? "Moving…" : "Continue"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type BulkEditPayload = {
+  eventId?: string;
+  albumMode: "unchanged" | "set";
+  albumId: string;
+  albumName: string;
+  privateMode: "unchanged" | "private" | "public";
+  peopleNames: string[];
+  newPeopleNames: string;
+  tagNames: string[];
+  newTags: string;
+};
+
+function BulkEditDialog({
+  photoCount,
+  events,
+  albums,
+  knownPeopleNames,
+  knownTags,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  photoCount: number;
+  events: GalleryEvent[];
+  albums: GalleryAlbum[];
+  knownPeopleNames: string[];
+  knownTags: string[];
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: (payload: BulkEditPayload) => void;
+}) {
+  const [eventId, setEventId] = useState("");
+  const [albumMode, setAlbumMode] = useState<"unchanged" | "set">("unchanged");
+  const [albumId, setAlbumId] = useState("");
+  const [albumName, setAlbumName] = useState("");
+  const [privateMode, setPrivateMode] = useState<
+    "unchanged" | "private" | "public"
+  >("unchanged");
+  const [peopleNames, setPeopleNames] = useState<string[]>([]);
+  const [newPeopleNames, setNewPeopleNames] = useState("");
+  const [tagNames, setTagNames] = useState<string[]>([]);
+  const [newTags, setNewTags] = useState("");
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !busy) onClose();
+      }}
+      role="presentation"
+    >
+      <div className="absolute inset-0 bg-stone-900/45 backdrop-blur-[2px]" />
+      <div
+        className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="gallery-bulk-edit-title"
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-6 pb-4">
+          <h2
+            id="gallery-bulk-edit-title"
+            className="font-serif text-xl text-brand-deep"
+          >
+            Edit {photoCount} photo{photoCount === 1 ? "" : "s"}
+          </h2>
+          <p className="mt-1 text-sm text-stone-500">
+            Only filled fields are applied. People and tags are added to each
+            selected photo.
+          </p>
+          <div className="mt-4 space-y-4">
+            <label className="block text-sm">
+              <span className="mb-1 block text-stone-500">Event</span>
+              <select
+                value={eventId}
+                onChange={(e) => setEventId(e.target.value)}
+                className="w-full rounded-lg border border-stone-200 px-3 py-2"
+              >
+                <option value="">Don&apos;t change</option>
+                {events.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {event.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="space-y-2">
+              <span className="block text-sm text-stone-500">Album</span>
+              <select
+                value={albumMode}
+                onChange={(e) =>
+                  setAlbumMode(e.target.value as "unchanged" | "set")
+                }
+                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+              >
+                <option value="unchanged">Don&apos;t change</option>
+                <option value="set">Set album</option>
+              </select>
+              {albumMode === "set" ? (
+                <>
+                  <select
+                    value={albumId}
+                    onChange={(e) => {
+                      setAlbumId(e.target.value);
+                      setAlbumName("");
+                    }}
+                    className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                  >
+                    <option value="">No album</option>
+                    {albums.map((album) => (
+                      <option key={album.id} value={album.id}>
+                        {album.name}
+                      </option>
+                    ))}
+                  </select>
+                  {!albumId ? (
+                    <input
+                      value={albumName}
+                      onChange={(e) => setAlbumName(e.target.value)}
+                      placeholder="Or create new album"
+                      className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                    />
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+
+            <label className="block text-sm">
+              <span className="mb-1 block text-stone-500">Privacy</span>
+              <select
+                value={privateMode}
+                onChange={(e) =>
+                  setPrivateMode(
+                    e.target.value as "unchanged" | "private" | "public",
+                  )
+                }
+                className="w-full rounded-lg border border-stone-200 px-3 py-2"
+              >
+                <option value="unchanged">Don&apos;t change</option>
+                <option value="private">Mark private</option>
+                <option value="public">Remove private</option>
+              </select>
+            </label>
+
+            <div className="space-y-2">
+              <span className="block text-sm text-stone-500">Add people</span>
+              {knownPeopleNames.length > 0 ? (
+                <MultiSelectFilter
+                  label="People"
+                  emptyLabel="Select people…"
+                  options={knownPeopleNames.map((name) => ({
+                    value: name,
+                    label: name,
+                  }))}
+                  selected={peopleNames}
+                  onChange={setPeopleNames}
+                />
+              ) : null}
+              <input
+                value={newPeopleNames}
+                onChange={(e) => setNewPeopleNames(e.target.value)}
+                placeholder="Or type new names, comma-separated"
+                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <span className="block text-sm text-stone-500">Add tags</span>
+              {knownTags.length > 0 ? (
+                <MultiSelectFilter
+                  label="Tags"
+                  emptyLabel="Select tags…"
+                  options={knownTags.map((tag) => ({
+                    value: tag,
+                    label: tag,
+                  }))}
+                  selected={tagNames}
+                  onChange={setTagNames}
+                />
+              ) : null}
+              <input
+                value={newTags}
+                onChange={(e) => setNewTags(e.target.value)}
+                placeholder="Or type new tags, comma-separated"
+                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="flex shrink-0 justify-end gap-2 border-t border-stone-100 bg-white px-6 py-4">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm text-stone-600 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              onConfirm({
+                eventId,
+                albumMode,
+                albumId,
+                albumName: albumName.trim(),
+                privateMode,
+                peopleNames,
+                newPeopleNames,
+                tagNames,
+                newTags,
+              })
+            }
+            className="rounded-xl bg-brand-deep px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {busy ? "Applying…" : "Apply changes"}
           </button>
         </div>
       </div>
@@ -928,6 +1183,11 @@ export function GalleryEditablePhotoGrid({
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [moveOpen, setMoveOpen] = useState(false);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [pendingBulk, setPendingBulk] = useState<{
+    payload: BulkEditPayload;
+    previousNames: string[];
+  } | null>(null);
   const [pendingMove, setPendingMove] = useState<{
     albumId: string;
     albumName: string;
@@ -969,6 +1229,16 @@ export function GalleryEditablePhotoGrid({
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [photos]);
 
+  const knownTags = useMemo(() => {
+    const tags = new Set<string>();
+    for (const photo of photos) {
+      for (const grouping of photo.groupings ?? []) {
+        if (grouping.trim()) tags.add(grouping.trim());
+      }
+    }
+    return [...tags].sort((a, b) => a.localeCompare(b));
+  }, [photos]);
+
   const selectedCount = selectedIds.size;
   const selectedPhotos = useMemo(
     () => photos.filter((photo) => selectedIds.has(photo.id)),
@@ -1001,7 +1271,7 @@ export function GalleryEditablePhotoGrid({
 
     setBusy(true);
     try {
-      const response = await fetch("/api/gallery/bulk-move", {
+      const response = await fetch("/api/gallery/bulk-update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1014,7 +1284,6 @@ export function GalleryEditablePhotoGrid({
       const body = (await response.json().catch(() => ({}))) as {
         error?: string;
         photos?: GalleryPhoto[];
-        albumId?: number | null;
       };
       if (!response.ok) {
         toast.error(body.error ?? "Could not move photos.");
@@ -1048,6 +1317,120 @@ export function GalleryEditablePhotoGrid({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function executeBulkUpdate(
+    payload: BulkEditPayload,
+    addPreviousAlbumAsTag: boolean,
+  ) {
+    const photoIds = [...selectedIds];
+    if (photoIds.length === 0) return;
+
+    const addPeople = [
+      ...new Set([
+        ...payload.peopleNames,
+        ...parseCommaList(payload.newPeopleNames),
+      ]),
+    ].map((guestName) => ({ guestName }));
+    const addGroupings = [
+      ...new Set([...payload.tagNames, ...parseCommaList(payload.newTags)]),
+    ];
+
+    const body: Record<string, unknown> = { photoIds };
+    if (payload.eventId) body.eventId = Number(payload.eventId);
+    if (payload.albumMode === "set") {
+      body.albumId = payload.albumId ? Number(payload.albumId) : null;
+      if (payload.albumName) body.albumName = payload.albumName;
+      body.addPreviousAlbumAsTag = addPreviousAlbumAsTag;
+    }
+    if (payload.privateMode === "private") body.isPrivate = true;
+    if (payload.privateMode === "public") body.isPrivate = false;
+    if (addPeople.length > 0) body.addPeople = addPeople;
+    if (addGroupings.length > 0) body.addGroupings = addGroupings;
+
+    setBusy(true);
+    try {
+      const response = await fetch("/api/gallery/bulk-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        photos?: GalleryPhoto[];
+      };
+      if (!response.ok) {
+        toast.error(result.error ?? "Could not update photos.");
+        return;
+      }
+
+      const updated = result.photos ?? [];
+      onPhotosMoved?.(updated);
+      for (const photo of updated) {
+        onPhotoUpdated?.(photo);
+        if (photo.albumId && photo.albumName) {
+          const exists = albums.some((album) => album.id === photo.albumId);
+          if (!exists) {
+            onAlbumsChange?.([
+              ...albums,
+              { id: photo.albumId, name: photo.albumName },
+            ]);
+          }
+        }
+      }
+      setSelectedIds(new Set());
+      setBulkEditOpen(false);
+      setPendingBulk(null);
+      toast.success(
+        `Updated ${updated.length || photoIds.length} photo${
+          (updated.length || photoIds.length) === 1 ? "" : "s"
+        }.`,
+      );
+    } catch {
+      toast.error("Could not update photos.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function beginBulkEdit(payload: BulkEditPayload) {
+    const hasPeople =
+      payload.peopleNames.length > 0 ||
+      parseCommaList(payload.newPeopleNames).length > 0;
+    const hasTags =
+      payload.tagNames.length > 0 || parseCommaList(payload.newTags).length > 0;
+    const hasEvent = Boolean(payload.eventId);
+    const hasPrivate = payload.privateMode !== "unchanged";
+    const hasAlbum = payload.albumMode === "set";
+
+    if (!hasPeople && !hasTags && !hasEvent && !hasPrivate && !hasAlbum) {
+      toast.error("Choose at least one change to apply.");
+      return;
+    }
+
+    if (!hasAlbum) {
+      void executeBulkUpdate(payload, false);
+      return;
+    }
+
+    const previousNames = [
+      ...new Set(
+        selectedPhotos
+          .map((photo) => photo.albumName?.trim())
+          .filter((name): name is string => Boolean(name)),
+      ),
+    ];
+
+    if (previousNames.length === 0 || moveTagMode === "never") {
+      void executeBulkUpdate(payload, false);
+      return;
+    }
+    if (moveTagMode === "always") {
+      void executeBulkUpdate(payload, true);
+      return;
+    }
+
+    setPendingBulk({ payload, previousNames });
   }
 
   function beginMove(target: { albumId: string; albumName: string }) {
@@ -1176,11 +1559,20 @@ export function GalleryEditablePhotoGrid({
         <button
           type="button"
           disabled={busy || selectedCount === 0}
-          onClick={() => setMoveOpen(true)}
+          onClick={() => setBulkEditOpen(true)}
           className="inline-flex items-center gap-1.5 rounded-lg bg-brand-deep px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
         >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          Edit selected {selectedCount > 0 ? `(${selectedCount})` : ""}
+        </button>
+        <button
+          type="button"
+          disabled={busy || selectedCount === 0}
+          onClick={() => setMoveOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+        >
           <FolderInput className="h-3.5 w-3.5" />
-          Move {selectedCount > 0 ? `(${selectedCount})` : ""}
+          Move album
         </button>
         {selectedCount > 0 ? (
           <span className="text-xs text-stone-500">
@@ -1247,6 +1639,21 @@ export function GalleryEditablePhotoGrid({
         />
       ) : null}
 
+      {bulkEditOpen ? (
+        <BulkEditDialog
+          photoCount={selectedCount}
+          events={events}
+          albums={albums}
+          knownPeopleNames={knownPeopleNames}
+          knownTags={knownTags}
+          busy={busy}
+          onClose={() => {
+            if (!busy) setBulkEditOpen(false);
+          }}
+          onConfirm={(payload) => beginBulkEdit(payload)}
+        />
+      ) : null}
+
       {pendingMove ? (
         <PreviousAlbumTagDialog
           albumNames={pendingMove.previousNames}
@@ -1263,6 +1670,22 @@ export function GalleryEditablePhotoGrid({
               albumName: pendingMove.albumName,
               addPreviousAlbumAsTag: decision.addTags,
             });
+          }}
+        />
+      ) : null}
+
+      {pendingBulk ? (
+        <PreviousAlbumTagDialog
+          albumNames={pendingBulk.previousNames}
+          busy={busy}
+          onClose={() => {
+            if (!busy) setPendingBulk(null);
+          }}
+          onDecide={(decision) => {
+            if (decision.remember !== "ask") {
+              void persistMoveTagMode(decision.remember);
+            }
+            void executeBulkUpdate(pendingBulk.payload, decision.addTags);
           }}
         />
       ) : null}
