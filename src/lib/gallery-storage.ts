@@ -12,8 +12,8 @@ export const GALLERY_UPLOAD_ROOT = path.join(
 
 export const MAX_GALLERY_IMAGE_BYTES = 50 * 1024 * 1024;
 export const MAX_GALLERY_ZIP_BYTES = 512 * 1024 * 1024;
-export const GALLERY_THUMB_MAX_EDGE = 640;
-export const GALLERY_THUMB_WEBP_QUALITY = 72;
+export const GALLERY_THUMB_MAX_EDGE = 420;
+export const GALLERY_THUMB_WEBP_QUALITY = 62;
 
 const IMAGE_EXTENSIONS = new Set([
   ".jpg",
@@ -90,7 +90,7 @@ export function buildGalleryStorageKey(fileName: string): string {
 /** Thumbnail key derived from the original storage key (WebP under thumbs/). */
 export function galleryThumbKey(storageKey: string): string {
   const base = path.basename(storageKey);
-  return path.posix.join("thumbs", `${base}.webp`);
+  return path.posix.join("thumbs", `${base}.v2.webp`);
 }
 
 export function galleryFilePath(storageKey: string): string {

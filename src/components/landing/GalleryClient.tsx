@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PublicHeader } from "@/components/landing/PublicHeader";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
@@ -14,8 +14,10 @@ import {
   GalleryEditablePhotoGrid,
   GalleryPublicPhotoGrid,
 } from "@/components/gallery/GalleryPhotoGrid";
+import { MultiSelectFilter } from "@/components/gallery/MultiSelectFilter";
 
 type GalleryPhotoView = GalleryPhoto;
+type GalleryTab = "photos" | "manage";
 
 function normalizePeople(
   people: unknown,
@@ -62,8 +64,8 @@ export function GalleryClient({
   const [photos, setPhotos] = useState<GalleryPhotoView[]>([]);
   const [eventFilter, setEventFilter] = useState("");
   const [albumFilter, setAlbumFilter] = useState("");
-  const [groupingFilter, setGroupingFilter] = useState("");
-  const [personFilter, setPersonFilter] = useState("");
+  const [tagFilters, setTagFilters] = useState<string[]>([]);
+  const [peopleFilters, setPeopleFilters] = useState<string[]>([]);
   const [events, setEvents] = useState<{ id: number; name: string }[]>([]);
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
   const [groupings, setGroupings] = useState<string[]>([]);
@@ -71,18 +73,32 @@ export function GalleryClient({
   const [albumMoveTagMode, setAlbumMoveTagMode] =
     useState<GalleryAlbumMoveTagMode>(initialAlbumMoveTagMode);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<GalleryTab>("photos");
 
   const isAdmin = Boolean(user?.isAdmin);
   const galleryVisible = enabled || isAdmin;
-  const filterKey = `${eventFilter}|${albumFilter}|${groupingFilter}|${personFilter}`;
+  const filterKey = `${eventFilter}|${albumFilter}|${tagFilters.join(",")}|${peopleFilters.join(",")}`;
+
+  const peopleOptions = useMemo(
+    () =>
+      people.map((person) => ({
+        value: person.guestName,
+        label: person.label,
+      })),
+    [people],
+  );
+  const tagOptions = useMemo(
+    () => groupings.map((tag) => ({ value: tag, label: tag })),
+    [groupings],
+  );
 
   useEffect(() => {
     if (!galleryVisible) return;
     const params = new URLSearchParams();
     if (eventFilter) params.set("eventId", eventFilter);
     if (albumFilter) params.set("albumId", albumFilter);
-    if (groupingFilter) params.set("grouping", groupingFilter);
-    if (personFilter) params.set("person", personFilter);
+    if (tagFilters.length > 0) params.set("tags", tagFilters.join(","));
+    if (peopleFilters.length > 0) params.set("people", peopleFilters.join(","));
     const query = params.toString() ? `?${params.toString()}` : "";
 
     void (async () => {
@@ -102,7 +118,7 @@ export function GalleryClient({
       }
       setError(null);
     })();
-  }, [galleryVisible, eventFilter, albumFilter, groupingFilter, personFilter]);
+  }, [galleryVisible, eventFilter, albumFilter, tagFilters, peopleFilters]);
 
   if (!galleryVisible) {
     return (
@@ -125,6 +141,35 @@ export function GalleryClient({
         </p>
 
         {isAdmin && (
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setTab("photos")}
+              className={[
+                "rounded-xl px-4 py-2 text-sm font-medium",
+                tab === "photos"
+                  ? "bg-brand-deep text-white"
+                  : "border border-stone-200 bg-white text-stone-600",
+              ].join(" ")}
+            >
+              Photos
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("manage")}
+              className={[
+                "rounded-xl px-4 py-2 text-sm font-medium",
+                tab === "manage"
+                  ? "bg-brand-deep text-white"
+                  : "border border-stone-200 bg-white text-stone-600",
+              ].join(" ")}
+            >
+              Manage
+            </button>
+          </div>
+        )}
+
+        {isAdmin && tab === "manage" && (
           <div className="mt-6">
             <GalleryManagementPanel
               compact
@@ -133,7 +178,10 @@ export function GalleryClient({
               albumMoveTagMode={albumMoveTagMode}
               onAlbumMoveTagModeChange={setAlbumMoveTagMode}
               onAlbumsChange={setAlbums}
-              onPhotoAdded={(photo) => setPhotos((current) => [photo, ...current])}
+              onPhotoAdded={(photo) => {
+                setPhotos((current) => [photo, ...current]);
+                setTab("photos");
+              }}
             />
           </div>
         )}
@@ -145,98 +193,101 @@ export function GalleryClient({
           </p>
         )}
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          {events.length > 1 && (
-            <select
-              value={eventFilter}
-              onChange={(e) => setEventFilter(e.target.value)}
-              className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
-            >
-              <option value="">All events</option>
-              {events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.name}
-                </option>
-              ))}
-            </select>
-          )}
-          {albums.length > 0 && (
-            <select
-              value={albumFilter}
-              onChange={(e) => setAlbumFilter(e.target.value)}
-              className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
-            >
-              <option value="">All albums</option>
-              {albums.map((album) => (
-                <option key={album.id} value={album.id}>
-                  {album.name}
-                </option>
-              ))}
-            </select>
-          )}
-          {groupings.length > 0 && (
-            <select
-              value={groupingFilter}
-              onChange={(e) => setGroupingFilter(e.target.value)}
-              className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
-            >
-              <option value="">All groupings</option>
-              {groupings.map((grouping) => (
-                <option key={grouping} value={grouping}>
-                  {grouping}
-                </option>
-              ))}
-            </select>
-          )}
-          {people.length > 0 && (
-            <select
-              value={personFilter}
-              onChange={(e) => setPersonFilter(e.target.value)}
-              className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
-            >
-              <option value="">All people</option>
-              {people.map((person) => (
-                <option key={person.guestName} value={person.guestName}>
-                  {person.label}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
+        {(!isAdmin || tab === "photos") && (
+          <>
+            <div className="mt-6 flex flex-wrap gap-3">
+              {events.length > 1 && (
+                <select
+                  value={eventFilter}
+                  onChange={(e) => setEventFilter(e.target.value)}
+                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                >
+                  <option value="">All events</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {albums.length > 0 && (
+                <select
+                  value={albumFilter}
+                  onChange={(e) => setAlbumFilter(e.target.value)}
+                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                >
+                  <option value="">All albums</option>
+                  {albums.map((album) => (
+                    <option key={album.id} value={album.id}>
+                      {album.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {tagOptions.length > 0 && (
+                <MultiSelectFilter
+                  label="Tags"
+                  emptyLabel="All tags"
+                  options={tagOptions}
+                  selected={tagFilters}
+                  onChange={setTagFilters}
+                />
+              )}
+              {peopleOptions.length > 0 && (
+                <MultiSelectFilter
+                  label="People"
+                  emptyLabel="All people"
+                  options={peopleOptions}
+                  selected={peopleFilters}
+                  onChange={setPeopleFilters}
+                />
+              )}
+            </div>
 
-        {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+            {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-        <div className="mt-8">
-          {photos.length === 0 ? (
-            <p className="text-sm text-stone-500">No photos yet.</p>
-          ) : isAdmin ? (
-            <GalleryEditablePhotoGrid
-              photos={photos}
-              events={events}
-              albums={albums}
-              paginationKey={filterKey}
-              albumMoveTagMode={albumMoveTagMode}
-              onAlbumMoveTagModeChange={setAlbumMoveTagMode}
-              onAlbumsChange={setAlbums}
-              onPhotoUpdated={(photo) =>
-                setPhotos((current) =>
-                  current.map((entry) => (entry.id === photo.id ? photo : entry)),
-                )
-              }
-              onPhotoRemoved={(photoId) =>
-                setPhotos((current) => current.filter((photo) => photo.id !== photoId))
-              }
-              onPhotosMoved={(moved) => {
-                const byId = new Map(moved.map((photo) => [photo.id, photo]));
-                setPhotos((current) =>
-                  current.map((photo) => byId.get(photo.id) ?? photo),
-                );
-              }}
-            />
-          ) : (
-            <GalleryPublicPhotoGrid photos={photos} paginationKey={filterKey} />
-          )}
-        </div>
+            <div className="mt-8">
+              {photos.length === 0 ? (
+                <p className="text-sm text-stone-500">No photos yet.</p>
+              ) : isAdmin ? (
+                <GalleryEditablePhotoGrid
+                  photos={photos}
+                  events={events}
+                  albums={albums}
+                  paginationKey={filterKey}
+                  albumMoveTagMode={albumMoveTagMode}
+                  onAlbumMoveTagModeChange={setAlbumMoveTagMode}
+                  onAlbumsChange={setAlbums}
+                  onPhotoUpdated={(photo) =>
+                    setPhotos((current) =>
+                      current.map((entry) =>
+                        entry.id === photo.id ? photo : entry,
+                      ),
+                    )
+                  }
+                  onPhotoRemoved={(photoId) =>
+                    setPhotos((current) =>
+                      current.filter((photo) => photo.id !== photoId),
+                    )
+                  }
+                  onPhotosMoved={(moved) => {
+                    const byId = new Map(
+                      moved.map((photo) => [photo.id, photo]),
+                    );
+                    setPhotos((current) =>
+                      current.map((photo) => byId.get(photo.id) ?? photo),
+                    );
+                  }}
+                />
+              ) : (
+                <GalleryPublicPhotoGrid
+                  photos={photos}
+                  paginationKey={filterKey}
+                />
+              )}
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
