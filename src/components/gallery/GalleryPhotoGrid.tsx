@@ -1174,6 +1174,8 @@ export function GalleryEditablePhotoGrid({
   albums = [],
   albumMoveTagMode = "ask",
   paginationKey = "",
+  knownPeopleNames: knownPeopleNamesProp,
+  knownTags: knownTagsProp,
   onAlbumMoveTagModeChange,
   onAlbumsChange,
   onPhotoUpdated,
@@ -1186,6 +1188,9 @@ export function GalleryEditablePhotoGrid({
   albumMoveTagMode?: GalleryAlbumMoveTagMode;
   /** Change this when filters change so the page resets to the first chunk. */
   paginationKey?: string;
+  /** Preferred people name list (e.g. from gallery filter options). */
+  knownPeopleNames?: string[];
+  knownTags?: string[];
   onAlbumMoveTagModeChange?: (mode: GalleryAlbumMoveTagMode) => void;
   onAlbumsChange?: (albums: GalleryAlbum[]) => void;
   onPhotoUpdated?: (photo: GalleryPhoto) => void;
@@ -1235,24 +1240,28 @@ export function GalleryEditablePhotoGrid({
   );
 
   const knownPeopleNames = useMemo(() => {
-    const names = new Set<string>();
+    const names = new Set<string>(
+      (knownPeopleNamesProp ?? []).map((name) => name.trim()).filter(Boolean),
+    );
     for (const photo of photos) {
       for (const tag of photo.tags) {
         if (tag.guestName.trim()) names.add(tag.guestName.trim());
       }
     }
     return [...names].sort((a, b) => a.localeCompare(b));
-  }, [photos]);
+  }, [knownPeopleNamesProp, photos]);
 
   const knownTags = useMemo(() => {
-    const tags = new Set<string>();
+    const tags = new Set<string>(
+      (knownTagsProp ?? []).map((tag) => tag.trim()).filter(Boolean),
+    );
     for (const photo of photos) {
       for (const grouping of photo.groupings ?? []) {
         if (grouping.trim()) tags.add(grouping.trim());
       }
     }
     return [...tags].sort((a, b) => a.localeCompare(b));
-  }, [photos]);
+  }, [knownTagsProp, photos]);
 
   const selectedCount = selectedIds.size;
   const selectedPhotos = useMemo(

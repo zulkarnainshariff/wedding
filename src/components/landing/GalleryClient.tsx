@@ -66,7 +66,8 @@ export function GalleryClient({
   const [albumFilter, setAlbumFilter] = useState("");
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [peopleFilters, setPeopleFilters] = useState<string[]>([]);
-  const [untaggedPeopleOnly, setUntaggedPeopleOnly] = useState(false);
+  /** "" = any-of selected, "exact" = only those people, "untagged" = no people tags */
+  const [peopleMode, setPeopleMode] = useState<"" | "exact" | "untagged">("");
   const [events, setEvents] = useState<{ id: number; name: string }[]>([]);
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
   const [groupings, setGroupings] = useState<string[]>([]);
@@ -78,7 +79,9 @@ export function GalleryClient({
 
   const isAdmin = Boolean(user?.isAdmin);
   const galleryVisible = enabled || isAdmin;
-  const filterKey = `${eventFilter}|${albumFilter}|${tagFilters.join(",")}|${peopleFilters.join(",")}|${untaggedPeopleOnly ? "untagged" : ""}`;
+  const untaggedPeopleOnly = peopleMode === "untagged";
+  const peopleExact = peopleMode === "exact";
+  const filterKey = `${eventFilter}|${albumFilter}|${tagFilters.join(",")}|${peopleFilters.join(",")}|${peopleMode}`;
 
   const peopleOptions = useMemo(
     () =>
@@ -86,6 +89,10 @@ export function GalleryClient({
         value: person.guestName,
         label: person.label,
       })),
+    [people],
+  );
+  const knownPeopleNames = useMemo(
+    () => people.map((person) => person.guestName),
     [people],
   );
   const tagOptions = useMemo(
@@ -103,6 +110,7 @@ export function GalleryClient({
       params.set("untaggedPeople", "1");
     } else if (peopleFilters.length > 0) {
       params.set("people", peopleFilters.join(","));
+      if (peopleExact) params.set("peopleExact", "1");
     }
     const query = params.toString() ? `?${params.toString()}` : "";
 
@@ -129,7 +137,9 @@ export function GalleryClient({
     albumFilter,
     tagFilters,
     peopleFilters,
+    peopleMode,
     untaggedPeopleOnly,
+    peopleExact,
   ]);
 
   if (!galleryVisible) {
@@ -266,21 +276,22 @@ export function GalleryClient({
                 />
               )}
               <select
-                value={untaggedPeopleOnly ? "untagged" : ""}
+                value={peopleMode}
                 onChange={(e) => {
-                  const untagged = e.target.value === "untagged";
-                  setUntaggedPeopleOnly(untagged);
-                  if (untagged) setPeopleFilters([]);
+                  const next = e.target.value as "" | "exact" | "untagged";
+                  setPeopleMode(next);
+                  if (next === "untagged") setPeopleFilters([]);
                 }}
                 className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
               >
-                <option value="">All people tagging</option>
-                <option value="untagged">Untagged people only</option>
+                <option value="">Select people</option>
+                <option value="exact">Only selected people</option>
+                <option value="untagged">Untagged photos</option>
               </select>
               {!untaggedPeopleOnly && peopleOptions.length > 0 && (
                 <MultiSelectFilter
                   label="People"
-                  emptyLabel="All people"
+                  emptyLabel="Everyone"
                   options={peopleOptions}
                   selected={peopleFilters}
                   onChange={setPeopleFilters}
@@ -299,6 +310,8 @@ export function GalleryClient({
                   events={events}
                   albums={albums}
                   paginationKey={filterKey}
+                  knownPeopleNames={knownPeopleNames}
+                  knownTags={groupings}
                   albumMoveTagMode={albumMoveTagMode}
                   onAlbumMoveTagModeChange={setAlbumMoveTagMode}
                   onAlbumsChange={setAlbums}
