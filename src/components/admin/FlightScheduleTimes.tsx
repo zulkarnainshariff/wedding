@@ -15,6 +15,8 @@ import {
   resolveOperatingFlightNumber,
 } from "@/lib/flight-numbers";
 import type { FlightScheduleLookupResult } from "@/lib/flight-schedule-lookup";
+import { isFlightLegSegment } from "@/lib/flight-segment-timing";
+import type { FlightSegment } from "@/lib/types";
 
 type FieldErrors = NonNullable<FlightScheduleLookupResult["fieldErrors"]>;
 
@@ -33,6 +35,18 @@ const initialScheduleState: ScheduleState = {
   fieldErrors: {},
   lastLookupSucceeded: false,
 };
+
+/** Slash-joined labels like "DL2468 / DL1142 / DL11" are not a single lookup key. */
+function isCompositeMultiLegFlightNumber(value: string | null | undefined): boolean {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed.includes("/")) return false;
+  // Codeshares use parentheses: "QF4716 (AA3164)" — still a single operating flight.
+  return trimmed.split("/").filter((part) => part.trim()).length >= 2;
+}
+
+function flightLegsFromForm(segments: FlightSegment[]): FlightSegment[] {
+  return segments.filter(isFlightLegSegment);
+}
 
 function airlineFieldsFromFlightNumber(value: string) {
   const legacy = parseLegacyFlightNumber(value);
@@ -57,12 +71,32 @@ function applyLookupToForm(
   form: ItemFormState,
   lookup: FlightScheduleLookupResult,
 ): ItemFormState {
+  const existingLegs = flightLegsFromForm(form.structured.segments);
+  const preserveMultiLegRoute = existingLegs.length >= 2;
+  const lookupLegs = (lookup.segments ?? []).filter(isFlightLegSegment);
+  const firstExisting = existingLegs[0];
+  const lastExisting = existingLegs[existingLegs.length - 1];
+
   const nextSimple = {
     ...form.structured.simple,
-    from: lookup.fromCity ?? form.structured.simple.from,
-    to: lookup.toCity ?? form.structured.simple.to,
-    fromIata: lookup.fromIata ?? form.structured.simple.fromIata,
-    toIata: lookup.toIata ?? form.structured.simple.toIata,
+    from: preserveMultiLegRoute
+      ? form.structured.simple.from || lookup.fromCity || ""
+      : (lookup.fromCity ?? form.structured.simple.from),
+    to: preserveMultiLegRoute
+      ? form.structured.simple.to || lookup.toCity || ""
+      : (lookup.toCity ?? form.structured.simple.to),
+    fromIata: preserveMultiLegRoute
+      ? firstExisting?.fromIata ||
+        form.structured.simple.fromIata ||
+        lookup.fromIata ||
+        ""
+      : (lookup.fromIata ?? form.structured.simple.fromIata),
+    toIata: preserveMultiLegRoute
+      ? lastExisting?.toIata ||
+        form.structured.simple.toIata ||
+        lookup.toIata ||
+        ""
+      : (lookup.toIata ?? form.structured.simple.toIata),
     departureTime: lookup.departureTime ?? form.structured.simple.departureTime,
     arrivalTime: lookup.arrivalTime ?? form.structured.simple.arrivalTime,
     aircraft: lookup.aircraft ?? form.structured.simple.aircraft,
@@ -73,12 +107,14 @@ function applyLookupToForm(
     arrivalTerminal:
       lookup.arrivalTerminal ?? form.structured.simple.arrivalTerminal,
     arrivalGate: lookup.arrivalGate ?? form.structured.simple.arrivalGate,
-    marketingFlightNumber:
-      lookup.marketingFlightNumber ??
-      form.structured.simple.marketingFlightNumber,
-    operatingFlightNumber:
-      lookup.operatingFlightNumber ??
-      form.structured.simple.operatingFlightNumber,
+    marketingFlightNumber: preserveMultiLegRoute
+      ? form.structured.simple.marketingFlightNumber
+      : (lookup.marketingFlightNumber ??
+        form.structured.simple.marketingFlightNumber),
+    operatingFlightNumber: preserveMultiLegRoute
+      ? form.structured.simple.operatingFlightNumber
+      : (lookup.operatingFlightNumber ??
+        form.structured.simple.operatingFlightNumber),
     airlineIata: lookup.airlineIata ?? form.structured.simple.airlineIata,
     airlineName: lookup.airlineName ?? form.structured.simple.airlineName,
     operatingAirlineIata:
@@ -86,6 +122,12 @@ function applyLookupToForm(
     operatingAirlineName:
       lookup.operatingAirlineName ?? form.structured.simple.operatingAirlineName,
   };
+
+  const nextSegments = preserveMultiLegRoute
+    ? form.structured.segments
+    : lookupLegs.length > 0
+      ? lookup.segments!
+      : form.structured.segments;
 
   return {
     ...form,
@@ -95,7 +137,7 @@ function applyLookupToForm(
     structured: {
       ...form.structured,
       simple: nextSimple,
-      segments: lookup.segments ?? form.structured.segments,
+      segments: nextSegments,
     },
   };
 }
@@ -186,6 +228,20 @@ export function FlightScheduleTimes({
       return;
     }
 
+    if (isCompositeMultiLegFlightNumber(operatingFlightNumber)) {
+      if (!options?.silent) {
+        setScheduleState({
+          loading: false,
+          manualRequired: false,
+          message:
+            "This booking has multiple flight numbers. Edit each segment’s number to look up that leg — the segment list will not be replaced.",
+          fieldErrors: {},
+          lastLookupSucceeded: false,
+        });
+      }
+      return;
+    }
+
     lookupAbortRef.current?.abort();
     const controller = new AbortController();
     lookupAbortRef.current = controller;
@@ -267,6 +323,7 @@ export function FlightScheduleTimes({
 
   useEffect(() => {
     if (!operatingFlightNumber || !flightDate) return;
+    if (isCompositeMultiLegFlightNumber(operatingFlightNumber)) return;
 
     const lookupKey = `${operatingFlightNumber}|${flightDate}`;
     if (autoLookupTimerRef.current) clearTimeout(autoLookupTimerRef.current);

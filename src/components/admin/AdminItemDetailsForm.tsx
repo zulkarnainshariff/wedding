@@ -615,6 +615,26 @@ function FlightSegmentsEditor({
     onChange(next);
   };
 
+  const flightLegs = segments.filter(
+    (segment) => !segment.transit && (segment.fromIata || segment.from),
+  );
+  const brokenConnections: string[] = [];
+  for (let index = 0; index < flightLegs.length - 1; index += 1) {
+    const currentTo =
+      flightLegs[index].toIata?.trim().toUpperCase() ||
+      flightLegs[index].to?.trim().toUpperCase() ||
+      "";
+    const nextFrom =
+      flightLegs[index + 1].fromIata?.trim().toUpperCase() ||
+      flightLegs[index + 1].from?.trim().toUpperCase() ||
+      "";
+    if (currentTo && nextFrom && currentTo !== nextFrom) {
+      brokenConnections.push(
+        `Segment ${index + 1} ends at ${currentTo} but segment ${index + 2} starts at ${nextFrom}.`,
+      );
+    }
+  }
+
   return (
     <div className="sm:col-span-2">
       <div className="mb-2 flex items-center justify-between">
@@ -639,6 +659,20 @@ function FlightSegmentsEditor({
           Add segment
         </button>
       </div>
+      {brokenConnections.length > 0 ? (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <p className="font-medium">Segments don’t connect</p>
+          <ul className="mt-1 list-disc pl-4">
+            {brokenConnections.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+          <p className="mt-1">
+            Add the missing connecting flight so the route is continuous (e.g.
+            YYZ→SLC, then SLC→LAX, then LAX→MEL).
+          </p>
+        </div>
+      ) : null}
       <div className="space-y-4">
         {segments.map((segment, index) => (
           <div
@@ -1210,15 +1244,26 @@ export function AdminItemDetailsForm({
                       {
                         from: simple.from,
                         fromIata: simple.fromIata,
-                        to: simple.to,
-                        toIata: simple.toIata,
+                        // Leave the connection airport blank — user fills the hub.
+                        to: "",
+                        toIata: "",
                         marketingFlightNumber: simple.marketingFlightNumber,
                         operatingFlightNumber:
                           simple.operatingFlightNumber ||
                           simple.marketingFlightNumber,
                         departureTime: simple.departureTime,
-                        arrivalTime: simple.arrivalTime,
+                        arrivalTime: "",
                         aircraft: simple.aircraft,
+                      },
+                      {
+                        from: "",
+                        fromIata: "",
+                        to: simple.to,
+                        toIata: simple.toIata,
+                        marketingFlightNumber: "",
+                        operatingFlightNumber: "",
+                        departureTime: "",
+                        arrivalTime: simple.arrivalTime,
                       },
                     ],
                   });

@@ -192,9 +192,9 @@ export function buildFlightItinerarySummaries(
     item.eventDate?.trim().split("T")[0] ??
     null;
 
-  if (legs.length > 0 && resolved) {
+  if (legs.length > 0) {
     return legs.map(({ segment, layoverAfter }, index) => {
-      const window = resolved.windows[index];
+      const window = resolved?.windows[index];
       const summary = buildLegSummary(
         segment,
         window?.dep,
