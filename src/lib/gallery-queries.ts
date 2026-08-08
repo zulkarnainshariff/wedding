@@ -17,6 +17,8 @@ export type GalleryListFilters = {
   groupings?: string[];
   person?: string;
   people?: string[];
+  /** When true, only photos with no people tags. */
+  untaggedPeople?: boolean;
   /** When false, private photos are excluded. Admins pass true. */
   includePrivate?: boolean;
 };
@@ -177,7 +179,9 @@ export async function listGalleryPhotos(filters: GalleryListFilters = {}) {
         .filter(Boolean),
     ),
   ];
-  if (peopleNeedles.length > 0) {
+  if (filters.untaggedPeople) {
+    result = result.filter((photo) => photo.tags.length === 0);
+  } else if (peopleNeedles.length > 0) {
     result = result.filter((photo) =>
       peopleNeedles.some((needle) =>
         photo.tags.some(
@@ -415,6 +419,50 @@ export async function appendPhotoGroupingsMany(
   for (const label of labels) {
     await appendPhotoGroupings(photoIds, label);
   }
+}
+
+/** Rename a grouping tag across all photos. Merges if the new name already exists on a photo. */
+export async function renameGalleryGrouping(from: string, to: string) {
+  const oldName = from.trim();
+  const newName = to.trim();
+  if (!oldName || !newName) {
+    throw new Error("Both current and new tag names are required.");
+  }
+  if (oldName === newName) {
+    return { renamed: 0, grouping: newName };
+  }
+
+  const existing = await db
+    .select({
+      photoId: galleryPhotoGroupings.photoId,
+      grouping: galleryPhotoGroupings.grouping,
+    })
+    .from(galleryPhotoGroupings)
+    .where(eq(galleryPhotoGroupings.grouping, oldName));
+
+  if (existing.length === 0) {
+    return { renamed: 0, grouping: newName };
+  }
+
+  const alreadyHaveNew = await db
+    .select({ photoId: galleryPhotoGroupings.photoId })
+    .from(galleryPhotoGroupings)
+    .where(eq(galleryPhotoGroupings.grouping, newName));
+  const haveNew = new Set(alreadyHaveNew.map((row) => row.photoId));
+
+  await db
+    .delete(galleryPhotoGroupings)
+    .where(eq(galleryPhotoGroupings.grouping, oldName));
+
+  const toInsert = existing
+    .filter((row) => !haveNew.has(row.photoId))
+    .map((row) => ({ photoId: row.photoId, grouping: newName }));
+
+  if (toInsert.length > 0) {
+    await db.insert(galleryPhotoGroupings).values(toInsert);
+  }
+
+  return { renamed: existing.length, grouping: newName };
 }
 
 export async function bulkUpdateGalleryPhotos(options: {

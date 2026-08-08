@@ -66,6 +66,7 @@ export function GalleryClient({
   const [albumFilter, setAlbumFilter] = useState("");
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [peopleFilters, setPeopleFilters] = useState<string[]>([]);
+  const [untaggedPeopleOnly, setUntaggedPeopleOnly] = useState(false);
   const [events, setEvents] = useState<{ id: number; name: string }[]>([]);
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
   const [groupings, setGroupings] = useState<string[]>([]);
@@ -77,7 +78,7 @@ export function GalleryClient({
 
   const isAdmin = Boolean(user?.isAdmin);
   const galleryVisible = enabled || isAdmin;
-  const filterKey = `${eventFilter}|${albumFilter}|${tagFilters.join(",")}|${peopleFilters.join(",")}`;
+  const filterKey = `${eventFilter}|${albumFilter}|${tagFilters.join(",")}|${peopleFilters.join(",")}|${untaggedPeopleOnly ? "untagged" : ""}`;
 
   const peopleOptions = useMemo(
     () =>
@@ -98,7 +99,11 @@ export function GalleryClient({
     if (eventFilter) params.set("eventId", eventFilter);
     if (albumFilter) params.set("albumId", albumFilter);
     if (tagFilters.length > 0) params.set("tags", tagFilters.join(","));
-    if (peopleFilters.length > 0) params.set("people", peopleFilters.join(","));
+    if (untaggedPeopleOnly) {
+      params.set("untaggedPeople", "1");
+    } else if (peopleFilters.length > 0) {
+      params.set("people", peopleFilters.join(","));
+    }
     const query = params.toString() ? `?${params.toString()}` : "";
 
     void (async () => {
@@ -118,7 +123,14 @@ export function GalleryClient({
       }
       setError(null);
     })();
-  }, [galleryVisible, eventFilter, albumFilter, tagFilters, peopleFilters]);
+  }, [
+    galleryVisible,
+    eventFilter,
+    albumFilter,
+    tagFilters,
+    peopleFilters,
+    untaggedPeopleOnly,
+  ]);
 
   if (!galleryVisible) {
     return (
@@ -178,6 +190,26 @@ export function GalleryClient({
               albumMoveTagMode={albumMoveTagMode}
               onAlbumMoveTagModeChange={setAlbumMoveTagMode}
               onAlbumsChange={setAlbums}
+              onGroupingsChange={setGroupings}
+              onTagRenamed={(from, to) => {
+                setPhotos((current) =>
+                  current.map((photo) => ({
+                    ...photo,
+                    groupings: [
+                      ...new Set(
+                        (photo.groupings ?? []).map((tag) =>
+                          tag === from ? to : tag,
+                        ),
+                      ),
+                    ],
+                  })),
+                );
+                setTagFilters((current) => [
+                  ...new Set(
+                    current.map((tag) => (tag === from ? to : tag)),
+                  ),
+                ]);
+              }}
               onPhotoAdded={(photo) => {
                 setPhotos((current) => [photo, ...current]);
                 setTab("photos");
@@ -233,7 +265,19 @@ export function GalleryClient({
                   onChange={setTagFilters}
                 />
               )}
-              {peopleOptions.length > 0 && (
+              <select
+                value={untaggedPeopleOnly ? "untagged" : ""}
+                onChange={(e) => {
+                  const untagged = e.target.value === "untagged";
+                  setUntaggedPeopleOnly(untagged);
+                  if (untagged) setPeopleFilters([]);
+                }}
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+              >
+                <option value="">All people tagging</option>
+                <option value="untagged">Untagged people only</option>
+              </select>
+              {!untaggedPeopleOnly && peopleOptions.length > 0 && (
                 <MultiSelectFilter
                   label="People"
                   emptyLabel="All people"
