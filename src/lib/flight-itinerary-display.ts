@@ -24,6 +24,7 @@ export type FlightLegSummary = {
   flightTime: string | null;
   transitAirport: string | null;
   transitLayoverMinutes: number | null;
+  connectionMissing?: boolean;
 };
 
 function daysBetween(startDate: string, endDate: string): number {
@@ -166,10 +167,13 @@ function buildLegSummary(
       : 0;
 
   return {
-    flightNumber: formatFlightNumberDisplay(
-      segment.marketingFlightNumber,
-      segment.operatingFlightNumber,
-    ),
+    flightNumber:
+      formatFlightNumberDisplay(
+        segment.marketingFlightNumber,
+        segment.operatingFlightNumber,
+      ) ||
+      segment.flightNumber?.trim() ||
+      null,
     departureLabel: depTime ? `Dep ${fromLabel}: ${depTime}` : `Dep ${fromLabel}`,
     arrivalLabel: arrTime
       ? `Arrive ${toLabel}: ${arrTime}${daySuffix > 0 ? ` +${daySuffix}` : ""}`
@@ -193,7 +197,7 @@ export function buildFlightItinerarySummaries(
     null;
 
   if (legs.length > 0) {
-    return legs.map(({ segment, layoverAfter }, index) => {
+    return legs.map(({ segment, layoverAfter, connectionMissing }, index) => {
       const window = resolved?.windows[index];
       const summary = buildLegSummary(
         segment,
@@ -206,6 +210,7 @@ export function buildFlightItinerarySummaries(
         ...summary,
         transitAirport: layoverAfter?.airport ?? null,
         transitLayoverMinutes: layoverAfter?.layoverMinutes ?? null,
+        connectionMissing: Boolean(connectionMissing),
       };
     });
   }
