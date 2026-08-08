@@ -151,6 +151,27 @@ function buildFlightBarAnchors(
     isTransit: false,
   });
 
+  // Keep short middle legs from stacking stop labels on top of each other.
+  const minGap = 8;
+  for (let index = 1; index < anchors.length; index += 1) {
+    const floor = anchors[index - 1].percent + minGap;
+    if (anchors[index].percent < floor) {
+      anchors[index] = {
+        ...anchors[index],
+        percent: Math.min(100 - minGap * (anchors.length - 1 - index), floor),
+      };
+    }
+  }
+  for (let index = anchors.length - 2; index >= 0; index -= 1) {
+    const ceiling = anchors[index + 1].percent - minGap;
+    if (anchors[index].percent > ceiling) {
+      anchors[index] = {
+        ...anchors[index],
+        percent: Math.max(minGap * index, ceiling),
+      };
+    }
+  }
+
   return anchors;
 }
 

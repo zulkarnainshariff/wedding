@@ -111,10 +111,8 @@ function normalizeSegmentIata(value?: string | null): string | null {
   return code && code.length === 3 ? code : null;
 }
 
-/** True for a real flight leg — excludes arrival-only stubs from "Add connecting segment". */
+/** True for a real flight leg — excludes pure layover stubs like `{ transit, airport }`. */
 export function isFlightLegSegment(segment: FlightSegment): boolean {
-  if (segment.transit) return false;
-
   const hasOrigin = Boolean(segment.fromIata?.trim() || segment.from?.trim());
   const hasDestination = Boolean(segment.toIata?.trim() || segment.to?.trim());
   const hasFlightNumber = Boolean(
@@ -123,13 +121,26 @@ export function isFlightLegSegment(segment: FlightSegment): boolean {
       segment.flightNumber?.trim(),
   );
 
-  return hasOrigin || (hasDestination && hasFlightNumber);
+  // A filled route/number wins over a leftover `transit` marker from older data.
+  if (hasOrigin || (hasDestination && hasFlightNumber)) {
+    return true;
+  }
+
+  return false;
 }
 
 export function prunePlaceholderFlightSegments(
   segments: FlightSegment[],
 ): FlightSegment[] {
-  return segments.filter((segment) => segment.transit || isFlightLegSegment(segment));
+  return segments
+    .filter((segment) => segment.transit || isFlightLegSegment(segment))
+    .map((segment) => {
+      if (!isFlightLegSegment(segment)) return segment;
+      if (!segment.transit && segment.airport == null) return segment;
+      // Drop layover-only fields that contaminate real flight legs.
+      const { transit: _transit, airport: _airport, ...leg } = segment;
+      return leg;
+    });
 }
 
 /** Last segment that ends at a connection or destination — skips arrival-only stubs. */
@@ -581,6 +592,8 @@ export type FlightLegDisplay = {
   segment: FlightSegment;
   segmentIndex: number;
   layoverAfter: FlightLegLayover | null;
+  /** True when the next leg does not depart from this leg’s arrival airport. */
+  connectionMissing?: boolean;
 };
 
 /** Flight legs only, with layovers derived from segment arrival → next departure. */
@@ -597,35 +610,48 @@ export function buildFlightLegDisplayList(
       segment,
       segmentIndex,
       layoverAfter: null,
+      connectionMissing: false,
     }));
   }
 
   const { windows } = resolved;
   return segments.map((segment, index) => {
     if (index >= windows.length - 1) {
-      return { segment, segmentIndex: index, layoverAfter: null };
+      return {
+        segment,
+        segmentIndex: index,
+        layoverAfter: null,
+        connectionMissing: false,
+      };
     }
 
     const current = windows[index];
     const next = windows[index + 1];
+    const currentAirport = segmentLabel(current.segment, "to");
+    const nextAirport = segmentLabel(next.segment, "from");
+    const airportsConnect =
+      Boolean(currentAirport) &&
+      Boolean(nextAirport) &&
+      currentAirport === nextAirport;
     const layoverMinutes = Math.round(
       (next.dep.getTime() - current.arr.getTime()) / 60_000,
     );
 
+    // Only show a transit pill when the legs actually meet at the same airport.
+    // A discontinuous chain (e.g. SLC arrival then LAX departure) means a
+    // missing middle flight — don't invent a multi-hour "TRANSIT LAX".
     return {
       segment,
       segmentIndex: index,
       layoverAfter:
-        layoverMinutes > 0
+        airportsConnect && layoverMinutes > 0
           ? {
-              airport:
-                current.toLabel === next.fromLabel
-                  ? current.toLabel
-                  : next.fromLabel,
+              airport: currentAirport,
               layoverMinutes: Math.max(1, layoverMinutes),
               departureAtMs: next.dep.getTime(),
             }
           : null,
+      connectionMissing: !airportsConnect,
     };
   });
 }

@@ -109,6 +109,12 @@ export function FlightItinerarySummary({
                   ) : null}
                 </span>
               </div>
+            ) : leg.connectionMissing ? (
+              <div className="flex items-center gap-2 px-1">
+                <span className="inline-flex flex-wrap items-center gap-x-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-800 max-md:whitespace-nowrap">
+                  Missing connecting flight
+                </span>
+              </div>
             ) : null}
           </div>
         ))}
