@@ -37,6 +37,9 @@ export async function GET(request: Request) {
   const untaggedPeople =
     searchParams.get("untaggedPeople") === "1" ||
     searchParams.get("untaggedPeople") === "true";
+  const peopleExact =
+    searchParams.get("peopleExact") === "1" ||
+    searchParams.get("peopleExact") === "true";
 
   const groupings = [
     ...new Set(
@@ -68,6 +71,7 @@ export async function GET(request: Request) {
       groupings,
       people,
       untaggedPeople,
+      peopleExact: !untaggedPeople && peopleExact,
       includePrivate: isAdmin,
     }),
     listGalleryAlbums(),

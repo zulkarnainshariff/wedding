@@ -19,6 +19,11 @@ export type GalleryListFilters = {
   people?: string[];
   /** When true, only photos with no people tags. */
   untaggedPeople?: boolean;
+  /**
+   * When true with `people`, require the photo's people set to match exactly
+   * (same names, same count — no extras, no subset).
+   */
+  peopleExact?: boolean;
   /** When false, private photos are excluded. Admins pass true. */
   includePrivate?: boolean;
 };
@@ -182,17 +187,32 @@ export async function listGalleryPhotos(filters: GalleryListFilters = {}) {
   if (filters.untaggedPeople) {
     result = result.filter((photo) => photo.tags.length === 0);
   } else if (peopleNeedles.length > 0) {
-    result = result.filter((photo) =>
-      peopleNeedles.some((needle) =>
-        photo.tags.some(
-          (tag) =>
-            tag.guestName.toLowerCase() === needle ||
-            tag.guestName.toLowerCase().includes(needle) ||
-            tag.username?.toLowerCase() === needle ||
-            tag.email?.toLowerCase() === needle,
+    if (filters.peopleExact) {
+      const wanted = new Set(peopleNeedles);
+      result = result.filter((photo) => {
+        const names = [
+          ...new Set(
+            photo.tags
+              .map((tag) => tag.guestName.trim().toLowerCase())
+              .filter(Boolean),
+          ),
+        ];
+        if (names.length !== wanted.size) return false;
+        return names.every((name) => wanted.has(name));
+      });
+    } else {
+      result = result.filter((photo) =>
+        peopleNeedles.some((needle) =>
+          photo.tags.some(
+            (tag) =>
+              tag.guestName.toLowerCase() === needle ||
+              tag.guestName.toLowerCase().includes(needle) ||
+              tag.username?.toLowerCase() === needle ||
+              tag.email?.toLowerCase() === needle,
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   const groupingNeedles = [
