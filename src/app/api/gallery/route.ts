@@ -34,6 +34,9 @@ export async function GET(request: Request) {
   const groupingsParam = searchParams.get("groupings") ?? searchParams.get("tags");
   const person = searchParams.get("person");
   const peopleParam = searchParams.get("people");
+  const untaggedPeople =
+    searchParams.get("untaggedPeople") === "1" ||
+    searchParams.get("untaggedPeople") === "true";
 
   const groupings = [
     ...new Set(
@@ -45,16 +48,18 @@ export async function GET(request: Request) {
       ].filter(Boolean),
     ),
   ];
-  const people = [
-    ...new Set(
-      [
-        ...(person ? [person] : []),
-        ...(peopleParam
-          ? peopleParam.split(",").map((entry) => entry.trim())
-          : []),
-      ].filter(Boolean),
-    ),
-  ];
+  const people = untaggedPeople
+    ? []
+    : [
+        ...new Set(
+          [
+            ...(person ? [person] : []),
+            ...(peopleParam
+              ? peopleParam.split(",").map((entry) => entry.trim())
+              : []),
+          ].filter(Boolean),
+        ),
+      ];
 
   const [photos, albums, filterOptions] = await Promise.all([
     listGalleryPhotos({
@@ -62,6 +67,7 @@ export async function GET(request: Request) {
       albumId: albumId ? Number(albumId) : undefined,
       groupings,
       people,
+      untaggedPeople,
       includePrivate: isAdmin,
     }),
     listGalleryAlbums(),

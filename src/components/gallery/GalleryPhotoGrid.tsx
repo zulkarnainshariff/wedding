@@ -986,6 +986,15 @@ export function GalleryPhotoCard({
 }) {
   const [expanded, setExpanded] = useState(false);
 
+  function handleImageClick() {
+    if (busy) return;
+    if (selectable) {
+      onSelectChange?.(!selected);
+      return;
+    }
+    setExpanded(true);
+  }
+
   return (
     <>
       <figure
@@ -1001,12 +1010,18 @@ export function GalleryPhotoCard({
             alt={photo.caption ?? photo.eventName}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-contain"
-            onClick={() => setExpanded(true)}
+            className={[
+              "h-full w-full object-contain",
+              selectable ? "cursor-pointer" : "cursor-zoom-in",
+            ].join(" ")}
+            onClick={handleImageClick}
             role="presentation"
           />
           {selectable ? (
-            <label className="absolute top-2 left-2 z-10 rounded-md bg-white/95 px-1.5 py-1 shadow-sm">
+            <label
+              className="absolute top-2 left-2 z-10 rounded-md bg-white/95 px-1.5 py-1 shadow-sm"
+              onClick={(event) => event.stopPropagation()}
+            >
               <input
                 type="checkbox"
                 checked={selected}

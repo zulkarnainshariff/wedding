@@ -74,6 +74,8 @@ export function GalleryManagementPanel({
   onPhotoUpdated,
   onPhotoRemoved,
   onAlbumsChange,
+  onGroupingsChange,
+  onTagRenamed,
   onAlbumMoveTagModeChange,
 }: {
   events: GalleryEvent[];
@@ -85,6 +87,8 @@ export function GalleryManagementPanel({
   onPhotoUpdated?: (photo: GalleryPhoto) => void;
   onPhotoRemoved?: (photoId: number) => void;
   onAlbumsChange?: (albums: GalleryAlbum[]) => void;
+  onGroupingsChange?: (groupings: string[]) => void;
+  onTagRenamed?: (from: string, to: string) => void;
   onAlbumMoveTagModeChange?: (mode: "ask" | "always" | "never") => void;
 }) {
   const toast = useToast();
@@ -92,6 +96,7 @@ export function GalleryManagementPanel({
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const [galleryEvents, setGalleryEvents] = useState<GalleryEvent[]>(events);
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
+  const [groupings, setGroupings] = useState<string[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [bulk, setBulk] = useState(EMPTY_BULK);
   const [newAlbumName, setNewAlbumName] = useState("");
@@ -100,9 +105,12 @@ export function GalleryManagementPanel({
   const [busy, setBusy] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [albumBusy, setAlbumBusy] = useState(false);
+  const [tagBusy, setTagBusy] = useState(false);
   const [moveTagMode, setMoveTagMode] = useState(albumMoveTagMode);
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
   const [editingAlbumName, setEditingAlbumName] = useState("");
+  const [editingTagName, setEditingTagName] = useState<string | null>(null);
+  const [editingTagValue, setEditingTagValue] = useState("");
 
   const loadPhotos = useCallback(async () => {
     setLoading(!compact);
@@ -116,6 +124,7 @@ export function GalleryManagementPanel({
         photos: GalleryPhoto[];
         events: GalleryEvent[];
         albums: GalleryAlbum[];
+        groupings?: string[];
         albumMoveTagMode?: "ask" | "always" | "never";
       };
       if (!compact) setPhotos(data.photos ?? []);
@@ -123,6 +132,9 @@ export function GalleryManagementPanel({
       const nextAlbums = data.albums ?? [];
       setAlbums(nextAlbums);
       onAlbumsChange?.(nextAlbums);
+      const nextGroupings = data.groupings ?? [];
+      setGroupings(nextGroupings);
+      onGroupingsChange?.(nextGroupings);
       if (data.albumMoveTagMode) {
         setMoveTagMode(data.albumMoveTagMode);
         onAlbumMoveTagModeChange?.(data.albumMoveTagMode);
@@ -132,7 +144,7 @@ export function GalleryManagementPanel({
     } finally {
       setLoading(false);
     }
-  }, [compact, onAlbumMoveTagModeChange, onAlbumsChange, toast]);
+  }, [compact, onAlbumMoveTagModeChange, onAlbumsChange, onGroupingsChange, toast]);
 
   useEffect(() => {
     void loadPhotos();
@@ -454,6 +466,52 @@ export function GalleryManagementPanel({
     }
   }
 
+  async function renameTag(from: string) {
+    const to = editingTagValue.trim();
+    if (!to) {
+      toast.error("Enter a tag name.");
+      return;
+    }
+    setTagBusy(true);
+    try {
+      const response = await fetch("/api/gallery/tags", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        groupings?: string[];
+      };
+      if (!response.ok) {
+        toast.error(body.error ?? "Could not rename tag.");
+        return;
+      }
+      if (body.groupings) {
+        setGroupings(body.groupings);
+        onGroupingsChange?.(body.groupings);
+      }
+      setPhotos((current) =>
+        current.map((photo) => ({
+          ...photo,
+          groupings: [
+            ...new Set(
+              (photo.groupings ?? []).map((tag) => (tag === from ? to : tag)),
+            ),
+          ],
+        })),
+      );
+      onTagRenamed?.(from, to);
+      setEditingTagName(null);
+      setEditingTagValue("");
+      toast.success("Tag renamed.");
+    } catch {
+      toast.error("Could not rename tag.");
+    } finally {
+      setTagBusy(false);
+    }
+  }
+
   const albumManager = (
     <div className="grid gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-[1fr_auto]">
       <div className="sm:col-span-2">
@@ -534,6 +592,76 @@ export function GalleryManagementPanel({
           ))}
         </ul>
       ) : null}
+    </div>
+  );
+
+  const tagsManager = (
+    <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
+      <div>
+        <p className="text-sm font-medium text-stone-700">Tags</p>
+        <p className="mt-1 text-xs text-stone-500">
+          Rename group tags used across gallery photos.
+        </p>
+      </div>
+      {groupings.length === 0 ? (
+        <p className="text-xs text-stone-500">No tags yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {groupings.map((tag) => (
+            <li
+              key={tag}
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2"
+            >
+              {editingTagName === tag ? (
+                <>
+                  <input
+                    value={editingTagValue}
+                    onChange={(e) => setEditingTagValue(e.target.value)}
+                    className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    disabled={tagBusy}
+                    onClick={() => void renameTag(tag)}
+                    className="rounded-lg bg-brand-deep px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    disabled={tagBusy}
+                    onClick={() => {
+                      setEditingTagName(null);
+                      setEditingTagValue("");
+                    }}
+                    className="rounded-lg border border-stone-200 px-3 py-1.5 text-xs text-stone-600"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 text-sm text-stone-700">
+                    {tag}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={tagBusy}
+                    onClick={() => {
+                      setEditingTagName(tag);
+                      setEditingTagValue(tag);
+                    }}
+                    className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
+                  >
+                    Rename
+                  </button>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 
@@ -847,6 +975,7 @@ export function GalleryManagementPanel({
     return (
       <div className="space-y-4">
         {albumManager}
+        {tagsManager}
         {addForm}
         {bulkForm}
       </div>
@@ -874,6 +1003,7 @@ export function GalleryManagementPanel({
       ) : (
         <div className="space-y-4">
           {albumManager}
+          {tagsManager}
           {bulkForm}
           {addForm}
         </div>
