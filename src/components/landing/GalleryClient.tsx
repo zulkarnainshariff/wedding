@@ -66,6 +66,8 @@ export function GalleryClient({
   const [albumFilter, setAlbumFilter] = useState("");
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [peopleFilters, setPeopleFilters] = useState<string[]>([]);
+  /** "" = any-of selected, "untagged" = no grouping tags */
+  const [tagsMode, setTagsMode] = useState<"" | "untagged">("");
   /** "" = any-of selected, "exact" = only those people, "untagged" = no people tags */
   const [peopleMode, setPeopleMode] = useState<"" | "exact" | "untagged">("");
   const [events, setEvents] = useState<{ id: number; name: string }[]>([]);
@@ -79,9 +81,10 @@ export function GalleryClient({
 
   const isAdmin = Boolean(user?.isAdmin);
   const galleryVisible = enabled || isAdmin;
+  const untaggedTagsOnly = tagsMode === "untagged";
   const untaggedPeopleOnly = peopleMode === "untagged";
   const peopleExact = peopleMode === "exact";
-  const filterKey = `${eventFilter}|${albumFilter}|${tagFilters.join(",")}|${peopleFilters.join(",")}|${peopleMode}`;
+  const filterKey = `${eventFilter}|${albumFilter}|${tagFilters.join(",")}|${peopleFilters.join(",")}|${tagsMode}|${peopleMode}`;
 
   const peopleOptions = useMemo(
     () =>
@@ -105,7 +108,11 @@ export function GalleryClient({
     const params = new URLSearchParams();
     if (eventFilter) params.set("eventId", eventFilter);
     if (albumFilter) params.set("albumId", albumFilter);
-    if (tagFilters.length > 0) params.set("tags", tagFilters.join(","));
+    if (untaggedTagsOnly) {
+      params.set("untaggedGroupings", "1");
+    } else if (tagFilters.length > 0) {
+      params.set("tags", tagFilters.join(","));
+    }
     if (untaggedPeopleOnly) {
       params.set("untaggedPeople", "1");
     } else if (peopleFilters.length > 0) {
@@ -137,7 +144,9 @@ export function GalleryClient({
     albumFilter,
     tagFilters,
     peopleFilters,
+    tagsMode,
     peopleMode,
+    untaggedTagsOnly,
     untaggedPeopleOnly,
     peopleExact,
   ]);
@@ -201,6 +210,7 @@ export function GalleryClient({
               onAlbumMoveTagModeChange={setAlbumMoveTagMode}
               onAlbumsChange={setAlbums}
               onGroupingsChange={setGroupings}
+              onPeopleChange={setPeople}
               onTagRenamed={(from, to) => {
                 setPhotos((current) =>
                   current.map((photo) => ({
@@ -217,6 +227,32 @@ export function GalleryClient({
                 setTagFilters((current) => [
                   ...new Set(
                     current.map((tag) => (tag === from ? to : tag)),
+                  ),
+                ]);
+              }}
+              onPersonRenamed={(from, to) => {
+                setPhotos((current) =>
+                  current.map((photo) => ({
+                    ...photo,
+                    tags: (() => {
+                      const renamed = photo.tags.map((tag) =>
+                        tag.guestName === from
+                          ? { ...tag, guestName: to }
+                          : tag,
+                      );
+                      const seen = new Set<string>();
+                      return renamed.filter((tag) => {
+                        const key = tag.guestName.toLowerCase();
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                      });
+                    })(),
+                  })),
+                );
+                setPeopleFilters((current) => [
+                  ...new Set(
+                    current.map((name) => (name === from ? to : name)),
                   ),
                 ]);
               }}
@@ -266,7 +302,19 @@ export function GalleryClient({
                   ))}
                 </select>
               )}
-              {tagOptions.length > 0 && (
+              <select
+                value={tagsMode}
+                onChange={(e) => {
+                  const next = e.target.value as "" | "untagged";
+                  setTagsMode(next);
+                  if (next === "untagged") setTagFilters([]);
+                }}
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm"
+              >
+                <option value="">Select tags</option>
+                <option value="untagged">No tags</option>
+              </select>
+              {!untaggedTagsOnly && tagOptions.length > 0 && (
                 <MultiSelectFilter
                   label="Tags"
                   emptyLabel="All tags"

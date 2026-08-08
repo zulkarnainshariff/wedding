@@ -75,7 +75,9 @@ export function GalleryManagementPanel({
   onPhotoRemoved,
   onAlbumsChange,
   onGroupingsChange,
+  onPeopleChange,
   onTagRenamed,
+  onPersonRenamed,
   onAlbumMoveTagModeChange,
 }: {
   events: GalleryEvent[];
@@ -88,7 +90,9 @@ export function GalleryManagementPanel({
   onPhotoRemoved?: (photoId: number) => void;
   onAlbumsChange?: (albums: GalleryAlbum[]) => void;
   onGroupingsChange?: (groupings: string[]) => void;
+  onPeopleChange?: (people: GalleryPersonFilterOption[]) => void;
   onTagRenamed?: (from: string, to: string) => void;
+  onPersonRenamed?: (from: string, to: string) => void;
   onAlbumMoveTagModeChange?: (mode: "ask" | "always" | "never") => void;
 }) {
   const toast = useToast();
@@ -97,6 +101,7 @@ export function GalleryManagementPanel({
   const [galleryEvents, setGalleryEvents] = useState<GalleryEvent[]>(events);
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
   const [groupings, setGroupings] = useState<string[]>([]);
+  const [peopleNames, setPeopleNames] = useState<string[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [bulk, setBulk] = useState(EMPTY_BULK);
   const [newAlbumName, setNewAlbumName] = useState("");
@@ -106,11 +111,16 @@ export function GalleryManagementPanel({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [albumBusy, setAlbumBusy] = useState(false);
   const [tagBusy, setTagBusy] = useState(false);
+  const [personBusy, setPersonBusy] = useState(false);
   const [moveTagMode, setMoveTagMode] = useState(albumMoveTagMode);
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
   const [editingAlbumName, setEditingAlbumName] = useState("");
   const [editingTagName, setEditingTagName] = useState<string | null>(null);
   const [editingTagValue, setEditingTagValue] = useState("");
+  const [editingPersonName, setEditingPersonName] = useState<string | null>(
+    null,
+  );
+  const [editingPersonValue, setEditingPersonValue] = useState("");
 
   const loadPhotos = useCallback(async () => {
     setLoading(!compact);
@@ -125,6 +135,7 @@ export function GalleryManagementPanel({
         events: GalleryEvent[];
         albums: GalleryAlbum[];
         groupings?: string[];
+        people?: GalleryPersonFilterOption[] | string[];
         albumMoveTagMode?: "ask" | "always" | "never";
       };
       if (!compact) setPhotos(data.photos ?? []);
@@ -135,6 +146,28 @@ export function GalleryManagementPanel({
       const nextGroupings = data.groupings ?? [];
       setGroupings(nextGroupings);
       onGroupingsChange?.(nextGroupings);
+      const nextPeople = (data.people ?? [])
+        .map((entry) => {
+          if (typeof entry === "string") {
+            return {
+              guestName: entry,
+              email: null,
+              userId: null,
+              username: null,
+              label: entry,
+            } satisfies GalleryPersonFilterOption;
+          }
+          return {
+            guestName: entry.guestName,
+            email: entry.email ?? null,
+            userId: entry.userId ?? null,
+            username: entry.username ?? null,
+            label: entry.label || entry.guestName,
+          } satisfies GalleryPersonFilterOption;
+        })
+        .filter((entry) => entry.guestName.trim());
+      setPeopleNames(nextPeople.map((person) => person.guestName));
+      onPeopleChange?.(nextPeople);
       if (data.albumMoveTagMode) {
         setMoveTagMode(data.albumMoveTagMode);
         onAlbumMoveTagModeChange?.(data.albumMoveTagMode);
@@ -144,7 +177,14 @@ export function GalleryManagementPanel({
     } finally {
       setLoading(false);
     }
-  }, [compact, onAlbumMoveTagModeChange, onAlbumsChange, onGroupingsChange, toast]);
+  }, [
+    compact,
+    onAlbumMoveTagModeChange,
+    onAlbumsChange,
+    onGroupingsChange,
+    onPeopleChange,
+    toast,
+  ]);
 
   useEffect(() => {
     void loadPhotos();
@@ -512,6 +552,74 @@ export function GalleryManagementPanel({
     }
   }
 
+  async function renamePerson(from: string) {
+    const to = editingPersonValue.trim();
+    if (!to) {
+      toast.error("Enter a person name.");
+      return;
+    }
+    setPersonBusy(true);
+    try {
+      const response = await fetch("/api/gallery/people", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        people?: GalleryPersonFilterOption[];
+      };
+      if (!response.ok) {
+        toast.error(body.error ?? "Could not rename person.");
+        return;
+      }
+      if (body.people) {
+        const nextPeople = body.people.map((person) => ({
+          guestName: person.guestName,
+          email: person.email ?? null,
+          userId: person.userId ?? null,
+          username: person.username ?? null,
+          label: person.label || person.guestName,
+        }));
+        setPeopleNames(nextPeople.map((person) => person.guestName));
+        onPeopleChange?.(nextPeople);
+      } else {
+        setPeopleNames((current) =>
+          [
+            ...new Set(
+              current.map((name) => (name === from ? to : name)),
+            ),
+          ].sort((a, b) => a.localeCompare(b)),
+        );
+      }
+      setPhotos((current) =>
+        current.map((photo) => ({
+          ...photo,
+          tags: (() => {
+            const renamed = photo.tags.map((tag) =>
+              tag.guestName === from ? { ...tag, guestName: to } : tag,
+            );
+            const seen = new Set<string>();
+            return renamed.filter((tag) => {
+              const key = tag.guestName.toLowerCase();
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+          })(),
+        })),
+      );
+      onPersonRenamed?.(from, to);
+      setEditingPersonName(null);
+      setEditingPersonValue("");
+      toast.success("Person renamed.");
+    } catch {
+      toast.error("Could not rename person.");
+    } finally {
+      setPersonBusy(false);
+    }
+  }
+
   const albumManager = (
     <div className="grid gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-[1fr_auto]">
       <div className="sm:col-span-2">
@@ -651,6 +759,76 @@ export function GalleryManagementPanel({
                     onClick={() => {
                       setEditingTagName(tag);
                       setEditingTagValue(tag);
+                    }}
+                    className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
+                  >
+                    Rename
+                  </button>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
+  const peopleManager = (
+    <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
+      <div>
+        <p className="text-sm font-medium text-stone-700">People</p>
+        <p className="mt-1 text-xs text-stone-500">
+          Rename people names used across gallery photos (for typos or updates).
+        </p>
+      </div>
+      {peopleNames.length === 0 ? (
+        <p className="text-xs text-stone-500">No people tagged yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {peopleNames.map((name) => (
+            <li
+              key={name}
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2"
+            >
+              {editingPersonName === name ? (
+                <>
+                  <input
+                    value={editingPersonValue}
+                    onChange={(e) => setEditingPersonValue(e.target.value)}
+                    className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    disabled={personBusy}
+                    onClick={() => void renamePerson(name)}
+                    className="rounded-lg bg-brand-deep px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    disabled={personBusy}
+                    onClick={() => {
+                      setEditingPersonName(null);
+                      setEditingPersonValue("");
+                    }}
+                    className="rounded-lg border border-stone-200 px-3 py-1.5 text-xs text-stone-600"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 text-sm text-stone-700">
+                    {name}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={personBusy}
+                    onClick={() => {
+                      setEditingPersonName(name);
+                      setEditingPersonValue(name);
                     }}
                     className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
                   >
@@ -976,6 +1154,7 @@ export function GalleryManagementPanel({
       <div className="space-y-4">
         {albumManager}
         {tagsManager}
+        {peopleManager}
         {addForm}
         {bulkForm}
       </div>
@@ -1004,6 +1183,7 @@ export function GalleryManagementPanel({
         <div className="space-y-4">
           {albumManager}
           {tagsManager}
+          {peopleManager}
           {bulkForm}
           {addForm}
         </div>

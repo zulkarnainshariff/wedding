@@ -19,6 +19,8 @@ export type GalleryListFilters = {
   people?: string[];
   /** When true, only photos with no people tags. */
   untaggedPeople?: boolean;
+  /** When true, only photos with no grouping tags. */
+  untaggedGroupings?: boolean;
   /**
    * When true with `people`, require the photo's people set to match exactly
    * (same names, same count — no extras, no subset).
@@ -225,7 +227,9 @@ export async function listGalleryPhotos(filters: GalleryListFilters = {}) {
         .filter(Boolean),
     ),
   ];
-  if (groupingNeedles.length > 0) {
+  if (filters.untaggedGroupings) {
+    result = result.filter((photo) => photo.groupings.length === 0);
+  } else if (groupingNeedles.length > 0) {
     result = result.filter((photo) =>
       groupingNeedles.some((needle) =>
         photo.groupings.some(
@@ -483,6 +487,81 @@ export async function renameGalleryGrouping(from: string, to: string) {
   }
 
   return { renamed: existing.length, grouping: newName };
+}
+
+/** Rename a people tag name across all photos. Merges if the new name already exists on a photo. */
+export async function renameGalleryPeopleName(from: string, to: string) {
+  const oldName = from.trim();
+  const newName = to.trim();
+  if (!oldName || !newName) {
+    throw new Error("Both current and new people names are required.");
+  }
+  if (oldName === newName) {
+    return { renamed: 0, guestName: newName };
+  }
+
+  const existing = await db
+    .select({
+      photoId: galleryPhotoTags.photoId,
+      guestName: galleryPhotoTags.guestName,
+      email: galleryPhotoTags.email,
+      userId: galleryPhotoTags.userId,
+    })
+    .from(galleryPhotoTags)
+    .where(eq(galleryPhotoTags.guestName, oldName));
+
+  if (existing.length === 0) {
+    return { renamed: 0, guestName: newName };
+  }
+
+  const alreadyHaveNew = await db
+    .select({
+      photoId: galleryPhotoTags.photoId,
+      email: galleryPhotoTags.email,
+      userId: galleryPhotoTags.userId,
+    })
+    .from(galleryPhotoTags)
+    .where(eq(galleryPhotoTags.guestName, newName));
+  const haveNew = new Map(
+    alreadyHaveNew.map((row) => [row.photoId, row] as const),
+  );
+
+  await db
+    .delete(galleryPhotoTags)
+    .where(eq(galleryPhotoTags.guestName, oldName));
+
+  const toInsert = existing
+    .filter((row) => !haveNew.has(row.photoId))
+    .map((row) => ({
+      photoId: row.photoId,
+      guestName: newName,
+      email: row.email,
+      userId: row.userId,
+    }));
+
+  if (toInsert.length > 0) {
+    await db.insert(galleryPhotoTags).values(toInsert);
+  }
+
+  // When a photo already had both names, keep the surviving row but fill gaps.
+  for (const row of existing) {
+    const current = haveNew.get(row.photoId);
+    if (!current) continue;
+    const nextEmail = current.email?.trim() || row.email || null;
+    const nextUserId = current.userId ?? row.userId ?? null;
+    if (nextEmail === current.email && nextUserId === current.userId) continue;
+    await db
+      .update(galleryPhotoTags)
+      .set({ email: nextEmail, userId: nextUserId })
+      .where(
+        and(
+          eq(galleryPhotoTags.photoId, row.photoId),
+          eq(galleryPhotoTags.guestName, newName),
+        ),
+      );
+  }
+
+  return { renamed: existing.length, guestName: newName };
 }
 
 export async function bulkUpdateGalleryPhotos(options: {
