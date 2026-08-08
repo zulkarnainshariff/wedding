@@ -1,10 +1,22 @@
-export const GALLERY_PAGE_SIZE = 36;
+export const GALLERY_PAGE_SIZE = 24;
 
 export function photoPreviewUrl(photo: {
   url: string;
   thumbUrl?: string | null;
 }): string {
   return photo.thumbUrl?.trim() || photo.url;
+}
+
+/** Prefer album name alone when it matches the event name. */
+export function photoLocationLabel(photo: {
+  albumName?: string | null;
+  eventName: string;
+}): string {
+  const album = photo.albumName?.trim() ?? "";
+  const event = photo.eventName.trim();
+  if (album && album.toLowerCase() === event.toLowerCase()) return album;
+  if (album) return `${album} · ${event}`;
+  return event;
 }
 
 export function parseGuestNames(input: string): { guestName: string }[] {

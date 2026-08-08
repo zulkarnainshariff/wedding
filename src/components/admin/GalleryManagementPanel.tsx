@@ -101,6 +101,8 @@ export function GalleryManagementPanel({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [albumBusy, setAlbumBusy] = useState(false);
   const [moveTagMode, setMoveTagMode] = useState(albumMoveTagMode);
+  const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
+  const [editingAlbumName, setEditingAlbumName] = useState("");
 
   const loadPhotos = useCallback(async () => {
     setLoading(!compact);
@@ -415,13 +417,49 @@ export function GalleryManagementPanel({
     }
   }
 
+  async function renameAlbum(albumId: number) {
+    const name = editingAlbumName.trim();
+    if (!name) {
+      toast.error("Enter an album name.");
+      return;
+    }
+    setAlbumBusy(true);
+    try {
+      const response = await fetch(`/api/gallery/albums/${albumId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        albums?: GalleryAlbum[];
+      };
+      if (!response.ok) {
+        toast.error(body.error ?? "Could not rename album.");
+        return;
+      }
+      if (body.albums) syncAlbums(body.albums);
+      setPhotos((current) =>
+        current.map((photo) =>
+          photo.albumId === albumId ? { ...photo, albumName: name } : photo,
+        ),
+      );
+      setEditingAlbumId(null);
+      setEditingAlbumName("");
+      toast.success("Album renamed.");
+    } catch {
+      toast.error("Could not rename album.");
+    } finally {
+      setAlbumBusy(false);
+    }
+  }
+
   const albumManager = (
     <div className="grid gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-[1fr_auto]">
       <div className="sm:col-span-2">
         <p className="text-sm font-medium text-stone-700">Albums</p>
         <p className="mt-1 text-xs text-stone-500">
-          Create albums here, then move photos individually or with multi-select
-          in the grid below.
+          Create or rename albums here, then move photos from the Photos tab.
         </p>
       </div>
       <input
@@ -440,9 +478,61 @@ export function GalleryManagementPanel({
         {albumBusy ? "Creating…" : "Create album"}
       </button>
       {albums.length > 0 ? (
-        <p className="text-xs text-stone-500 sm:col-span-2">
-          {albums.map((album) => album.name).join(" · ")}
-        </p>
+        <ul className="space-y-2 sm:col-span-2">
+          {albums.map((album) => (
+            <li
+              key={album.id}
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2"
+            >
+              {editingAlbumId === album.id ? (
+                <>
+                  <input
+                    value={editingAlbumName}
+                    onChange={(e) => setEditingAlbumName(e.target.value)}
+                    className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    disabled={albumBusy}
+                    onClick={() => void renameAlbum(album.id)}
+                    className="rounded-lg bg-brand-deep px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    disabled={albumBusy}
+                    onClick={() => {
+                      setEditingAlbumId(null);
+                      setEditingAlbumName("");
+                    }}
+                    className="rounded-lg border border-stone-200 px-3 py-1.5 text-xs text-stone-600"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 text-sm text-stone-700">
+                    {album.name}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={albumBusy}
+                    onClick={() => {
+                      setEditingAlbumId(album.id);
+                      setEditingAlbumName(album.name);
+                    }}
+                    className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
+                  >
+                    Rename
+                  </button>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
       ) : null}
     </div>
   );
@@ -555,7 +645,9 @@ export function GalleryManagementPanel({
         />
       </label>
       <label className="block text-sm">
-        <span className="mb-1 block text-stone-500">Groupings (optional)</span>
+        <span className="mb-1 block text-stone-500">
+          Tags (optional, comma-separated)
+        </span>
         <input
           value={form.groupings}
           onChange={(e) =>
@@ -699,7 +791,9 @@ export function GalleryManagementPanel({
         />
       </label>
       <label className="block text-sm">
-        <span className="mb-1 block text-stone-500">Groupings (optional)</span>
+        <span className="mb-1 block text-stone-500">
+          Tags (optional, comma-separated)
+        </span>
         <input
           value={bulk.groupings}
           onChange={(e) =>
@@ -765,7 +859,7 @@ export function GalleryManagementPanel({
         <h3 className="font-serif text-lg text-brand-deep">Photo gallery</h3>
         <p className="mt-1 text-sm text-stone-500">
           Upload photos in bulk (including zip files), organise them into albums,
-          and tag people or groupings. Photos appear on{" "}
+          and tag people. Photos appear on{" "}
           <code className="text-xs">/gallery</code>
           {!photoGalleryEnabled
             ? ". Enable the gallery under Public features when you are ready to go live."

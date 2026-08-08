@@ -8,6 +8,7 @@ import {
   formatCommaList,
   GALLERY_PAGE_SIZE,
   parseCommaList,
+  photoLocationLabel,
   photoPreviewUrl,
 } from "@/lib/gallery-photo-utils";
 import type {
@@ -83,85 +84,140 @@ function photoToForm(photo: GalleryPhoto): PhotoFormState {
 function PeopleTagsEditor({
   people,
   users,
+  knownNames,
   onChange,
 }: {
   people: PeopleTagDraft[];
   users: BriefUser[];
+  knownNames: string[];
   onChange: (people: PeopleTagDraft[]) => void;
 }) {
+  const nameOptions = useMemo(() => {
+    const set = new Set(knownNames.map((name) => name.trim()).filter(Boolean));
+    for (const row of people) {
+      if (row.guestName.trim()) set.add(row.guestName.trim());
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [knownNames, people]);
+
   return (
     <div className="space-y-3">
-      <span className="block text-sm text-stone-500">People tags</span>
-      {people.map((row, index) => (
-        <div
-          key={index}
-          className="grid gap-2 rounded-lg border border-stone-100 bg-stone-50/80 p-3 sm:grid-cols-2"
-        >
-          <label className="block text-sm sm:col-span-2">
-            <span className="mb-1 block text-xs text-stone-500">Name</span>
-            <input
-              value={row.guestName}
-              onChange={(e) => {
-                const next = [...people];
-                next[index] = { ...row, guestName: e.target.value };
-                onChange(next);
-              }}
-              placeholder="Celia"
-              className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs text-stone-500">
-              Email (optional)
-            </span>
-            <input
-              type="email"
-              value={row.email}
-              onChange={(e) => {
-                const next = [...people];
-                next[index] = { ...row, email: e.target.value, userId: "" };
-                onChange(next);
-              }}
-              placeholder="name@example.com"
-              className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs text-stone-500">
-              Linked user (optional)
-            </span>
-            <select
-              value={row.userId}
-              onChange={(e) => {
-                const next = [...people];
-                next[index] = {
-                  ...row,
-                  userId: e.target.value,
-                  email: e.target.value ? "" : row.email,
-                };
-                onChange(next);
-              }}
-              className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2"
-            >
-              <option value="">Not linked</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  @{user.username}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="sm:col-span-2">
-            <button
-              type="button"
-              onClick={() => onChange(people.filter((_, i) => i !== index))}
-              className="text-xs text-stone-500 hover:text-red-600"
-            >
-              Remove person
-            </button>
+      <span className="block text-sm text-stone-500">People</span>
+      {people.map((row, index) => {
+        const hasEmail = Boolean(row.email.trim());
+        const hasUser = Boolean(row.userId);
+        return (
+          <div
+            key={index}
+            className="grid gap-2 rounded-lg border border-stone-100 bg-stone-50/80 p-3 sm:grid-cols-2"
+          >
+            <label className="block text-sm sm:col-span-2">
+              <span className="mb-1 block text-xs text-stone-500">
+                Name (select or type new)
+              </span>
+              <input
+                list={`gallery-people-names-${index}`}
+                value={row.guestName}
+                onChange={(e) => {
+                  const next = [...people];
+                  next[index] = { ...row, guestName: e.target.value };
+                  onChange(next);
+                }}
+                placeholder="Name"
+                className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2"
+              />
+              <datalist id={`gallery-people-names-${index}`}>
+                {nameOptions.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+              {nameOptions.length > 0 ? (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const picked = e.target.value;
+                    if (!picked) return;
+                    const next = [...people];
+                    next[index] = { ...row, guestName: picked };
+                    onChange(next);
+                  }}
+                  className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">Choose existing name…</option>
+                  {nameOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs text-stone-500">
+                Email (optional)
+              </span>
+              <input
+                type="email"
+                value={row.email}
+                disabled={hasUser}
+                onChange={(e) => {
+                  const next = [...people];
+                  next[index] = {
+                    ...row,
+                    email: e.target.value,
+                    userId: "",
+                  };
+                  onChange(next);
+                }}
+                placeholder="name@example.com"
+                className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs text-stone-500">
+                Linked user (optional)
+              </span>
+              <select
+                value={row.userId}
+                disabled={hasEmail}
+                onChange={(e) => {
+                  const userId = e.target.value;
+                  const matched = users.find(
+                    (user) => String(user.id) === userId,
+                  );
+                  const next = [...people];
+                  next[index] = {
+                    ...row,
+                    userId,
+                    email: "",
+                    guestName: matched
+                      ? matched.username
+                      : row.guestName,
+                  };
+                  onChange(next);
+                }}
+                className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400"
+              >
+                <option value="">Not linked</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    @{user.username}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="sm:col-span-2">
+              <button
+                type="button"
+                onClick={() => onChange(people.filter((_, i) => i !== index))}
+                className="text-xs text-stone-500 hover:text-red-600"
+              >
+                Remove person
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       <button
         type="button"
         onClick={() =>
@@ -181,6 +237,7 @@ function GalleryPhotoEditDialog({
   events,
   albums,
   users,
+  knownPeopleNames,
   busy,
   onClose,
   onSave,
@@ -189,6 +246,7 @@ function GalleryPhotoEditDialog({
   events: GalleryEvent[];
   albums: GalleryAlbum[];
   users: BriefUser[];
+  knownPeopleNames: string[];
   busy: boolean;
   onClose: () => void;
   onSave: (form: PhotoFormState) => void;
@@ -210,140 +268,154 @@ function GalleryPhotoEditDialog({
     >
       <div className="absolute inset-0 bg-stone-900/45 backdrop-blur-[2px]" />
       <div
-        className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
+        className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="gallery-edit-title"
       >
-        <h2 id="gallery-edit-title" className="font-serif text-xl text-brand-deep">
-          Edit photo
-        </h2>
-        <div className="mt-4 grid gap-4">
-          <label className="block text-sm">
-            <span className="mb-1 block text-stone-500">Event</span>
-            <select
-              value={form.eventId}
-              onChange={(e) =>
-                setForm((current) => ({ ...current, eventId: e.target.value }))
-              }
-              className="w-full rounded-lg border border-stone-200 px-3 py-2"
-            >
-              {events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-stone-500">Album</span>
-            <select
-              value={form.albumId}
-              onChange={(e) =>
-                setForm((current) => ({
-                  ...current,
-                  albumId: e.target.value,
-                  albumName: "",
-                }))
-              }
-              className="w-full rounded-lg border border-stone-200 px-3 py-2"
-            >
-              <option value="">No album</option>
-              {albums.map((album) => (
-                <option key={album.id} value={album.id}>
-                  {album.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {!form.albumId ? (
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-6 pb-4">
+          <h2
+            id="gallery-edit-title"
+            className="font-serif text-xl text-brand-deep"
+          >
+            Edit photo
+          </h2>
+          <div className="mt-4 grid gap-4">
             <label className="block text-sm">
-              <span className="mb-1 block text-stone-500">Or create album</span>
-              <input
-                value={form.albumName}
+              <span className="mb-1 block text-stone-500">Event</span>
+              <select
+                value={form.eventId}
                 onChange={(e) =>
                   setForm((current) => ({
                     ...current,
-                    albumName: e.target.value,
+                    eventId: e.target.value,
                   }))
                 }
-                placeholder="New album name"
                 className="w-full rounded-lg border border-stone-200 px-3 py-2"
-              />
+              >
+                {events.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {event.name}
+                  </option>
+                ))}
+              </select>
             </label>
-          ) : null}
-          {!isUploaded ? (
             <label className="block text-sm">
-              <span className="mb-1 block text-stone-500">Photo URL</span>
-              <input
-                type="url"
-                value={form.url}
+              <span className="mb-1 block text-stone-500">Album</span>
+              <select
+                value={form.albumId}
                 onChange={(e) =>
-                  setForm((current) => ({ ...current, url: e.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    albumId: e.target.value,
+                    albumName: "",
+                  }))
+                }
+                className="w-full rounded-lg border border-stone-200 px-3 py-2"
+              >
+                <option value="">No album</option>
+                {albums.map((album) => (
+                  <option key={album.id} value={album.id}>
+                    {album.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {!form.albumId ? (
+              <label className="block text-sm">
+                <span className="mb-1 block text-stone-500">Or create album</span>
+                <input
+                  value={form.albumName}
+                  onChange={(e) =>
+                    setForm((current) => ({
+                      ...current,
+                      albumName: e.target.value,
+                    }))
+                  }
+                  placeholder="New album name"
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                />
+              </label>
+            ) : null}
+            {!isUploaded ? (
+              <label className="block text-sm">
+                <span className="mb-1 block text-stone-500">Photo URL</span>
+                <input
+                  type="url"
+                  value={form.url}
+                  onChange={(e) =>
+                    setForm((current) => ({ ...current, url: e.target.value }))
+                  }
+                  className="w-full rounded-lg border border-stone-200 px-3 py-2"
+                />
+              </label>
+            ) : (
+              <p className="rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-500">
+                Uploaded file — URL cannot be changed. Reassign the album or tags
+                below.
+              </p>
+            )}
+            <label className="block text-sm">
+              <span className="mb-1 block text-stone-500">Caption (optional)</span>
+              <input
+                value={form.caption}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    caption: e.target.value,
+                  }))
                 }
                 className="w-full rounded-lg border border-stone-200 px-3 py-2"
               />
             </label>
-          ) : (
-            <p className="rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-500">
-              Uploaded file — URL cannot be changed. Reassign the album or tags
-              below.
-            </p>
-          )}
-          <label className="block text-sm">
-            <span className="mb-1 block text-stone-500">Caption (optional)</span>
-            <input
-              value={form.caption}
-              onChange={(e) =>
-                setForm((current) => ({ ...current, caption: e.target.value }))
-              }
-              className="w-full rounded-lg border border-stone-200 px-3 py-2"
-            />
-          </label>
-          <label className="flex items-start gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-3 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={form.isPrivate}
-              onChange={(e) =>
-                setForm((current) => ({
-                  ...current,
-                  isPrivate: e.target.checked,
-                }))
-              }
-            />
-            <span>
-              <span className="font-medium text-stone-800">Private</span>
-              <span className="mt-0.5 block text-xs text-stone-500">
-                Hidden when not logged in as admin. Only admins can see private
-                photos.
+            <label className="flex items-start gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={form.isPrivate}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    isPrivate: e.target.checked,
+                  }))
+                }
+              />
+              <span>
+                <span className="font-medium text-stone-800">Private</span>
+                <span className="mt-0.5 block text-xs text-stone-500">
+                  Hidden when not logged in as admin. Only admins can see private
+                  photos.
+                </span>
               </span>
-            </span>
-          </label>
-          <PeopleTagsEditor
-            people={form.people}
-            users={users}
-            onChange={(people) =>
-              setForm((current) => ({ ...current, people }))
-            }
-          />
-          <label className="block text-sm">
-            <span className="mb-1 block text-stone-500">Groupings</span>
-            <input
-              value={form.groupings}
-              onChange={(e) =>
-                setForm((current) => ({
-                  ...current,
-                  groupings: e.target.value,
-                }))
+            </label>
+            <PeopleTagsEditor
+              people={form.people}
+              users={users}
+              knownNames={knownPeopleNames}
+              onChange={(people) =>
+                setForm((current) => ({ ...current, people }))
               }
-              placeholder="Family, Bridal party"
-              className="w-full rounded-lg border border-stone-200 px-3 py-2"
             />
-          </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-stone-500">
+                Tags (comma-separated)
+              </span>
+              <input
+                value={form.groupings}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    groupings: e.target.value,
+                  }))
+                }
+                placeholder="Family, Bridal party"
+                className="w-full rounded-lg border border-stone-200 px-3 py-2"
+              />
+            </label>
+          </div>
         </div>
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-stone-100 bg-white px-6 py-4">
           <button
             type="button"
             onClick={onClose}
@@ -610,8 +682,7 @@ function GalleryPhotoLightbox({
             <p className="font-medium text-stone-800">{photo.caption}</p>
           ) : null}
           <p className="text-stone-500">
-            {photo.albumName ? `${photo.albumName} · ` : ""}
-            {photo.eventName}
+            {photoLocationLabel(photo)}
             {photo.isPrivate ? " · Private" : ""}
           </p>
           {photo.tags.length > 0 ? (
@@ -630,7 +701,7 @@ function GalleryPhotoLightbox({
           ) : null}
           {(photo.groupings?.length ?? 0) > 0 ? (
             <p className="mt-1 text-stone-500">
-              Groupings: {photo.groupings.join(", ")}
+              Tags: {photo.groupings.join(", ")}
             </p>
           ) : null}
         </div>
@@ -675,7 +746,9 @@ export function GalleryPhotoCard({
             alt={photo.caption ?? photo.eventName}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
+            onClick={() => setExpanded(true)}
+            role="presentation"
           />
           {selectable ? (
             <label className="absolute top-2 left-2 z-10 rounded-md bg-white/95 px-1.5 py-1 shadow-sm">
@@ -689,57 +762,52 @@ export function GalleryPhotoCard({
             </label>
           ) : null}
           {photo.isPrivate ? (
-            <span className="absolute bottom-2 left-2 rounded bg-stone-900/75 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
+            <span className="absolute bottom-2 left-2 z-10 rounded bg-stone-900/75 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
               Private
             </span>
           ) : null}
-          <div className="pointer-events-none absolute inset-0 bg-stone-900/0 opacity-0 transition group-hover:bg-stone-900/35 group-hover:opacity-100 group-focus-within:bg-stone-900/35 group-focus-within:opacity-100">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setExpanded(true)}
-              className="pointer-events-auto absolute top-2 right-2 rounded-lg bg-white/95 p-2 text-stone-700 shadow-sm transition hover:bg-white disabled:opacity-50"
-              aria-label="View larger"
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setExpanded(true)}
+            className="absolute top-2 right-2 z-10 rounded-lg bg-white/95 p-2 text-stone-700 shadow-sm transition hover:bg-white disabled:opacity-50"
+            aria-label="View larger"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+          {editable ? (
+            <div
+              className={[
+                "absolute z-10 flex gap-1",
+                selectable ? "top-2 left-10" : "top-2 left-2",
+              ].join(" ")}
             >
-              <Maximize2 className="h-4 w-4" />
-            </button>
-            {editable ? (
-              <div
-                className={[
-                  "absolute flex gap-1",
-                  selectable ? "top-2 left-10" : "top-2 left-2",
-                ].join(" ")}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onEdit}
+                className="rounded-lg bg-white/95 p-2 text-stone-700 shadow-sm hover:bg-white disabled:opacity-50"
+                aria-label="Edit photo"
               >
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={onEdit}
-                  className="pointer-events-auto rounded-lg bg-white/95 p-2 text-stone-700 shadow-sm hover:bg-white disabled:opacity-50"
-                  aria-label="Edit photo"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={onDelete}
-                  className="pointer-events-auto rounded-lg bg-white/95 p-2 text-red-600 shadow-sm hover:bg-white disabled:opacity-50"
-                  aria-label="Delete photo"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ) : null}
-          </div>
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onDelete}
+                className="rounded-lg bg-white/95 p-2 text-red-600 shadow-sm hover:bg-white disabled:opacity-50"
+                aria-label="Delete photo"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
         </div>
         <figcaption className="px-3 py-2 text-sm">
           {photo.caption && (
             <p className="font-medium text-stone-800">{photo.caption}</p>
           )}
-          <p className="text-xs text-stone-400">
-            {photo.albumName ? `${photo.albumName} · ` : ""}
-            {photo.eventName}
-          </p>
+          <p className="text-xs text-stone-400">{photoLocationLabel(photo)}</p>
           {photo.tags.length > 0 && (
             <p className="mt-1 text-xs text-stone-500">
               {photo.tags.map((tag) => tag.guestName).join(", ")}
@@ -890,6 +958,16 @@ export function GalleryEditablePhotoGrid({
     () => photos.slice(0, visibleCount),
     [photos, visibleCount],
   );
+
+  const knownPeopleNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const photo of photos) {
+      for (const tag of photo.tags) {
+        if (tag.guestName.trim()) names.add(tag.guestName.trim());
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [photos]);
 
   const selectedCount = selectedIds.size;
   const selectedPhotos = useMemo(
@@ -1148,6 +1226,7 @@ export function GalleryEditablePhotoGrid({
           events={events}
           albums={albums}
           users={users}
+          knownPeopleNames={knownPeopleNames}
           busy={busy}
           onClose={() => {
             if (!busy) setEditingPhoto(null);

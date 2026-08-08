@@ -14,7 +14,9 @@ export type GalleryListFilters = {
   eventId?: number;
   albumId?: number;
   grouping?: string;
+  groupings?: string[];
   person?: string;
+  people?: string[];
   /** When false, private photos are excluded. Admins pass true. */
   includePrivate?: boolean;
 };
@@ -165,24 +167,48 @@ export async function listGalleryPhotos(filters: GalleryListFilters = {}) {
     groupings: groupingsByPhoto.get(photo.id) ?? [],
   }));
 
-  if (filters.person?.trim()) {
-    const needle = filters.person.trim().toLowerCase();
+  const peopleNeedles = [
+    ...new Set(
+      [
+        ...(filters.people ?? []),
+        ...(filters.person?.trim() ? [filters.person.trim()] : []),
+      ]
+        .map((entry) => entry.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+  if (peopleNeedles.length > 0) {
     result = result.filter((photo) =>
-      photo.tags.some(
-        (tag) =>
-          tag.guestName.toLowerCase() === needle ||
-          tag.guestName.toLowerCase().includes(needle) ||
-          tag.username?.toLowerCase() === needle ||
-          tag.email?.toLowerCase() === needle,
+      peopleNeedles.some((needle) =>
+        photo.tags.some(
+          (tag) =>
+            tag.guestName.toLowerCase() === needle ||
+            tag.guestName.toLowerCase().includes(needle) ||
+            tag.username?.toLowerCase() === needle ||
+            tag.email?.toLowerCase() === needle,
+        ),
       ),
     );
   }
 
-  if (filters.grouping?.trim()) {
-    const needle = filters.grouping.trim().toLowerCase();
+  const groupingNeedles = [
+    ...new Set(
+      [
+        ...(filters.groupings ?? []),
+        ...(filters.grouping?.trim() ? [filters.grouping.trim()] : []),
+      ]
+        .map((entry) => entry.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+  if (groupingNeedles.length > 0) {
     result = result.filter((photo) =>
-      photo.groupings.some((grouping) =>
-        grouping.toLowerCase().includes(needle),
+      groupingNeedles.some((needle) =>
+        photo.groupings.some(
+          (grouping) =>
+            grouping.toLowerCase() === needle ||
+            grouping.toLowerCase().includes(needle),
+        ),
       ),
     );
   }

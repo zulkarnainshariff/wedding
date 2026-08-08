@@ -31,14 +31,37 @@ export async function GET(request: Request) {
   const eventId = searchParams.get("eventId");
   const albumId = searchParams.get("albumId");
   const grouping = searchParams.get("grouping");
+  const groupingsParam = searchParams.get("groupings") ?? searchParams.get("tags");
   const person = searchParams.get("person");
+  const peopleParam = searchParams.get("people");
+
+  const groupings = [
+    ...new Set(
+      [
+        ...(grouping ? [grouping] : []),
+        ...(groupingsParam
+          ? groupingsParam.split(",").map((entry) => entry.trim())
+          : []),
+      ].filter(Boolean),
+    ),
+  ];
+  const people = [
+    ...new Set(
+      [
+        ...(person ? [person] : []),
+        ...(peopleParam
+          ? peopleParam.split(",").map((entry) => entry.trim())
+          : []),
+      ].filter(Boolean),
+    ),
+  ];
 
   const [photos, albums, filterOptions] = await Promise.all([
     listGalleryPhotos({
       eventId: eventId ? Number(eventId) : undefined,
       albumId: albumId ? Number(albumId) : undefined,
-      grouping: grouping ?? undefined,
-      person: person ?? undefined,
+      groupings,
+      people,
       includePrivate: isAdmin,
     }),
     listGalleryAlbums(),
