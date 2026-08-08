@@ -6,7 +6,6 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { MultiSelectFilter } from "@/components/gallery/MultiSelectFilter";
 import {
-  formatCommaList,
   GALLERY_PAGE_SIZE,
   parseCommaList,
   photoLocationLabel,
@@ -36,7 +35,8 @@ type PhotoFormState = {
   caption: string;
   isPrivate: boolean;
   people: PeopleTagDraft[];
-  groupings: string;
+  groupings: string[];
+  newGroupings: string;
 };
 
 function tagsToDraft(tags: GalleryPeopleTag[]): PeopleTagDraft[] {
@@ -78,8 +78,67 @@ function photoToForm(photo: GalleryPhoto): PhotoFormState {
     caption: photo.caption ?? "",
     isPrivate: Boolean(photo.isPrivate),
     people: tagsToDraft(photo.tags),
-    groupings: formatCommaList(photo.groupings ?? []),
+    groupings: [...(photo.groupings ?? [])],
+    newGroupings: "",
   };
+}
+
+function mergeGroupingTags(
+  selected: string[],
+  newTagsText: string,
+): string[] {
+  return [
+    ...new Set(
+      [...selected, ...parseCommaList(newTagsText)]
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+function GroupingTagsEditor({
+  selected,
+  newTags,
+  knownTags,
+  onSelectedChange,
+  onNewTagsChange,
+}: {
+  selected: string[];
+  newTags: string;
+  knownTags: string[];
+  onSelectedChange: (tags: string[]) => void;
+  onNewTagsChange: (value: string) => void;
+}) {
+  const options = useMemo(() => {
+    const set = new Set(knownTags.map((tag) => tag.trim()).filter(Boolean));
+    for (const tag of selected) {
+      if (tag.trim()) set.add(tag.trim());
+    }
+    return [...set]
+      .sort((a, b) => a.localeCompare(b))
+      .map((tag) => ({ value: tag, label: tag }));
+  }, [knownTags, selected]);
+
+  return (
+    <div className="space-y-2">
+      <span className="block text-sm text-stone-500">Tags</span>
+      {options.length > 0 ? (
+        <MultiSelectFilter
+          label="Tags"
+          emptyLabel="Select tags…"
+          options={options}
+          selected={selected}
+          onChange={onSelectedChange}
+        />
+      ) : null}
+      <input
+        value={newTags}
+        onChange={(e) => onNewTagsChange(e.target.value)}
+        placeholder="Or type new tags, comma-separated"
+        className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+      />
+    </div>
+  );
 }
 
 function PeopleTagsEditor({
@@ -268,6 +327,7 @@ function GalleryPhotoEditDialog({
   albums,
   users,
   knownPeopleNames,
+  knownTags,
   busy,
   onClose,
   onSave,
@@ -277,6 +337,7 @@ function GalleryPhotoEditDialog({
   albums: GalleryAlbum[];
   users: BriefUser[];
   knownPeopleNames: string[];
+  knownTags: string[];
   busy: boolean;
   onClose: () => void;
   onSave: (form: PhotoFormState) => void;
@@ -427,22 +488,17 @@ function GalleryPhotoEditDialog({
                 setForm((current) => ({ ...current, people }))
               }
             />
-            <label className="block text-sm">
-              <span className="mb-1 block text-stone-500">
-                Tags (comma-separated)
-              </span>
-              <input
-                value={form.groupings}
-                onChange={(e) =>
-                  setForm((current) => ({
-                    ...current,
-                    groupings: e.target.value,
-                  }))
-                }
-                placeholder="Family, Bridal party"
-                className="w-full rounded-lg border border-stone-200 px-3 py-2"
-              />
-            </label>
+            <GroupingTagsEditor
+              selected={form.groupings}
+              newTags={form.newGroupings}
+              knownTags={knownTags}
+              onSelectedChange={(groupings) =>
+                setForm((current) => ({ ...current, groupings }))
+              }
+              onNewTagsChange={(newGroupings) =>
+                setForm((current) => ({ ...current, newGroupings }))
+              }
+            />
           </div>
         </div>
         <div className="flex shrink-0 justify-end gap-2 border-t border-stone-100 bg-white px-6 py-4">
@@ -1507,7 +1563,7 @@ export function GalleryEditablePhotoGrid({
           caption: form.caption.trim() || null,
           isPrivate: form.isPrivate,
           tags: draftToTags(form.people),
-          groupings: parseCommaList(form.groupings),
+          groupings: mergeGroupingTags(form.groupings, form.newGroupings),
         }),
       });
 
@@ -1643,6 +1699,7 @@ export function GalleryEditablePhotoGrid({
           albums={albums}
           users={users}
           knownPeopleNames={knownPeopleNames}
+          knownTags={knownTags}
           busy={busy}
           onClose={() => {
             if (!busy) setEditingPhoto(null);

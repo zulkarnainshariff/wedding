@@ -37,20 +37,27 @@ export async function GET(request: Request) {
   const untaggedPeople =
     searchParams.get("untaggedPeople") === "1" ||
     searchParams.get("untaggedPeople") === "true";
+  const untaggedGroupings =
+    searchParams.get("untaggedGroupings") === "1" ||
+    searchParams.get("untaggedGroupings") === "true" ||
+    searchParams.get("untaggedTags") === "1" ||
+    searchParams.get("untaggedTags") === "true";
   const peopleExact =
     searchParams.get("peopleExact") === "1" ||
     searchParams.get("peopleExact") === "true";
 
-  const groupings = [
-    ...new Set(
-      [
-        ...(grouping ? [grouping] : []),
-        ...(groupingsParam
-          ? groupingsParam.split(",").map((entry) => entry.trim())
-          : []),
-      ].filter(Boolean),
-    ),
-  ];
+  const groupings = untaggedGroupings
+    ? []
+    : [
+        ...new Set(
+          [
+            ...(grouping ? [grouping] : []),
+            ...(groupingsParam
+              ? groupingsParam.split(",").map((entry) => entry.trim())
+              : []),
+          ].filter(Boolean),
+        ),
+      ];
   const people = untaggedPeople
     ? []
     : [
@@ -71,6 +78,7 @@ export async function GET(request: Request) {
       groupings,
       people,
       untaggedPeople,
+      untaggedGroupings,
       peopleExact: !untaggedPeople && peopleExact,
       includePrivate: isAdmin,
     }),
