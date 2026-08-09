@@ -218,6 +218,33 @@ function NavLink({
   );
 }
 
+function HomeBrandLink({
+  children,
+  className,
+  ariaLabel = "Home",
+}: {
+  children: React.ReactNode;
+  className?: string;
+  ariaLabel?: string;
+}) {
+  const guard = useNavigationGuard();
+
+  return (
+    <Link
+      href="/"
+      aria-label={ariaLabel}
+      onClick={(event) => {
+        if (guard && !guard.confirmNavigation()) {
+          event.preventDefault();
+        }
+      }}
+      className={className}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function SignedInRow({ username }: { username: string }) {
   return (
     <div className="flex items-center justify-between gap-2 rounded-xl bg-accent-pearl/50 px-3 py-2 text-xs text-muted">
@@ -255,18 +282,21 @@ export function Sidebar({ compact = false }: { compact?: boolean }) {
     >
       <div className={["border-b border-border/80 p-4", compact ? "px-2" : ""].join(" ")}>
         <div className={["flex items-start gap-2", compact ? "flex-col items-center" : ""].join(" ")}>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm">
+          <HomeBrandLink
+            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm transition-opacity hover:opacity-90"
+            ariaLabel="Go to home"
+          >
             <AppMark size={40} />
-          </div>
+          </HomeBrandLink>
           {user && <NotificationBell compact={compact} />}
         </div>
         {!compact && (
-          <div className="mt-3">
+          <HomeBrandLink className="mt-3 block transition-opacity hover:opacity-90" ariaLabel="Go to home">
             <p className="font-serif text-lg text-brand-deep">Wedding</p>
             <p className="text-xs tracking-wide text-stone-500 uppercase">
               Travel Itinerary
             </p>
-          </div>
+          </HomeBrandLink>
         )}
       </div>
 
@@ -340,10 +370,10 @@ export function MobileHeader({
 }) {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border/80 bg-surface-soft/95 px-4 py-3 backdrop-blur lg:hidden">
-      <div>
+      <HomeBrandLink className="min-w-0 transition-opacity hover:opacity-90" ariaLabel="Go to home">
         <p className="font-serif text-lg text-brand-deep">Wedding Itinerary</p>
         <p className="text-xs text-stone-500">Wedding travel 2026</p>
-      </div>
+      </HomeBrandLink>
       <button
         type="button"
         onClick={onOpenMenu}

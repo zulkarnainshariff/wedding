@@ -18,7 +18,10 @@ export function AdminTabBarMobile({
   onChange: (tab: string) => void;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const activeLabel = tabs.find(([value]) => value === activeTab)?.[1] ?? "Menu";
+
+  useEffect(() => setMounted(true), []);
 
   function selectTab(value: string) {
     onChange(value);
@@ -36,46 +39,49 @@ export function AdminTabBarMobile({
         <Menu className="h-5 w-5" />
       </button>
 
-      {mobileOpen ? (
-        <div className="fixed inset-0 z-50">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/30"
-            aria-label="Close menu"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="absolute top-0 right-0 bottom-0 flex w-[min(20rem,85vw)] flex-col bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
-              <p className="text-sm font-medium text-stone-700">{activeLabel}</p>
+      {mounted && mobileOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-50">
               <button
                 type="button"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-lg p-1 text-stone-500 hover:bg-stone-100"
+                className="absolute inset-0 bg-black/30"
                 aria-label="Close menu"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <nav className="overflow-y-auto p-2">
-              {tabs.map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => selectTab(value)}
-                  className={[
-                    "w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium",
-                    activeTab === value
-                      ? "bg-brand-deep/10 text-brand-deep"
-                      : "text-stone-600 hover:bg-stone-50",
-                  ].join(" ")}
-                >
-                  {label}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
-      ) : null}
+                onClick={() => setMobileOpen(false)}
+              />
+              <div className="absolute inset-y-0 right-0 flex h-dvh w-[min(20rem,85vw)] flex-col bg-white shadow-xl">
+                <div className="flex shrink-0 items-center justify-between border-b border-stone-200 px-4 py-3">
+                  <p className="text-sm font-medium text-stone-700">{activeLabel}</p>
+                  <button
+                    type="button"
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded-lg p-1 text-stone-500 hover:bg-stone-100"
+                    aria-label="Close menu"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <nav className="min-h-0 flex-1 overflow-y-auto p-2">
+                  {tabs.map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => selectTab(value)}
+                      className={[
+                        "w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium",
+                        activeTab === value
+                          ? "bg-brand-deep/10 text-brand-deep"
+                          : "text-stone-600 hover:bg-stone-50",
+                      ].join(" ")}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
