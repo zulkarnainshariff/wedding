@@ -9,7 +9,8 @@ import { getCategoryIcon, getCategoryStyles } from "@/lib/category-ui";
 import { useCategories } from "@/components/categories/CategoriesProvider";
 import { formatFlightSeatsSummary } from "@/lib/flight-seats";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/activity-utils";
-import { FlightItinerarySummary } from "@/components/itinerary/FlightViews";
+import { FlightCardScheduleBlock } from "@/components/itinerary/FlightViews";
+import { flightPassengerSummaryParts } from "@/lib/flight-itinerary-display";
 import { getAccommodationTileLines, enrichStayDetailsFromItem, buildAccommodationCompactSummary } from "@/lib/accommodation-utils";
 import { useStackedAccommodationLayout } from "@/hooks/useStackedAccommodationLayout";
 import { getItemLocation, getItemMapLink } from "@/lib/item-location";
@@ -45,9 +46,7 @@ import {
   isFlightPartiallyCheckedIn,
 } from "@/lib/flight-check-in";
 import {
-  formatFlightProgressDuration,
   flightRouteLine,
-  flightSummaryExtraParts,
   getFlightTimelineDisplay,
   isFlightInProgress,
   isFlightLanded,
@@ -193,7 +192,6 @@ function FlightDetailedPreview({
 
   return (
     <div className="mt-3 space-y-3 border-t border-stone-100 pt-3">
-      <FlightItinerarySummary item={item} compact />
       <InlineDetail
         label="Dep. terminal"
         value={
@@ -304,7 +302,9 @@ export function ItemCard({
   const flightRoute =
     category === "flight" ? flightRouteLine(flightTimeline, item.summary) : null;
   const flightSummaryExtras =
-    category === "flight" ? flightSummaryExtraParts(item.summary, flightRoute) : [];
+    category === "flight"
+      ? flightPassengerSummaryParts(item.summary, flightRoute)
+      : [];
   const completed = isItemCompleted(item);
   const flightCheckedIn =
     category === "flight" &&
@@ -573,35 +573,9 @@ export function ItemCard({
             <p className="mt-2 text-xs text-stone-400">{displayTime}</p>
           )}
 
-          {category === "flight" && flightSchedule && !limitedView && (
-            <div className="mt-2 space-y-0.5 text-xs text-stone-500">
-              {flightSchedule.departure && (
-                <p>
-                  <span className="font-medium text-stone-400">Departs </span>
-                  {flightSchedule.departure}
-                </p>
-              )}
-              {flightSchedule.arrival && (
-                <p>
-                  <span className="font-medium text-stone-400">Arrives </span>
-                  {flightSchedule.arrival}
-                </p>
-              )}
-              {viewMode === "condensed" &&
-                flightTimeline?.transitStops.map((stop) => {
-                const layover = formatFlightProgressDuration(stop.layoverMinutes);
-                if (!layover) return null;
-                return (
-                  <p key={stop.airport}>
-                    <span className="font-medium text-amber-700/80">Transit </span>
-                    <span className="text-amber-800">
-                      {stop.airport} · {layover}
-                    </span>
-                  </p>
-                );
-              })}
-            </div>
-          )}
+          {category === "flight" && flightSchedule && !limitedView ? (
+            <FlightCardScheduleBlock item={item} schedule={flightSchedule} />
+          ) : null}
 
           {category === "flight" && <FlightProgressBar item={item} />}
 

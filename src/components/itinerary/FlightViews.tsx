@@ -21,6 +21,7 @@ import { FlightLiveStatusPanel } from "@/components/itinerary/FlightLiveStatus";
 import { formatFlightProgressDuration } from "@/lib/flight-progress";
 import {
   buildFlightItinerarySummaries,
+  resolveTotalJourneyTimeLabel,
 } from "@/lib/flight-itinerary-display";
 import { ItemNotesSection } from "@/components/itinerary/FormattedItemNotes";
 import type { ItineraryItem } from "@/lib/schema";
@@ -83,14 +84,16 @@ export function FlightItinerarySummary({
                 </p>
               ) : null}
               <p className="mt-1 text-sm leading-relaxed text-stone-800">
-                <span className="max-md:block">{leg.departureLabel}</span>
-                <span className="text-stone-400 max-md:hidden"> · </span>
-                <span className="max-md:mt-0.5 max-md:block">{leg.arrivalLabel}</span>
+                <span className="block sm:inline">{leg.departureLabel}</span>
+                <span className="hidden text-stone-400 sm:inline"> · </span>
+                <span className="mt-0.5 block sm:mt-0 sm:inline">
+                  {leg.arrivalLabel}
+                </span>
                 {leg.flightTime ? (
                   <>
-                    <span className="text-stone-400 max-md:hidden"> · </span>
-                    <span className="max-md:mt-0.5 max-md:block text-stone-600">
-                      Flight time {leg.flightTime}
+                    <span className="hidden text-stone-400 sm:inline"> · </span>
+                    <span className="mt-0.5 block text-stone-600 sm:mt-0 sm:inline">
+                      {leg.flightTime}
                     </span>
                   </>
                 ) : null}
@@ -121,6 +124,43 @@ export function FlightItinerarySummary({
             ) : null}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+export function FlightCardScheduleBlock({
+  item,
+  schedule,
+}: {
+  item: ItineraryItem;
+  schedule: { departure: string | null; arrival: string | null };
+}) {
+  const totalTime = resolveTotalJourneyTimeLabel(item);
+
+  return (
+    <div className="mt-2 space-y-2">
+      <FlightItinerarySummary item={item} compact />
+      <div className="space-y-0.5 text-xs text-stone-500">
+        {totalTime ? (
+          <p className="leading-relaxed">
+            <span className="font-medium text-stone-400">Total time </span>
+            <span className="text-stone-600">{totalTime}</span>
+            <span className="text-stone-400"> (incl. transit)</span>
+          </p>
+        ) : null}
+        {schedule.departure ? (
+          <p className="leading-relaxed break-words">
+            <span className="font-medium text-stone-400">Departs </span>
+            {schedule.departure}
+          </p>
+        ) : null}
+        {schedule.arrival ? (
+          <p className="leading-relaxed break-words">
+            <span className="font-medium text-stone-400">Arrives </span>
+            {schedule.arrival}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -232,8 +272,6 @@ export function FlightDetailView({
           </span>
         ) : null}
       </div>
-
-      <FlightItinerarySummary item={item} />
 
       <dl>
         <DetailRow

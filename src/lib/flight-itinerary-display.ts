@@ -165,6 +165,19 @@ function buildLegSummary(
     journeyStartDate && arrivalDate
       ? daysBetween(journeyStartDate, arrivalDate)
       : 0;
+  let flightTime = formatFlightDurationLabel(segment.flightTime);
+  if (
+    !flightTime &&
+    windowDep &&
+    windowArr &&
+    !Number.isNaN(windowDep.getTime()) &&
+    !Number.isNaN(windowArr.getTime()) &&
+    windowArr.getTime() > windowDep.getTime()
+  ) {
+    flightTime = formatMinutesAsDurationLabel(
+      Math.round((windowArr.getTime() - windowDep.getTime()) / 60_000),
+    );
+  }
 
   return {
     flightNumber:
@@ -178,7 +191,7 @@ function buildLegSummary(
     arrivalLabel: arrTime
       ? `Arrive ${toLabel}: ${arrTime}${daySuffix > 0 ? ` +${daySuffix}` : ""}`
       : `Arrive ${toLabel}`,
-    flightTime: formatFlightDurationLabel(segment.flightTime),
+    flightTime,
   };
 }
 
@@ -274,4 +287,105 @@ export function formatStoredFlightClock(
   }
 
   return clock;
+}
+
+function parseDurationToMinutes(value?: string | null): number | null {
+  if (!value?.trim()) return null;
+  const trimmed = value.trim();
+  const hoursMins = /^(\d+)\s*h(?:ours?)?(?:\s*(\d+)\s*m(?:ins?)?)?$/i.exec(
+    trimmed,
+  );
+  if (hoursMins) {
+    return Number(hoursMins[1]) * 60 + Number(hoursMins[2] ?? 0);
+  }
+  const minsOnly = /^(\d+)\s*m(?:ins?)?$/i.exec(trimmed);
+  if (minsOnly) return Number(minsOnly[1]);
+  return null;
+}
+
+function formatMinutesAsDurationLabel(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  const parts: string[] = [];
+  if (hours > 0) {
+    parts.push(hours === 1 ? "1 hour" : `${hours} hours`);
+  }
+  if (mins > 0) {
+    parts.push(mins === 1 ? "1 min" : `${mins} mins`);
+  }
+  return parts.join(" ") || "0 mins";
+}
+
+export function resolveTotalJourneyTimeLabel(item: ItineraryItem): string | null {
+  const details = getFlightDetails(item.details);
+  if (!details) return null;
+
+  const stored = formatFlightDurationLabel(details.totalFlightTime);
+  if (stored) return stored;
+
+  const legs = buildFlightLegDisplayList(item);
+  let totalMinutes = 0;
+  let hasAny = false;
+
+  for (const leg of legs) {
+    const segmentMinutes = parseDurationToMinutes(leg.segment.flightTime);
+    if (segmentMinutes != null) {
+      totalMinutes += segmentMinutes;
+      hasAny = true;
+    }
+    if (leg.layoverAfter?.layoverMinutes) {
+      totalMinutes += leg.layoverAfter.layoverMinutes;
+      hasAny = true;
+    }
+  }
+
+  if (!hasAny) {
+    const singleLegMinutes = parseDurationToMinutes(
+      details.flightTime ?? details.totalFlightTime,
+    );
+    if (singleLegMinutes != null) {
+      totalMinutes = singleLegMinutes;
+      hasAny = true;
+    }
+  }
+
+  if (!hasAny && item.startDatetime && item.endDatetime) {
+    const start = new Date(item.startDatetime).getTime();
+    const end = new Date(item.endDatetime).getTime();
+    if (end > start) {
+      totalMinutes = Math.round((end - start) / 60_000);
+      hasAny = true;
+    }
+  }
+
+  if (!hasAny || totalMinutes <= 0) return null;
+  return formatMinutesAsDurationLabel(totalMinutes);
+}
+
+export function flightPassengerSummaryParts(
+  summary: string | null | undefined,
+  routeLine: string | null,
+): string[] {
+  return flightSummaryExtraParts(summary, routeLine).filter(
+    (part) => !/^Dep\s/i.test(part) && !/^Arrive\s/i.test(part),
+  );
+}
+
+function flightSummaryExtraParts(
+  summary: string | null | undefined,
+  routeLine: string | null,
+): string[] {
+  if (!summary) return [];
+
+  const FLIGHT_ROUTE_PART = /^[A-Z]{3}(?:\s*→\s*[A-Z]{3})+$/;
+
+  return summary
+    .split(" · ")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => {
+      if (!routeLine) return !FLIGHT_ROUTE_PART.test(part);
+      if (part === routeLine) return false;
+      return !FLIGHT_ROUTE_PART.test(part);
+    });
 }
