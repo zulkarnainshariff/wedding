@@ -1,10 +1,13 @@
 "use client";
 
 import { CheckCircle2 } from "lucide-react";
-import type { FlightDetails } from "@/lib/types";
-import { formatTravellerLabel } from "@/lib/types";
+import type { FlightDetails, PetRelocationDetails } from "@/lib/types";
+import { formatTravellerLabel, isCargoFlight } from "@/lib/types";
 import { formatBookingGroupsDisplay } from "@/lib/booking-groups";
 import { useDisplayFormat } from "@/hooks/useDisplayFormat";
+import { useItineraryUI } from "@/components/itinerary/ItineraryUIContext";
+import { usePetItemsLinkedToFlight } from "@/hooks/usePetItemsLinkedToFlight";
+import { LinkedBookingDetailSection } from "@/components/itinerary/LinkedBookingViews";
 import {
   formatFlightSeatsSummary,
   hasFlightAssignedSeats,
@@ -179,7 +182,11 @@ export function FlightDetailView({
   canEdit?: boolean;
 }) {
   const flight = normalizeFlightDetails(details);
-  const passengers = flight.passengers ?? flight.travellers;
+  const cargoOnly = isCargoFlight(flight);
+  const passengers = cargoOnly
+    ? []
+    : (flight.passengers ??
+      flight.travellers.filter((name) => !flight.cargoParty?.includes(name)));
   const bookingRefs = formatBookingGroupsDisplay(
     flight.bookingGroups,
     flight.bookingReferences,
@@ -219,6 +226,11 @@ export function FlightDetailView({
 
       <div className="flex flex-wrap items-center gap-2 border-b border-stone-100 py-3">
         <StatusBadge status={flight.status} />
+        {cargoOnly ? (
+          <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
+            Cargo flight
+          </span>
+        ) : null}
       </div>
 
       <FlightItinerarySummary item={item} />
@@ -265,7 +277,12 @@ export function FlightDetailView({
         />
         <DetailRow
           label="Passengers"
-          value={passengers.map((p) => formatTravellerLabel(p)).join(", ")}
+          value={
+            cargoOnly
+              ? "None (cargo flight)"
+              : passengers.map((p) => formatTravellerLabel(p)).join(", ") ||
+                undefined
+          }
         />
         {flight.cargoParty && flight.cargoParty.length > 0 && (
           <DetailRow
@@ -373,14 +390,71 @@ export function FlightDetailView({
       </div>
 
       <ItemNotesSection notes={flight.notes} variant="section" />
+
+      {itemId ? <LinkedPetTravelSection flightItemId={itemId} canEdit={canEdit} /> : null}
+    </div>
+  );
+}
+
+function LinkedPetTravelSection({
+  flightItemId,
+  canEdit,
+}: {
+  flightItemId: number;
+  canEdit: boolean;
+}) {
+  const { petItems, loading } = usePetItemsLinkedToFlight(flightItemId);
+  const { openItem } = useItineraryUI();
+
+  if (loading && petItems.length === 0) {
+    return (
+      <p className="mt-4 border-t border-stone-100 pt-4 text-sm text-stone-400">
+        Loading linked pet travel…
+      </p>
+    );
+  }
+
+  if (petItems.length === 0) return null;
+
+  return (
+    <div className="mt-4 border-t border-stone-100 pt-4">
+      <h3 className="mb-3 text-sm font-semibold tracking-wide text-stone-500 uppercase">
+        Linked pet travel
+      </h3>
+      <div className="space-y-3">
+        {petItems.map((petItem) => {
+          const details = petItem.details as PetRelocationDetails;
+          return (
+            <button
+              key={petItem.id}
+              type="button"
+              onClick={() => openItem(petItem.id)}
+              className="w-full rounded-xl border border-rose-100 bg-rose-50/60 px-4 py-3 text-left transition hover:bg-rose-50"
+            >
+              <p className="text-sm font-medium text-stone-800">{petItem.title}</p>
+              <p className="mt-1 text-xs text-stone-600">
+                {details.petName} · {details.from} → {details.to}
+                {details.handler ? ` · ${details.handler}` : ""}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+      {!canEdit ? null : (
+        <p className="mt-2 text-xs text-stone-500">
+          Edit pet travel items from Manage → Items.
+        </p>
+      )}
     </div>
   );
 }
 
 export function PetRelocationDetailView({
   details,
+  linkedItem,
 }: {
-  details: import("@/lib/types").PetRelocationDetails;
+  details: PetRelocationDetails;
+  linkedItem?: ItineraryItem | null;
 }) {
   return (
     <div>
@@ -401,6 +475,12 @@ export function PetRelocationDetailView({
           <DetailRow label="Status" value="To be confirmed" />
         )}
       </dl>
+
+      {linkedItem ? (
+        <LinkedBookingDetailSection linkedItem={linkedItem} canEdit={false} />
+      ) : details.linkedItemId ? (
+        <p className="mt-3 text-sm text-stone-400">Loading linked flight…</p>
+      ) : null}
 
       <ItemNotesSection notes={details.notes} variant="section" />
     </div>

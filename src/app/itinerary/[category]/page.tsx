@@ -11,11 +11,9 @@ import { TravelInsuranceItinerary } from "@/components/itinerary/TravelInsurance
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ category: string }> };
-type Search = { searchParams: Promise<{ tab?: string }> };
 
-export default async function CategoryPage({ params, searchParams }: Params & Search) {
+export default async function CategoryPage({ params }: Params) {
   const { category } = await params;
-  const { tab } = await searchParams;
   const itemCategories = await getItemCategories();
   const categoryRow = itemCategories.find((entry) => entry.slug === category);
 
@@ -48,24 +46,9 @@ export default async function CategoryPage({ params, searchParams }: Params & Se
   }
 
   if (categoryRow.pageBehavior === "flights_hub") {
-    const [passengerItems, petItems] = await Promise.all([
-      getItemsByCategory("flight"),
-      getItemsByCategory("pet_relocation"),
-    ]);
-    const initialTab =
-      tab === "pet_relocation"
-        ? "pet_relocation"
-        : tab === "flight"
-          ? "flight"
-          : "all";
+    const passengerItems = await getItemsByCategory("flight");
 
-    return (
-      <FlightsPanel
-        passengerItems={passengerItems}
-        petItems={petItems}
-        initialTab={initialTab}
-      />
-    );
+    return <FlightsPanel passengerItems={passengerItems} />;
   }
 
   if (categoryRow.pageBehavior === "travel_insurance") {

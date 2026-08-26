@@ -139,18 +139,22 @@ function updateFlightTravellers(
     ...group,
     travellers: group.travellers.filter((name) => travellers.includes(name)),
   }));
+  const cargoParty = structured.cargoParty.filter((name) =>
+    travellers.includes(name),
+  );
 
   return {
     ...structured,
     travellers,
+    cargoParty,
     bookingGroups: nextGroups,
     seats:
       structured.seats.length > 0
-        ? structured.seats
+        ? structured.seats.filter((row) => travellers.includes(row.name))
         : defaultTravellerRows(travellers),
     baggage:
       structured.baggage.length > 0
-        ? structured.baggage
+        ? structured.baggage.filter((row) => travellers.includes(row.name))
         : defaultTravellerRows(travellers),
   };
 }
@@ -1060,6 +1064,8 @@ export function AdminItemDetailsForm({
     });
 
   const linkableItems = allItems.filter((item) => item.category !== "activity");
+  const linkableFlights = allItems.filter((item) => item.category === "flight");
+  const isCargoFlight = structured.simple.isCargo === "true";
   const unlinkedSuggestedCarRentals = useMemo(
     () =>
       listUnlinkedSuggestedCarRentalBookings(
@@ -1168,60 +1174,122 @@ export function AdminItemDetailsForm({
                 : "Arrival is on a different day than this item, so only departure time can be used for sorting."}
             </p>
           </label>
-          <ParticipantMultiSelect
-            value={structured.travellers}
-            onChange={(travellers) =>
-              onChange(updateFlightTravellers(structured, travellers))
-            }
-            accountUsernames={allSystemUsernames}
-          />
-          <BookingGroupsEditor
-            groups={structured.bookingGroups}
-            onChange={(bookingGroups) => onChange({ ...structured, bookingGroups })}
-            flightTravellers={structured.travellers}
-          />
-          <SeatCheckInEditor
-            rows={
-              structured.segments.length >= 2
-                ? structured.travellers.map((name) => ({ name, value: "" }))
-                : structured.seats
-            }
-            showSeats={structured.segments.length < 2}
-            checkInStatus={structured.checkInStatus}
-            nameOptions={structured.travellers}
-            accountUsernames={allSystemUsernames}
-            onChange={(seats) => onChange({ ...structured, seats })}
-            onCheckInChange={(checkInStatus) =>
-              onChange({ ...structured, checkInStatus })
-            }
-          />
-          <div className="sm:col-span-2">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm text-stone-500">Baggage allowance</p>
-              <select
-                value={structured.baggageUnit}
-                onChange={(e) =>
-                  onChange({
-                    ...structured,
-                    baggageUnit: e.target.value as "metric" | "imperial",
-                  })
-                }
-                className="rounded-lg border border-stone-200 px-2 py-1 text-xs"
-              >
-                <option value="metric">Kilograms (kg)</option>
-                <option value="imperial">Pounds (lb)</option>
-              </select>
-            </div>
-            <TravellerRecordsEditor
-              label=""
-              rows={structured.baggage}
-              nameOptions={structured.travellers}
-              accountUsernames={allSystemUsernames}
-              onChange={(baggage) => onChange({ ...structured, baggage })}
-              valueLabel={structured.baggageUnit === "imperial" ? "lb" : "kg"}
-              inputType="number"
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={isCargoFlight}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                onChange({
+                  ...structured,
+                  simple: {
+                    ...structured.simple,
+                    isCargo: checked ? "true" : "false",
+                  },
+                  ...(checked
+                    ? {
+                        travellers: [],
+                        cargoParty: [],
+                        bookingGroups: [],
+                        seats: [],
+                        baggage: [],
+                        checkInStatus: {},
+                      }
+                    : {}),
+                });
+              }}
             />
-          </div>
+            Cargo flight (no passengers)
+          </label>
+          {!isCargoFlight ? (
+            <>
+              <ParticipantMultiSelect
+                value={structured.travellers}
+                onChange={(travellers) =>
+                  onChange(updateFlightTravellers(structured, travellers))
+                }
+                accountUsernames={allSystemUsernames}
+              />
+              {structured.travellers.length > 0 ? (
+                <div className="sm:col-span-2 space-y-2 rounded-lg border border-stone-200 px-3 py-3">
+                  <p className="text-sm text-stone-500">
+                    Mark travellers travelling as cargo (not cabin passengers)
+                  </p>
+                  {structured.travellers.map((name) => (
+                    <label key={name} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={structured.cargoParty.includes(name)}
+                        onChange={(e) => {
+                          const cargoParty = e.target.checked
+                            ? [...structured.cargoParty, name]
+                            : structured.cargoParty.filter(
+                                (entry) => entry !== name,
+                              );
+                          onChange({ ...structured, cargoParty });
+                        }}
+                      />
+                      {name} (cargo)
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+              <BookingGroupsEditor
+                groups={structured.bookingGroups}
+                onChange={(bookingGroups) => onChange({ ...structured, bookingGroups })}
+                flightTravellers={structured.travellers}
+              />
+              <SeatCheckInEditor
+                rows={
+                  structured.segments.length >= 2
+                    ? structured.travellers.map((name) => ({ name, value: "" }))
+                    : structured.seats
+                }
+                showSeats={structured.segments.length < 2}
+                checkInStatus={structured.checkInStatus}
+                nameOptions={structured.travellers.filter(
+                  (name) => !structured.cargoParty.includes(name),
+                )}
+                accountUsernames={allSystemUsernames}
+                onChange={(seats) => onChange({ ...structured, seats })}
+                onCheckInChange={(checkInStatus) =>
+                  onChange({ ...structured, checkInStatus })
+                }
+              />
+              <div className="sm:col-span-2">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm text-stone-500">Baggage allowance</p>
+                  <select
+                    value={structured.baggageUnit}
+                    onChange={(e) =>
+                      onChange({
+                        ...structured,
+                        baggageUnit: e.target.value as "metric" | "imperial",
+                      })
+                    }
+                    className="rounded-lg border border-stone-200 px-2 py-1 text-xs"
+                  >
+                    <option value="metric">Kilograms (kg)</option>
+                    <option value="imperial">Pounds (lb)</option>
+                  </select>
+                </div>
+                <TravellerRecordsEditor
+                  label=""
+                  rows={structured.baggage}
+                  nameOptions={structured.travellers}
+                  accountUsernames={allSystemUsernames}
+                  onChange={(baggage) => onChange({ ...structured, baggage })}
+                  valueLabel={structured.baggageUnit === "imperial" ? "lb" : "kg"}
+                  inputType="number"
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-stone-500 sm:col-span-2">
+              Cargo flights do not require passenger travellers. Link pet travel
+              items to this flight from the Items tab.
+            </p>
+          )}
           {structured.segments.length > 0 ? (
             <FlightSegmentsEditor
               segments={structured.segments}
@@ -1491,6 +1559,27 @@ export function AdminItemDetailsForm({
 
       {category === "pet_relocation" && (
         <>
+          <label className="block text-sm sm:col-span-2">
+            <span className="mb-1 block text-stone-500">Linked flight</span>
+            <select
+              value={structured.linkedItemId}
+              onChange={(e) =>
+                onChange({ ...structured, linkedItemId: e.target.value })
+              }
+              className="w-full rounded-lg border border-stone-200 px-3 py-2"
+            >
+              <option value="">None</option>
+              {linkableFlights.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-stone-500">
+              Optional — link this pet travel booking to a passenger or cargo
+              flight item.
+            </p>
+          </label>
           <TextInput label="Pet name" value={structured.simple.petName} onChange={(v) => setSimple("petName", v)} />
           <TextInput label="From" value={structured.simple.from} onChange={(v) => setSimple("from", v)} />
           <TextInput label="To" value={structured.simple.to} onChange={(v) => setSimple("to", v)} />

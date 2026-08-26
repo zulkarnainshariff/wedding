@@ -25,6 +25,7 @@ import {
   getFlightDetails,
   getPetRelocationDetails,
   isCategory,
+  isCargoFlight,
   type Category,
   type FlightDetails,
 } from "@/lib/types";
@@ -274,7 +275,9 @@ export function ItemCard({
     category,
   );
   const status = flightDetails?.status ?? petDetails?.status;
-  const linkedItemId = activityDetails?.linkedItemId;
+  const linkedItemId =
+    activityDetails?.linkedItemId ?? petDetails?.linkedItemId;
+  const cargoFlight = category === "flight" && isCargoFlight(flightDetails);
 
   const categoryLabel =
     category === "activity" && activityDetails?.activityType === "sub_item"
@@ -283,8 +286,10 @@ export function ItemCard({
       ? ACTIVITY_TYPE_LABELS[activityDetails?.activityType ?? ""] ??
         "Schedule"
       : category === "pet_relocation"
-        ? "Pet Relocation (cargo)"
-        : categoryMeta?.label ?? item.category;
+        ? "Pet Travel"
+        : cargoFlight
+          ? "Cargo flight"
+          : categoryMeta?.label ?? item.category;
 
   const subItems = item.subItems ?? [];
   const limitedView = Boolean(item.limitedView);
