@@ -550,7 +550,7 @@ function ItemDetailBody({
         />
       )}
       {category === "pet_relocation" && petDetails && (
-        <PetRelocationDetailView details={petDetails} />
+        <PetRelocationDetailView details={petDetails} linkedItem={linkedItem} />
       )}
       {category === "accommodation" && stayDetails && (
         <AccommodationDetailView details={stayDetails} />
@@ -640,7 +640,17 @@ export function ItemDetailView({
   const stayDetails = getAccommodationDetails(item.details);
   const carDetails = getCarRentalDetails(item.details);
   const activityDetails = getActivityDetails(item.details);
-  const { linkedItem } = useLinkedItem(activityDetails?.linkedItemId);
+  const petLinkedFlightId = petDetails?.linkedItemId;
+  const { linkedItem: activityLinkedItem } = useLinkedItem(
+    activityDetails?.linkedItemId,
+  );
+  const { linkedItem: petLinkedFlight } = useLinkedItem(petLinkedFlightId);
+  const linkedItem =
+    category === "activity"
+      ? activityLinkedItem
+      : category === "pet_relocation"
+        ? petLinkedFlight
+        : null;
   const sharedLocation = getItemLocation(item.details as Record<string, unknown>);
   const { formatWallClockDateTime, formatFlightSchedule } = useDisplayFormat();
   const documentCounts = useDocumentIndicators();

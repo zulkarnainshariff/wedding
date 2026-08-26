@@ -13,7 +13,7 @@ export const FLIGHT_CHECK_IN_REMINDER_WINDOW_MS = 3 * 60 * 60_000;
 export function getFlightPassengers(
   details: FlightDetails | null | undefined,
 ): string[] {
-  if (!details) return [];
+  if (!details || details.isCargo) return [];
   const names = details.passengers ?? details.travellers ?? [];
   return names.filter(
     (name) => name.trim() && name !== "Everyone" && name.toLowerCase() !== "all",

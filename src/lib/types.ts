@@ -84,6 +84,8 @@ export type FlightDetails = {
   notes?: string[];
   status: "confirmed" | "tbc";
   checkInStatus?: Record<string, boolean>;
+  /** When true, this flight carries cargo only (no passenger travellers). */
+  isCargo?: boolean;
 };
 
 export type PetRelocationDetails = {
@@ -99,6 +101,7 @@ export type PetRelocationDetails = {
   arrivalTime?: string | null;
   notes?: string[];
   status: "confirmed" | "tbc";
+  linkedItemId?: number;
 };
 
 export type AccommodationSuggestion = {
@@ -209,8 +212,8 @@ export const CATEGORY_META: Record<
     color: "sky",
   },
   pet_relocation: {
-    label: "Pet Relocation",
-    plural: "Pet Relocation",
+    label: "Pet Travel",
+    plural: "Pet Travel",
     shortLabel: "Pets",
     icon: "cat",
     color: "rose",
@@ -278,6 +281,12 @@ export function getFlightDetails(details: unknown): FlightDetails | null {
     fromIata: fromIata || undefined,
     toIata: toIata || undefined,
   };
+}
+
+export function isCargoFlight(
+  details: FlightDetails | null | undefined,
+): boolean {
+  return Boolean(details?.isCargo);
 }
 
 export function getPetRelocationDetails(

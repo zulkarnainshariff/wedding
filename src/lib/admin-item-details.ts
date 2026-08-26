@@ -32,6 +32,7 @@ export type StructuredItemDetails = {
   viewers: string[];
   viewerLinks: Record<string, string[]>;
   travellers: string[];
+  cargoParty: string[];
   bookingGroups: BookingGroup[];
   seats: TravellerRecord[];
   baggage: TravellerRecord[];
@@ -66,6 +67,7 @@ const EMPTY_SIMPLE: Record<Category, Record<string, string>> = {
     departureGate: "",
     totalFlightTime: "",
     scheduleSortBy: "arrival",
+    isCargo: "false",
   },
   pet_relocation: {
     petName: "Seymour",
@@ -132,6 +134,7 @@ export function emptyStructuredDetails(category: Category): StructuredItemDetail
     viewers: [],
     viewerLinks: {},
     travellers: [],
+    cargoParty: [],
     bookingGroups: [],
     seats: [],
     baggage: [],
@@ -227,6 +230,21 @@ export function parseStructuredDetails(
     structured.travellers = Array.isArray(details.travellers)
       ? (details.travellers as string[])
       : [];
+    structured.cargoParty = Array.isArray(details.cargoParty)
+      ? (details.cargoParty as string[]).filter((name) =>
+          structured.travellers.includes(name),
+        )
+      : [];
+    if (
+      structured.cargoParty.length === 0 &&
+      Array.isArray(details.passengers) &&
+      structured.travellers.length > 0
+    ) {
+      const passengerSet = new Set(details.passengers as string[]);
+      structured.cargoParty = structured.travellers.filter(
+        (name) => !passengerSet.has(name),
+      );
+    }
     const legacy = parseLegacyFlightNumber(details.flightNumber as string | undefined);
     if (!structured.simple.marketingFlightNumber) {
       structured.simple.marketingFlightNumber =
@@ -293,6 +311,7 @@ export function parseStructuredDetails(
         ),
       ) as Record<string, boolean>;
     }
+    structured.simple.isCargo = details.isCargo ? "true" : "false";
   }
 
   if (category === "accommodation") {
@@ -326,6 +345,9 @@ export function parseStructuredDetails(
           (entry): entry is string => typeof entry === "string",
         )
       : [];
+    structured.linkedItemId = details.linkedItemId
+      ? String(details.linkedItemId)
+      : "";
   }
 
   if (category === "travel_insurance") {
@@ -382,7 +404,8 @@ export function buildStructuredDetailsPayload(
       structured.simple.from && structured.simple.to
         ? `${structured.simple.from} to ${structured.simple.to}`
         : "";
-    payload.travellers = structured.travellers;
+    const isCargo = structured.simple.isCargo === "true";
+    payload.isCargo = isCargo;
     payload.marketingFlightNumber =
       structured.simple.marketingFlightNumber.trim() || undefined;
     payload.operatingFlightNumber =
@@ -408,16 +431,6 @@ export function buildStructuredDetailsPayload(
     payload.operatingAirlineName =
       structured.simple.operatingAirlineName.trim() || undefined;
     payload.status = structured.simple.status === "tbc" ? "tbc" : "confirmed";
-    payload.bookingGroups = normalizeBookingGroupLinks(
-      structured.bookingGroups.filter((group) => group.reference.trim()),
-    ).map((group) => ({
-      reference: group.reference.trim(),
-      travellers: group.travellers.filter((name) => name.trim()),
-      linkedWith: (group.linkedWith ?? []).filter(Boolean),
-    }));
-    payload.bookingReferences = flatMapFromGroups(structured.bookingGroups);
-    payload.baggage = objectFromRecords(structured.baggage, true);
-    payload.checkInStatus = structured.checkInStatus;
     payload.scheduleSortBy =
       structured.simple.scheduleSortBy === "departure" ? "departure" : "arrival";
     const filteredSegments = prunePlaceholderFlightSegments(structured.segments)
@@ -447,12 +460,44 @@ export function buildStructuredDetailsPayload(
           : undefined,
       }));
     payload.segments = filteredSegments;
-    if (filteredSegments.length >= 2) {
-      delete payload.seats;
+
+    if (isCargo) {
+      payload.travellers = [];
+      payload.passengers = [];
+      payload.cargoParty = undefined;
+      payload.bookingGroups = [];
+      payload.bookingReferences = {};
+      payload.baggage = {};
+      payload.seats = {};
+      payload.checkInStatus = {};
     } else {
-      payload.seats = objectFromRecords(structured.seats);
+      const cargoSet = new Set(structured.cargoParty);
+      payload.travellers = structured.travellers;
+      payload.cargoParty =
+        structured.cargoParty.length > 0 ? structured.cargoParty : undefined;
+      payload.passengers = structured.travellers.filter(
+        (name) => !cargoSet.has(name),
+      );
+      payload.bookingGroups = normalizeBookingGroupLinks(
+        structured.bookingGroups.filter((group) => group.reference.trim()),
+      ).map((group) => ({
+        reference: group.reference.trim(),
+        travellers: group.travellers.filter((name) => name.trim()),
+        linkedWith: (group.linkedWith ?? []).filter(Boolean),
+      }));
+      payload.bookingReferences = flatMapFromGroups(structured.bookingGroups);
+      payload.baggage = objectFromRecords(structured.baggage, true);
+      payload.checkInStatus = structured.checkInStatus;
+      if (filteredSegments.length >= 2) {
+        delete payload.seats;
+      } else {
+        payload.seats = objectFromRecords(structured.seats);
+      }
     }
     delete payload.bookingReference;
+    delete payload.isCargo;
+    delete payload.scheduleSortBy;
+    payload.isCargo = isCargo;
   }
 
   if (category === "accommodation") {
@@ -493,6 +538,9 @@ export function buildStructuredDetailsPayload(
     payload.species = "cat";
     payload.status = structured.simple.status === "tbc" ? "tbc" : "confirmed";
     payload.participants = structured.participants;
+    if (structured.linkedItemId) {
+      payload.linkedItemId = Number(structured.linkedItemId);
+    }
   }
 
   if (category === "travel_insurance") {

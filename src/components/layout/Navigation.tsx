@@ -155,8 +155,7 @@ function NavLink({
             ? pathname === "/itinerary"
             : category === "flights_hub"
               ? pathname === "/itinerary/flight" ||
-                pathname.startsWith("/itinerary/flight/") ||
-                pathname.startsWith("/itinerary/pet_relocation")
+                pathname.startsWith("/itinerary/flight/")
               : pathname === href || pathname.startsWith(`${href}/`);
 
   const Icon =
@@ -546,8 +545,7 @@ export function BottomNav() {
             tab.category === "invitations"
               ? pathname.startsWith("/invitation")
               : tab.category === "flights_hub"
-                ? pathname.startsWith("/itinerary/flight") ||
-                  pathname.startsWith("/itinerary/pet_relocation")
+                ? pathname.startsWith("/itinerary/flight")
                 : pathname.startsWith(tab.href);
           const Icon =
             tab.category === "invitations"
