@@ -11,7 +11,6 @@ import { ItemCompleteToggle, type ItemDoneAccent } from "@/components/itinerary/
 import { FlightCheckInReminderPill, FlightCheckInToggle } from "@/components/itinerary/FlightCheckInToggle";
 import {
   flightRouteLine,
-  flightSummaryExtraParts,
   getFlightTimelineDisplay,
   isFlightInProgress,
 } from "@/lib/flight-progress";
@@ -21,9 +20,11 @@ import {
   useDocumentIndicators,
 } from "@/components/itinerary/useDocumentIndicators";
 import {
+  FlightCardScheduleBlock,
   FlightDetailView,
   PetRelocationDetailView,
 } from "@/components/itinerary/FlightViews";
+import { flightPassengerSummaryParts } from "@/lib/flight-itinerary-display";
 import {
   AccommodationDetailView,
   CarRentalDetailView,
@@ -313,7 +314,9 @@ function ItemDetailHeader({
   const flightRoute =
     category === "flight" ? flightRouteLine(flightTimeline, item.summary) : null;
   const flightSummaryExtras =
-    category === "flight" ? flightSummaryExtraParts(item.summary, flightRoute) : [];
+    category === "flight"
+      ? flightPassengerSummaryParts(item.summary, flightRoute)
+      : [];
   const [flightInProgress, setFlightInProgress] = useState(() =>
     category === "flight" ? isFlightInProgress(item) : false,
   );
@@ -478,17 +481,8 @@ function ItemDetailHeader({
       </div>
 
       <div className="mt-5 flex flex-col gap-1 text-sm text-stone-500">
-        {category === "flight" ? (
-          <>
-            <div className="flex flex-wrap gap-4">
-              {flightSchedule?.departure && (
-                <span>Departs: {flightSchedule.departure}</span>
-              )}
-              {flightSchedule?.arrival && (
-                <span>Arrives: {flightSchedule.arrival}</span>
-              )}
-            </div>
-          </>
+        {category === "flight" && flightSchedule ? (
+          <FlightCardScheduleBlock item={item} schedule={flightSchedule} />
         ) : (
           <>
             {item.startDatetime && (
