@@ -1084,7 +1084,10 @@ export function AdminItemDetailsForm({
 
   return (
     <div className="mt-3 grid gap-4 sm:grid-cols-2">
-      {category !== "flight" && !isScheduleCarRental && (
+      {category !== "flight" &&
+        category !== "accommodation" &&
+        category !== "car_rental" &&
+        !isScheduleCarRental && (
         <LocationFields
           locationName={structured.locationName}
           locationMapUrl={structured.locationMapUrl}
@@ -1362,6 +1365,16 @@ export function AdminItemDetailsForm({
             </select>
           </label>
           <TextInput label="Stay name" value={structured.simple.location} onChange={(v) => setSimple("location", v)} />
+          <TextInput label="Address" value={structured.simple.address} onChange={(v) => setSimple("address", v)} />
+          <TextInput
+            label="Google Maps link"
+            value={structured.simple.mapUrl}
+            onChange={(v) => setSimple("mapUrl", v)}
+            type="url"
+          />
+          <TextInput label="Listing URL" value={structured.simple.listingUrl} onChange={(v) => setSimple("listingUrl", v)} type="url" />
+          <TextInput label="Host name" value={structured.simple.hostName} onChange={(v) => setSimple("hostName", v)} />
+          <TextInput label="Confirmation code" value={structured.simple.confirmationCode} onChange={(v) => setSimple("confirmationCode", v)} />
           <ParticipantMultiSelect
             label="Guests staying"
             value={structured.participants}
@@ -1375,8 +1388,6 @@ export function AdminItemDetailsForm({
             value={structured.simple.guests}
             onChange={(v) => setSimple("guests", v)}
           />
-          <TextInput label="Address" value={structured.simple.address} onChange={(v) => setSimple("address", v)} />
-          <TextInput label="Listing URL" value={structured.simple.listingUrl} onChange={(v) => setSimple("listingUrl", v)} type="url" />
           <label className="block text-sm sm:col-span-2">
             <span className="mb-1 block text-stone-500">Check-in</span>
             <div className="flex flex-wrap gap-2">
@@ -1554,6 +1565,12 @@ export function AdminItemDetailsForm({
           <TextInput label="Return location" value={structured.simple.returnLocation} onChange={(v) => setSimple("returnLocation", v)} />
           <TimeInput label="Return time" value={structured.simple.returnTime} onChange={(v) => setSimple("returnTime", v)} />
           <TextInput label="Confirmation code" value={structured.simple.confirmationCode} onChange={(v) => setSimple("confirmationCode", v)} />
+          <TextInput
+            label="Google Maps link"
+            value={structured.simple.mapUrl}
+            onChange={(v) => setSimple("mapUrl", v)}
+            type="url"
+          />
         </>
       )}
 
