@@ -193,7 +193,10 @@ export function parseStructuredDetails(
   const location = getItemLocation(details);
 
   structured.locationName = location?.name ?? "";
-  structured.locationMapUrl = location?.mapLink ?? "";
+  structured.locationMapUrl =
+    location?.mapLink ||
+    (typeof details.mapUrl === "string" ? details.mapUrl : "") ||
+    "";
   structured.isPrivate = Boolean(details.isPrivate);
   structured.privateViewers = parsePrivateViewers(
     details.privateViewers ?? details.extraViewers,
@@ -224,6 +227,15 @@ export function parseStructuredDetails(
 
   if (category === "accommodation") {
     structured.simple.location = readAccommodationStayName(details);
+    if (!structured.locationMapUrl && structured.simple.mapUrl) {
+      structured.locationMapUrl = structured.simple.mapUrl;
+    }
+  }
+
+  if (category === "car_rental") {
+    if (!structured.locationMapUrl && structured.simple.mapUrl) {
+      structured.locationMapUrl = structured.simple.mapUrl;
+    }
   }
 
   if (category === "flight") {
@@ -510,6 +522,23 @@ export function buildStructuredDetailsPayload(
             .filter(Boolean)
         : structured.simple.guests || undefined;
     payload.suggestions = structured.suggestions.filter((s) => s.label && s.url);
+    const mapUrl =
+      structured.simple.mapUrl.trim() ||
+      structured.locationMapUrl.trim() ||
+      "";
+    payload.mapUrl = mapUrl || undefined;
+    for (const key of [
+      "address",
+      "listingUrl",
+      "hostName",
+      "confirmationCode",
+      "checkOutDate",
+    ] as const) {
+      const value = payload[key];
+      if (typeof value === "string" && !value.trim()) {
+        delete payload[key];
+      }
+    }
   }
 
   if (category === "car_rental") {
@@ -519,6 +548,23 @@ export function buildStructuredDetailsPayload(
     }
     if (structured.linkedItemId) {
       payload.linkedItemId = Number(structured.linkedItemId);
+    }
+    const mapUrl =
+      structured.simple.mapUrl.trim() ||
+      structured.locationMapUrl.trim() ||
+      "";
+    payload.mapUrl = mapUrl || undefined;
+    for (const key of [
+      "vehicleModel",
+      "pickupTime",
+      "returnLocation",
+      "returnTime",
+      "confirmationCode",
+    ] as const) {
+      const value = payload[key];
+      if (typeof value === "string" && !value.trim()) {
+        delete payload[key];
+      }
     }
     const hasBookingDetails = Boolean(
       structured.simple.company?.trim() ||
@@ -541,6 +587,11 @@ export function buildStructuredDetailsPayload(
     if (structured.linkedItemId) {
       payload.linkedItemId = Number(structured.linkedItemId);
     }
+    const location = buildLocationPayload(
+      structured.locationName,
+      structured.locationMapUrl,
+    );
+    if (location) payload.location = location;
   }
 
   if (category === "travel_insurance") {
@@ -555,6 +606,11 @@ export function buildStructuredDetailsPayload(
       structured.simple.autoInsuranceIncluded === "true";
     payload.autoInsuranceDetails =
       structured.simple.autoInsuranceDetails || undefined;
+    const location = buildLocationPayload(
+      structured.locationName,
+      structured.locationMapUrl,
+    );
+    if (location) payload.location = location;
   }
 
   return mergeItemPrivacyFields(payload, structured);
